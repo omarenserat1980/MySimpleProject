@@ -1,62 +1,75 @@
-# Brain Mini-Kernel → Virtual Server Roadmap
+# Brain Bottom-Up Digital Computer → Blade Server Roadmap
 
 ## Goal
-Grow a very small, testable Brain-owned software kernel into a simulated server environment in small verified increments. This roadmap does **not** claim to implement Microsoft's Windows kernel or to boot Windows Server 2025.
+Build a Brain-owned digital system incrementally, like assembling a machine from the simplest working component: digital clock → calculator → programmable CPU → computer → operating-system kernel → server → main server → blade-server fabric. Every layer must reuse and extend the verified layer below it.
 
-## Existing foundations (reuse; do not duplicate)
+**Truth boundary:** the initial milestones are software models and emulators. They do not, by themselves, create physical circuitry, reserve real CPU/RAM, implement Microsoft's Windows kernel, or prove a real Windows Server 2025 boot.
+
+## Existing foundations — reuse rather than duplicate
 - `brain_v12/virtual_hardware/kernel.py`: deterministic process lifecycle, timer ticks, syscall event log.
 - `brain_v12/virtual_hardware/computer.py`: virtual CPU, RAM, storage, NIC, firmware, kernel, filesystem and bootloader composition.
-- `brain_v12/virtual_hardware/server_fabric.py`: server profiles and simulation/host-capacity boundaries.
-- `brain_v12/brain/windows_server_2025_simulation_factory.py`: Windows Server 2025 *behavior simulation* and synthetic evidence.
-- `brain_v12/web/windows-desktop-simulator.html`: browser desktop interface; not an operating system.
+- `brain_v12/virtual_hardware/cpu.py`, `x86_64.py`, `memory.py`, `bus.py`, `filesystem.py`, `firmware.py`, `bootloader.py`: existing computer building blocks.
+- `brain_v12/virtual_hardware/server_fabric.py`: server profiles and explicit simulation/host-capacity boundaries.
+- `brain_v12/brain/windows_server_2025_simulation_factory.py`: Windows Server 2025 behavior simulation and synthetic evidence.
+- `brain_v12/web/windows-desktop-simulator.html`: browser desktop interface, not an operating system.
 
-## Incremental gates
+## Evolution ladder
 
-### K0 — Mini-kernel contract (first milestone)
-- Keep the kernel deterministic and side-effect-free.
-- Test process create → timer scheduling → syscall audit → terminate.
-- Reject negative timer ticks and unknown process IDs.
-- Expose a stable status snapshot for later diagnostics.
-- Never execute host commands or native Windows binaries.
+### D0 — Digital clock and logic
+- Define deterministic ticks, counters, Boolean operations, reset, and state transitions.
+- Make timing logical/simulated; do not imply physical clock frequency.
+- Acceptance: repeatable tests for increment, reset, rollover, and invalid inputs.
 
-**Acceptance:** focused unit tests pass; status explicitly labels this as simulated kernel behavior.
+### D1 — Calculator
+- Add arithmetic/logic operations over the existing logic primitives.
+- Specify integer width, signedness, overflow, divide-by-zero, and result flags.
+- Acceptance: table-driven tests for edge cases and deterministic results.
 
-### K1 — Minimal kernel services
-- Add a small, versioned syscall allowlist (status, monotonic tick, virtual file read/write only).
-- Validate syscall names and arguments; reject unknown calls by default.
-- Add tests for invalid inputs and audit-log behavior.
+### D2 — Programmable mini-CPU
+- Define a small versioned instruction set, registers, program counter, flags, and a bounded instruction-step loop.
+- Load only BrainVM bytecode/program objects; no arbitrary host/native code execution.
+- Acceptance: hand-written programs execute with exact expected register/memory snapshots and an instruction budget prevents infinite loops.
 
-### K2 — Virtual boot chain
-- Connect firmware → virtual bootloader → mini-kernel → init/service manager.
-- Record ordered, deterministic boot events and failure reasons.
-- Keep virtual disk contents separate from host files.
+### D3 — Complete virtual computer
+- Compose CPU + RAM + bus + storage + NIC + firmware + bootloader + filesystem using the existing `VirtualComputer`.
+- Keep virtual memory and disk separate from host resources.
+- Acceptance: boot sequence, read/write, CPU program, and virtual packet tests pass together.
 
-### K3 — Server services
-- Add a virtual service manager with dependency ordering, restart policy, and health status.
-- Add loopback-only virtual networking first; external networking remains disabled by default.
-- Add DNS/HTTP-like protocol simulations without opening real sockets.
+### D4 — Mini-kernel and OS services
+- Build on existing `VirtualKernel`: process lifecycle, timer scheduling, safe syscall allowlist, audit trail, and service manager.
+- Unknown syscalls fail closed; no shell commands or native EXE execution.
+- Acceptance: create → schedule → syscall → terminate tests; invalid tick and unknown PID tests pass.
 
-### K4 — Durable state and recovery
-- Persist virtual machine configuration and synthetic run records in the existing Brain evidence store where supported.
-- Test stop/restart/recovery and tamper detection.
-- Distinguish stored reports from live liveness checks.
+### D5 — Standalone virtual server
+- Add service dependency ordering, health checks, restart policy, virtual DNS/HTTP protocols, and loopback-only networking.
+- Distinguish configured capacity from measured host CPU/RAM; external networking is disabled by default.
+- Acceptance: deterministic API/service scenario plus injected-failure and recovery tests.
 
-### K5 — Windows Server behavior profile
-- Reuse the existing Windows Server 2025 simulation factory; do not build a second competing boot state machine.
-- Model boot phases, service startup, network health, restart, and fault injection.
-- Reports must retain `execution_mode=SIMULATION_ONLY` and `real_windows_boot_verified=false`.
+### D6 — Main server / controller
+- Coordinate multiple virtual server nodes through the existing task queue and evidence systems.
+- Add admission control, node identity, health/heartbeat timestamps, resource accounting, audit, snapshots, and recovery.
+- Heartbeat or a stored record alone is not proof of remote reachability or current execution.
+- Acceptance: multi-node tasks show traceable assignment, result, independent verification, and restart recovery.
 
-### K6 — Optional real virtualization backend (separate approval gate)
-- Only after the simulator is reliable, evaluate an isolated QEMU/KVM backend on an authorized host.
-- Require available compute/storage, a legitimate OS installation source/license, explicit operator authorization, and guest-generated boot evidence.
-- Do not use the low-memory Arkan laptop as a required execution dependency; do not create paid cloud resources automatically.
-- A successful simulator run, green CI, ISO file, or QEMU process alone is not proof of a real Windows boot.
+### D7 — Blade-server fabric
+- Model a chassis containing multiple independently identified blade nodes, management plane, virtual switch, shared-storage model, power/thermal telemetry model, and per-blade failure isolation.
+- Reuse server fabric and virtual hardware components; do not duplicate schedulers or evidence stores.
+- Acceptance: blade add/remove, isolated failure, rescheduling, and recovery tests; simulated chassis resources remain explicitly labelled `SIMULATED`.
 
-## Truth labels
-- `SIMULATED`: model-generated state or capacity.
-- `HOST_OBSERVED`: measured on a named host at a recorded time.
-- `GUEST_VERIFIED`: evidence generated inside a booted guest.
-- `real_windows_boot_verified` remains false until the independent real-boot gate passes.
+### D8 — Optional real execution backend
+- Only after simulation gates pass, evaluate a native/VM backend on authorized infrastructure.
+- Require actual available compute/storage, explicit operator authorization, and independent host/guest evidence.
+- Real Windows Server boot requires guest-generated evidence plus an independent completion gate. A green workflow, ISO, virtual profile, or simulated boot is insufficient.
+- Do not make the low-memory Arkan laptop a required dependency or automatically create paid cloud resources.
 
-## First implementation target
-The first code change should strengthen tests around the existing `VirtualKernel`, not create a parallel kernel implementation. Only advance to K1 when K0 tests pass.
+## Windows Server relationship
+Windows Server 2025 is a target behavior profile and optional guest OS, not the same thing as the Brain mini-kernel. Reuse `brain_v12/brain/windows_server_2025_simulation_factory.py`; keep reports labelled `execution_mode=SIMULATION_ONLY` and `real_windows_boot_verified=false` until independently proven otherwise.
+
+## Evidence labels
+- `SIMULATED`: model-generated state/capacity.
+- `HOST_OBSERVED`: resource observation from a named host with timestamp.
+- `GUEST_VERIFIED`: evidence generated inside the actual booted guest.
+- Never promote a simulated value to host/guest truth without a verification gate.
+
+## Immediate implementation target
+Strengthen tests around the existing `VirtualKernel` first (D4 foundation), then build upward in order. Do not start a parallel kernel or claim the later stages are complete before their acceptance tests pass.
