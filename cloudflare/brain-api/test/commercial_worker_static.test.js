@@ -174,7 +174,7 @@ for (const header of ["PAYPAL-AUTH-ALGO", "PAYPAL-CERT-URL", "PAYPAL-TRANSMISSIO
 assert.match(paypalWebhookGuard, /verification_status !== "SUCCESS"/, "webhook must reject failed provider signature verification");
 assert.match(paypalWebhookGuard, /event\.event_type !== "PAYMENT\.CAPTURE\.COMPLETED"/, "unrelated PayPal webhook event types must not verify payments");
 assert.match(paypalWebhookGuard, /resource\.status \|\| ""\)\.toUpperCase\(\) !== "COMPLETED"/, "webhook must require a completed capture");
-assert.match(paypalWebhookGuard, /Number\(payment\.amount\) !== amount/, "webhook must match capture amount to persisted payment");
+assert.match(paypalWebhookGuard, /amount !== Number\(payment\.amount\)/, "webhook must match capture amount to persisted payment");
 assert.match(paypalWebhookGuard, /currency !== String\(payment\.currency\)\.toUpperCase\(\)/, "webhook must match capture currency to persisted payment");
 assert.match(paypalWebhookGuard, /PAYPAL_CAPTURE_IDENTIFIERS_MISSING/, "webhook must reject captures without stable identifiers");
 console.log("PAYPAL_WEBHOOK_SIGNATURE_AND_CAPTURE_GATES=PASS");
