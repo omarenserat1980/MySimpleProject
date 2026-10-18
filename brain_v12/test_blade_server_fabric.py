@@ -11,6 +11,13 @@ class BrainBladeServerFabricTests(unittest.TestCase):
         placed = fabric.place_task("halt", [("HALT",)])
         self.assertEqual(placed["blade_id"], "b1")
         self.assertFalse(placed["physical_hardware"])
+        status = fabric.blade_status("b1")
+        self.assertEqual(status["tasks_registered"], 1)
+        self.assertEqual(status["task_slots_available"], 3)
+        self.assertEqual(status["logical_ram_cells_capacity"], 64)
+        self.assertEqual(status["logical_ram_cells_assigned"], 16)
+        self.assertEqual(status["logical_ram_utilization"], 0.25)
+        self.assertEqual(status["resource_accounting_mode"], "SIMULATED_LOGICAL_ESTIMATE")
         result = fabric.run_blade("b1", max_ticks=4)
         self.assertEqual(result["mode"], "SIMULATED_BLADE_RUN")
 
