@@ -75,6 +75,7 @@ jobs:
           set -euo pipefail
           python3 -m pytest -q brain_v12/tests/test_software_resource_node.py brain_v12/tests/test_windows_software_boot_gate.py
       - name: Download and verify Windows Server 2025 Evaluation ISO
+        timeout-minutes: 70
         env:
           ISO_URL_INPUT: ${{ inputs.windows_iso_url }}
           TRUSTED_SHA256_INPUT: ${{ inputs.trusted_iso_sha256 }}
@@ -110,7 +111,12 @@ jobs:
               sys.exit(2)
           PY
           [[ "$TRUSTED_SHA256" =~ ^[0-9a-fA-F]{64}$ ]] || { echo "BLOCKED: trusted SHA-256 must be exactly 64 hexadecimal characters"; exit 2; }
-          curl --fail --location --proto '=https' --proto-redir '=https' --max-redirs 5 --retry 3 --retry-delay 3 --connect-timeout 30 "$ISO_URL" -o windows-server-2025.iso
+          echo "Starting bounded ISO download (maximum 65 minutes); progress is reported by curl."
+          curl --fail --location --proto '=https' --proto-redir '=https' --max-redirs 5 --retry 3 --retry-delay 3 --connect-timeout 30 --max-time 3900 --progress-bar "$ISO_URL" -o windows-server-2025.iso || {
+            rc=$?
+            echo "BLOCKED: ISO download failed or exceeded the 65-minute limit (curl exit $rc); no unverified image will be booted."
+            exit "$rc"
+          }
           actual="$(sha256sum windows-server-2025.iso | awk '{print $1}')"
           test "${actual,,}" = "${TRUSTED_SHA256,,}" || { echo "BLOCKED: ISO SHA-256 mismatch; downloaded bytes will not be booted"; exit 2; }
           printf '{"iso":"Windows Server 2025 Evaluation x64 en-US","bytes":%s,"sha256":"%s","verified":true}\n' "$(stat -c %s windows-server-2025.iso)" "$actual" > windows-iso-verification.json
