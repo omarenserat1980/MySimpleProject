@@ -28,6 +28,20 @@ For VHD, VHDX, and FFU, the script requests index 1 as required by DISM. WIM que
 
 A nonzero DISM exit code, hash mismatch, or metadata change is a failed inspection and must not be promoted to verified evidence. Keep reports alongside a trusted audit trail and bind them to the exact artifact manifest.
 
+## Independent SHA-256 comparison
+
+Use `brain_v12/tools/windows_artifact_hash_verify.ps1` to compare an artifact against a SHA-256 value obtained independently from an authoritative source. Do not copy the expected hash from the artifact manifest itself; that would only compare the file to its own claim.
+
+```powershell
+.\brain_v12\tools\windows_artifact_hash_verify.ps1 `
+  -ArtifactPath 'D:\AuthorizedMedia\WindowsServer2025.iso' `
+  -ExpectedSha256 '<64-hex-digest-from-an-independently-reviewed-source>' `
+  -TrustedReferenceUrl 'https://www.microsoft.com/<official-media-reference>' `
+  -OutputPath 'D:\Evidence\windows-artifact-hash-check.json'
+```
+
+The tool refuses to overwrite the artifact or an existing evidence file. A matching digest proves only that the bytes match the supplied digest. The report deliberately sets `reference_independently_reviewed`, `publisher_authenticity_verified`, and `real_guest_boot_verified` to false: a URL string and hash comparison do not establish that the reference is authentic or that the OS booted.
+
 ## Next gate
 
 1. Review the manifest and independently verify publisher signature/provenance through an approved mechanism.
