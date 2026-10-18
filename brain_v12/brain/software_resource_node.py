@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Software-backed CPU/RAM resource node for Brain.
+"""Evidence-aware software CPU/RAM resource planning for Brain.
 
-This layer does not fake KVM. It allocates a virtual machine topology backed by
-the host's actual CPU/RAM and selects QEMU TCG when /dev/kvm is unavailable.
-The resulting guest is still a real VM process; only CPU acceleration is
-software emulated.
+This plans a QEMU guest from measured host resources. It never claims that a
+plan is a running VM, a Windows boot, or physical hardware.
 """
 from __future__ import annotations
 
@@ -13,7 +11,6 @@ import json
 import os
 import platform
 import shutil
-import subprocess
 from dataclasses import asdict, dataclass
 
 
@@ -31,24 +28,59 @@ class ResourcePlan:
 
 
 def host_memory_mib() -> int:
-    pages = os.sysconf("SC_PHYS_PAGES")
-    page_size = os.sysconf("SC_PAGE_SIZE")
-    return (pages * page_size) // (1024 * 1024)
+    """Return detected physical memory in MiB, or 0 when detection fails."""
+    try:
+        pages = os.sysconf("SC_PHYS_PAGES")
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        if pages <= 0 or page_size <= 0:
+            return 0
+        return (pages * page_size) // (1024 * 1024)
+    except (AttributeError, OSError, ValueError):
+        return 0
 
 
 def kvm_available() -> bool:
-    return os.path.exists("/dev/kvm") and os.access("/dev/kvm", os.R_OK | os.W_OK)
+    """Report accessible KVM only; never infer it from the OS or QEMU."""
+    machine = platform.machine().lower()
+    return (
+        machine in {"x86_64", "amd64"}
+        and os.path.exists("/dev/kvm")
+        and os.access("/dev/kvm", os.R_OK | os.W_OK)
+    )
 
 
 def build_plan(requested_cpus: int = 2, requested_memory_mib: int = 4096) -> ResourcePlan:
-    cpus = max(1, os.cpu_count() or 1)
-    mem = max(512, host_memory_mib())
-    guest_cpus = max(1, min(requested_cpus, max(1, cpus - 1)))
-    guest_mem = max(512, min(requested_memory_mib, max(512, mem // 2)))
+    if requested_cpus < 1:
+        raise ValueError("REQUESTED_CPUS_MUST_BE_POSITIVE")
+    if requested_memory_mib < 512:
+        raise ValueError("REQUESTED_MEMORY_MUST_BE_AT_LEAST_512_MIB")
+
+    cpus = os.cpu_count() or 0
+    mem = host_memory_mib()
     qemu = shutil.which("qemu-system-x86_64")
     kvm = kvm_available()
     accelerator = "kvm" if kvm else "tcg"
-    status = "READY" if qemu else "BLOCKED_MISSING_QEMU"
+
+    # Leave at least one host CPU available where possible and never invent
+    # minimum host RAM. A blocked plan has zero guest allocations.
+    if cpus < 2:
+        status = "BLOCKED_INSUFFICIENT_HOST_CPU"
+        guest_cpus = guest_mem = 0
+    elif mem < 1024:
+        status = "BLOCKED_INSUFFICIENT_OR_UNKNOWN_HOST_MEMORY"
+        guest_cpus = guest_mem = 0
+    elif not qemu:
+        status = "BLOCKED_MISSING_QEMU"
+        guest_cpus = guest_mem = 0
+    else:
+        guest_cpus = min(requested_cpus, cpus - 1)
+        guest_mem = min(requested_memory_mib, mem // 2)
+        if guest_mem < 512:
+            status = "BLOCKED_INSUFFICIENT_OR_UNKNOWN_HOST_MEMORY"
+            guest_cpus = guest_mem = 0
+        else:
+            status = "PLAN_READY_NOT_EXECUTED"
+
     return ResourcePlan(
         host_architecture=platform.machine(),
         host_cpu_count=cpus,
@@ -63,45 +95,40 @@ def build_plan(requested_cpus: int = 2, requested_memory_mib: int = 4096) -> Res
 
 
 def qemu_command(plan: ResourcePlan, iso: str, disk: str, firmware: str | None = None) -> list[str]:
-    if plan.status != "READY":
+    if plan.status != "PLAN_READY_NOT_EXECUTED" or not plan.qemu:
         raise RuntimeError(plan.status)
     cmd = [
-        plan.qemu,
-        "-machine", "q35",
-        "-cpu", "max",
-        "-smp", str(plan.guest_cpu_count),
-        "-m", str(plan.guest_memory_mib),
+        plan.qemu, "-machine", "q35", "-cpu", "max",
+        "-smp", str(plan.guest_cpu_count), "-m", str(plan.guest_memory_mib),
         "-drive", f"file={disk},if=virtio,format=qcow2",
-        "-cdrom", iso,
-        "-boot", "order=d,menu=on",
-        "-display", "none",
-        "-serial", "stdio",
+        "-cdrom", iso, "-boot", "order=d,menu=on",
+        "-display", "none", "-serial", "stdio",
     ]
-    if plan.accelerator == "kvm":
-        cmd[1:1] = ["-accel", "kvm"]
-    else:
-        cmd[1:1] = ["-accel", "tcg,thread=multi"]
+    cmd[1:1] = ["-accel", "kvm" if plan.kvm_available else "tcg,thread=multi"]
     if firmware:
         cmd[1:1] = ["-drive", f"if=pflash,format=raw,readonly=on,file={firmware}"]
     return cmd
 
 
 def main() -> int:
-    p = argparse.ArgumentParser()
-    p.add_argument("--cpus", type=int, default=2)
-    p.add_argument("--memory-mib", type=int, default=4096)
-    p.add_argument("--iso")
-    p.add_argument("--disk")
-    p.add_argument("--firmware")
-    p.add_argument("--print-qemu-command", action="store_true")
-    args = p.parse_args()
-    plan = build_plan(args.cpus, args.memory_mib)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cpus", type=int, default=2)
+    parser.add_argument("--memory-mib", type=int, default=4096)
+    parser.add_argument("--iso")
+    parser.add_argument("--disk")
+    parser.add_argument("--firmware")
+    parser.add_argument("--print-qemu-command", action="store_true")
+    args = parser.parse_args()
+    try:
+        plan = build_plan(args.cpus, args.memory_mib)
+    except ValueError as exc:
+        parser.error(str(exc))
     print(json.dumps(asdict(plan), indent=2, sort_keys=True))
     if args.print_qemu_command:
         if not args.iso or not args.disk:
-            p.error("--iso and --disk are required with --print-qemu-command")
+            parser.error("--iso and --disk are required with --print-qemu-command")
         print(json.dumps(qemu_command(plan, args.iso, args.disk, args.firmware)))
-    return 0 if plan.status == "READY" else 2
+    return 0 if plan.status == "PLAN_READY_NOT_EXECUTED" else 2
 
 
 if __name__ == "__main__":
