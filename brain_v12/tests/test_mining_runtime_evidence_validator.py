@@ -109,6 +109,7 @@ def test_secret_like_fields_are_rejected():
 def test_reported_shares_never_promote_real_mining_or_revenue():
     evidence = valid_envelope()
     evidence["observations"]["accepted_shares"] = "ACCEPTED_REPORTED"
+    evidence["integrity"]["payload_sha256"] = canonical_payload_sha256(evidence)
     report = validate_mining_runtime_evidence(evidence)
     assert report["valid"] is True
     assert report["real_mining_verified"] is False
