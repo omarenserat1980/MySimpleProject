@@ -84,11 +84,14 @@ class StratumV1Session:
             raise StratumProtocolError("POOL_AUTHORIZATION_REQUIRED")
         if not self.current_job_id or job_id not in self.active_job_ids:
             raise StratumProtocolError("UNKNOWN_OR_STALE_JOB")
-        fields = (extranonce2, ntime, nonce)
-        if any(not isinstance(value, str) or not value or len(value) % 2
-               or any(ch not in "0123456789abcdefABCDEF" for ch in value)
-               for value in fields):
-            raise StratumProtocolError("INVALID_SHARE_HEX_FIELDS")
+        if (not isinstance(extranonce2, str) or not 2 <= len(extranonce2) <= 64
+                or len(extranonce2) % 2
+                or any(ch not in "0123456789abcdefABCDEF" for ch in extranonce2)):
+            raise StratumProtocolError("INVALID_EXTRANONCE2_HEX_WIDTH")
+        for field_name, value in (("NTIME", ntime), ("NONCE", nonce)):
+            if (not isinstance(value, str) or len(value) != 8
+                    or any(ch not in "0123456789abcdefABCDEF" for ch in value)):
+                raise StratumProtocolError("INVALID_" + field_name + "_HEX_WIDTH")
         return self._request("mining.submit",
                              [self.username, job_id, extranonce2, ntime, nonce],
                              "share")
