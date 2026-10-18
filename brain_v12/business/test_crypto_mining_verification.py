@@ -1,11 +1,18 @@
 from brain_v12.business.crypto_mining_intelligence import PayoutEvidence
 from brain_v12.business.crypto_mining_verification import (
     BlockchainProof, VerificationState, start_cloud_mining_verification,
+    _start_cloud_mining_verification_with_verifier,
 )
 
 
-def _ready_cycle(opportunity_id: str):
-    cycle = start_cloud_mining_verification("CloudMineCrypto", opportunity_id)
+def _ready_cycle(opportunity_id: str, chain_verifier=None):
+    cycle = (
+        _start_cloud_mining_verification_with_verifier(
+            "CloudMineCrypto", opportunity_id, chain_verifier=chain_verifier
+        )
+        if chain_verifier is not None
+        else start_cloud_mining_verification("CloudMineCrypto", opportunity_id)
+    )
     for state in (
         VerificationState.RISK_CHECK,
         VerificationState.FREE_TEST,
@@ -32,12 +39,17 @@ def _payout():
 
 
 def test_cloud_mining_cycle_requires_explicit_blockchain_proof_before_realized():
-    cycle = _ready_cycle("cloudminecrypto-free-001")
+    cycle = _ready_cycle(
+        "cloudminecrypto-free-001",
+        chain_verifier=lambda proof, payout: proof.txid == "tx-001",
+    )
 
     result = cycle.submit_payout_evidence(_payout())
 
     assert result["state"] == VerificationState.BLOCKCHAIN_VERIFY.value
     assert result["history"][-1] == "BLOCKCHAIN_VERIFY"
+    assert result["evidence"]["payout_verification"]["status"] == "CLAIMED_PAYOUT_EVIDENCE"
+    assert result["evidence"]["payout_verification"]["financial_state"] == "UNVERIFIED"
 
     result = cycle.submit_blockchain_proof(BlockchainProof(
         txid="tx-001",
@@ -84,3 +96,42 @@ def test_missing_chain_proof_never_becomes_realized():
 
     assert result["state"] == VerificationState.WITHDRAWAL_TEST.value
     assert result["evidence"]["payout_verification"]["financial_state"] == "EXPECTED"
+
+
+def test_caller_supplied_chain_proof_without_independent_verifier_fails_closed():
+    cycle = _ready_cycle("cloudminecrypto-free-004")
+    cycle.submit_payout_evidence(_payout())
+    try:
+        cycle.submit_blockchain_proof(BlockchainProof(
+            txid="tx-001",
+            explorer_url="https://example.test/tx/tx-001",
+            confirmations=3,
+            verified_at="2026-10-03T03:30:00Z",
+        ))
+    except ValueError as exc:
+        assert "independent chain verifier is not configured" in str(exc)
+    else:
+        raise AssertionError("caller-supplied proof must not realize revenue")
+    assert cycle.state == VerificationState.BLOCKCHAIN_VERIFY
+
+
+def test_independent_chain_verifier_rejection_never_realizes_revenue():
+    cycle = _ready_cycle(
+        "cloudminecrypto-free-005",
+        chain_verifier=lambda proof, payout: False,
+    )
+    cycle.submit_payout_evidence(_payout())
+    try:
+        cycle.submit_blockchain_proof(
+            BlockchainProof(
+                txid="tx-001",
+                explorer_url="https://example.test/tx/tx-001",
+                confirmations=3,
+                verified_at="2026-10-03T03:30:00Z",
+            ),
+        )
+    except ValueError as exc:
+        assert "independent chain verification failed" in str(exc)
+    else:
+        raise AssertionError("rejected chain verification must not realize revenue")
+    assert cycle.state == VerificationState.BLOCKCHAIN_VERIFY

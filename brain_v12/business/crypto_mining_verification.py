@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import Any, Callable
 
 from .crypto_mining_intelligence import PayoutEvidence, verify_payout
 
@@ -49,6 +49,9 @@ class MiningVerificationCycle:
     state: VerificationState = VerificationState.DISCOVERED
     evidence: dict[str, Any] = field(default_factory=dict)
     history: list[str] = field(default_factory=lambda: [VerificationState.DISCOVERED.value])
+    _chain_verifier: Callable[[BlockchainProof, dict[str, Any]], bool] | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def advance(self, new_state: VerificationState, reason: str) -> dict[str, Any]:
         allowed = {
@@ -72,10 +75,14 @@ class MiningVerificationCycle:
         result = verify_payout(payout)
         self.evidence["payout_verification"] = result
         self.evidence["payout_txid"] = payout.txid
-        if self.state == VerificationState.WITHDRAWAL_TEST and result["status"] == "VERIFIED_COMPLETED":
+        if (
+            self.state == VerificationState.WITHDRAWAL_TEST
+            and result["status"] == "CLAIMED_PAYOUT_EVIDENCE"
+            and result["checks"].get("on_chain_reference_present")
+        ):
             self.advance(
                 VerificationState.BLOCKCHAIN_VERIFY,
-                "payout evidence passed; explicit chain proof required",
+                "payout claim recorded; independent chain verifier required",
             )
         elif result["status"].startswith("REJECTED"):
             if self.state not in {VerificationState.REVENUE_REALIZED, VerificationState.REJECTED}:
@@ -83,26 +90,42 @@ class MiningVerificationCycle:
         return self.snapshot()
 
     def submit_blockchain_proof(self, proof: BlockchainProof) -> dict[str, Any]:
+        """Accept a chain proof only when an independent verifier is injected.
+
+        The verifier must query an authoritative source or validate a verifiable
+        proof and check network, txid, destination, amount, and confirmations.
+        A caller-supplied BlockchainProof object alone is not independent evidence.
+        """
         if self.state != VerificationState.BLOCKCHAIN_VERIFY:
             raise ValueError("blockchain proof is only accepted in BLOCKCHAIN_VERIFY")
         proof.validate()
         payout = self.evidence.get("payout_verification", {})
         checks = payout.get("checks", {})
         expected_txid = self.evidence.get("payout_txid")
-        if payout.get("status") != "VERIFIED_COMPLETED" or not checks.get("on_chain_proof") or not expected_txid:
-            raise ValueError("verified payout evidence is required before blockchain proof")
+        if (
+            payout.get("status") != "CLAIMED_PAYOUT_EVIDENCE"
+            or not checks.get("on_chain_reference_present")
+            or not expected_txid
+        ):
+            raise ValueError("claimed payout evidence is required before blockchain proof")
         if proof.txid != expected_txid:
             raise ValueError("blockchain proof txid does not match payout evidence")
+        if self._chain_verifier is None:
+            raise ValueError("independent chain verifier is not configured; proof remains unverified")
+        if not self._chain_verifier(proof, payout):
+            raise ValueError("independent chain verification failed")
+
         self.evidence["blockchain_proof"] = {
             "txid": proof.txid,
             "explorer_url": proof.explorer_url,
             "confirmations": proof.confirmations,
             "chain_status": proof.chain_status,
             "verified_at": proof.verified_at,
+            "independently_verified": True,
         }
         self.advance(
             VerificationState.REVENUE_REALIZED,
-            "explicit confirmed blockchain proof matched payout",
+            "independent chain verifier confirmed payout evidence",
         )
         return self.snapshot()
 
@@ -123,7 +146,26 @@ class MiningVerificationCycle:
         }
 
 
-def start_cloud_mining_verification(provider: str, opportunity_id: str) -> MiningVerificationCycle:
+def _start_cloud_mining_verification_with_verifier(
+    provider: str,
+    opportunity_id: str,
+    *,
+    chain_verifier: Callable[[BlockchainProof, dict[str, Any]], bool],
+) -> MiningVerificationCycle:
+    """Internal dependency-injection seam for trusted wiring and isolated tests."""
+    if not provider.strip() or not opportunity_id.strip():
+        raise ValueError("provider and opportunity_id are required")
+    return MiningVerificationCycle(
+        opportunity_id=opportunity_id,
+        provider=provider,
+        _chain_verifier=chain_verifier,
+    )
+
+
+def start_cloud_mining_verification(
+    provider: str, opportunity_id: str
+) -> MiningVerificationCycle:
+    """Create a fail-closed cycle; no caller-provided verifier is accepted."""
     if not provider.strip() or not opportunity_id.strip():
         raise ValueError("provider and opportunity_id are required")
     return MiningVerificationCycle(opportunity_id=opportunity_id, provider=provider)
