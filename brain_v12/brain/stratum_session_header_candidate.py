@@ -46,6 +46,9 @@ def build_session_header_candidate(
         raise StratumProtocolError("EXTRANONCE_NOT_NEGOTIATED")
     if not prevhash_dialect_confirmed:
         raise ValueError("STRATUM_PREVHASH_DIALECT_NOT_CONFIRMED")
+    if (not isinstance(nonce_hex, str) or len(nonce_hex) != 8
+            or any(ch not in "0123456789abcdefABCDEF" for ch in nonce_hex)):
+        raise ValueError("INVALID_NONCE_HEX")
 
     coinbase = build_coinbase(
         job, session.extranonce1_hex, extranonce2, session.extranonce2_size
@@ -57,9 +60,7 @@ def build_session_header_candidate(
         merkle_root_raw=merkle_root,
         ntime_hex=ntime_hex,
         nbits_hex=job.nbits_hex,
-        nonce=int(nonce_hex, 16) if isinstance(nonce_hex, str)
-        and len(nonce_hex) == 8
-        and all(ch in "0123456789abcdefABCDEF" for ch in nonce_hex) else -1,
+        nonce=int(nonce_hex, 16),
         share_target=share_target,
     )
     return {
