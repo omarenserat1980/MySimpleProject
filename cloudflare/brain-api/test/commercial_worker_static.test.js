@@ -138,6 +138,10 @@ assert.match(worker, /\/api\/payments\/paypal\/capture/);
 assert.match(worker, /\/api\/payments\/paypal\/webhook/);
 assert.match(worker, /verify-webhook-signature/);
 assert.match(worker, /PAYPAL_WEBHOOK_ID_NOT_CONFIGURED/);
+assert.match(worker, /"PayPal-Request-Id": createRequestId/, "PayPal order creation must use a stable idempotency key");
+assert.match(worker, /"PayPal-Request-Id": captureRequestId/, "PayPal capture retries must use a stable idempotency key");
+assert.match(worker, /PAYPAL_CAPTURE_NOT_COMPLETED/, "webhook must reject capture events whose resource status is not COMPLETED");
+assert.match(worker, /Number\(order\.amount\) !== amount/, "verified capture must match the current order amount");
 assert.ok(worker.includes("provider IN ('paytabs','paypal')"), "delivery revenue gate must recognize verified PayPal payments");
 
 const paypalCaptureStart = worker.indexOf("async function capturePayPalPayment");
