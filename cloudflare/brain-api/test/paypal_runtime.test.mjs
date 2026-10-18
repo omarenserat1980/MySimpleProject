@@ -84,3 +84,21 @@ test("PayPal webhook rejects missing signature headers before OAuth credentials 
   assert.equal(response.status, 401);
   assert.deepEqual(await response.json(), { ok: false, error: "PAYPAL_WEBHOOK_HEADERS_REQUIRED" });
 });
+
+
+test("PayPal webhook fails closed without OAuth credentials after envelope validation", async () => {
+  const response = await worker.fetch(new Request("https://brain.test/api/payments/paypal/webhook", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "PAYPAL-AUTH-ALGO": "SHA256withRSA",
+      "PAYPAL-CERT-URL": "https://example.invalid/cert",
+      "PAYPAL-TRANSMISSION-ID": "synthetic-transmission-id",
+      "PAYPAL-TRANSMISSION-SIG": "synthetic-signature",
+      "PAYPAL-TRANSMISSION-TIME": "2026-10-18T00:00:00Z",
+    },
+    body: JSON.stringify({ event_type: "PAYMENT.CAPTURE.COMPLETED", resource: { status: "COMPLETED" } }),
+  }), { BRAIN_DB: {}, PAYPAL_WEBHOOK_ID: "synthetic-webhook-id" });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { ok: false, error: "PAYPAL_SECRETS_NOT_CONFIGURED" });
+});
