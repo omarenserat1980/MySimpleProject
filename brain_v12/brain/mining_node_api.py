@@ -214,6 +214,36 @@ def get_simulation_contract() -> dict[str, Any]:
     }
 
 
+def stratum_candidate_pipeline_status() -> dict[str, Any]:
+    """Expose pipeline integration capability without executing a job or touching the network."""
+    from . import stratum_candidate_pipeline
+
+    available = callable(stratum_candidate_pipeline.prepare_and_search_job) and callable(
+        stratum_candidate_pipeline.validate_job_network_target
+    )
+    return {
+        "ok": available,
+        "component": "stratum_candidate_pipeline",
+        "status": "AVAILABLE_OFFLINE_BOUNDED" if available else "UNAVAILABLE",
+        "prepare_and_search_job_available": callable(stratum_candidate_pipeline.prepare_and_search_job),
+        "network_target_validation_available": callable(stratum_candidate_pipeline.validate_job_network_target),
+        "execution_performed": False,
+        "network_access_performed": False,
+        "pool_contacted": False,
+        "share_submitted": False,
+        "pool_acceptance_verified": False,
+        "real_mining_verified": False,
+        "revenue_verified": False,
+        "evidence_class": "OFFLINE_BOUNDED_POW_CANDIDATE_ONLY",
+        "note": "Capability discovery only; this endpoint does not execute nonce search or infer live pool activity.",
+    }
+
+
+@router.get("/stratum-pipeline/status")
+def get_stratum_candidate_pipeline_status() -> dict[str, Any]:
+    return stratum_candidate_pipeline_status()
+
+
 @router.get("/status")
 def get_mining_node_status() -> dict[str, Any]:
     """Return truthful node status without activating workers or external services."""
