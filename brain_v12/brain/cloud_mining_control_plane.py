@@ -70,7 +70,24 @@ class CloudMiningControlPlane:
             or not 0 < worker.max_cpu_percent <= 100
         ):
             raise ValueError("max_cpu_percent must be finite and in (0, 100]")
-        self.workers[worker.worker_id] = worker
+        existing = self.workers.get(worker.worker_id)
+        if existing is not None and (
+            existing.owner != worker.owner
+            or str(existing.kind).strip().lower() != kind
+        ):
+            raise ValueError("worker identity conflict: owner and kind are immutable")
+        # Normalize the accepted kind before persisting so later checks use one
+        # canonical identity. Updating limits/enabled state for the same owner
+        # and kind remains supported.
+        self.workers[worker.worker_id] = CloudWorker(
+            worker_id=worker.worker_id,
+            kind=kind,
+            region=worker.region,
+            owner=worker.owner,
+            enabled=worker.enabled,
+            max_temperature_c=worker.max_temperature_c,
+            max_cpu_percent=worker.max_cpu_percent,
+        )
 
     def plan(self, worker_id: str, algorithm: str = "randomx") -> MiningJob:
         worker = self.workers.get(worker_id)
