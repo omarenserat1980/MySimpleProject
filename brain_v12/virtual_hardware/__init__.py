@@ -3,6 +3,7 @@
 Deterministic, inspectable software-defined hardware plus guest-OS contracts.
 """
 from .computer import VirtualComputer
+from .digital_logic import DigitalClock, MiniCalculator
 from .cpu import VirtualCPU
 from .memory import VirtualRAM
 from .bus import VirtualBus
@@ -31,7 +32,7 @@ from .extended_devices import (
 )
 
 __all__ = [
-    "VirtualComputer", "VirtualCPU", "VirtualRAM", "VirtualBus", "VirtualPCIeBAR", "VirtualPCIeEndpoint", "VirtualPCIeFabric", "VirtualECCMemoryController",
+    "VirtualComputer", "DigitalClock", "MiniCalculator", "VirtualCPU", "VirtualRAM", "VirtualBus", "VirtualPCIeBAR", "VirtualPCIeEndpoint", "VirtualPCIeFabric", "VirtualECCMemoryController",
     "VirtualNIC", "VirtualStorage", "VirtualGPU", "VirtualDisk", "VirtualUEFI",
     "X86_64CPU", "X86UnsupportedInstruction", "CPUProfile", "get_cpu_profile", "list_cpu_profiles",
     "StorageProfile", "get_storage_profile", "list_storage_profiles", "MemoryProfile", "CacheHierarchy",
