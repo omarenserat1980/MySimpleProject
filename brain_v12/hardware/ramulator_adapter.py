@@ -145,4 +145,4 @@ def run_script(
 
 def evidence_json(result: dict[str, Any]) -> str:
     """Serialize adapter evidence deterministically for artifact storage."""
-    return json.dumps(result, sort_keys=True, separators=(",", ":")) + "\\n"
+    return json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n"
