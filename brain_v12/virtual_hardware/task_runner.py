@@ -121,7 +121,7 @@ class BrainVMTaskRunner:
     def checkpoint(self) -> dict:
         """Serialize programs and all scheduler state for deterministic resume."""
         return {
-            "schema": "brainvm-task-runner-checkpoint-v1",
+            "schema": "brainvm-runner-snapshot-v1",
             "mode": "SIMULATED_BRAINVM_TASK_RUNNER",
             "ram_cells": self.ram_cells,
             "clock_width_bits": self.clock_width_bits,
@@ -150,7 +150,7 @@ class BrainVMTaskRunner:
 
     def restore_checkpoint(self, checkpoint: dict) -> dict:
         """Validate into a fresh runner, then atomically replace this runner's state."""
-        if not isinstance(checkpoint, dict) or checkpoint.get("schema") != "brainvm-task-runner-checkpoint-v1":
+        if not isinstance(checkpoint, dict) or checkpoint.get("schema") != "brainvm-runner-snapshot-v1":
             raise ValueError("TASK_RUNNER_CHECKPOINT_SCHEMA_UNSUPPORTED")
         if checkpoint.get("mode") != "SIMULATED_BRAINVM_TASK_RUNNER" or checkpoint.get("task_programs_included") is not True:
             raise ValueError("TASK_RUNNER_CHECKPOINT_MODE_OR_PROGRAMS_INVALID")
