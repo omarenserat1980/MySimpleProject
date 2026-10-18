@@ -569,8 +569,8 @@ async function markPayPalPaymentVerified(env, orderId, paypalOrderId, captureId,
 
   const [verifiedPayment, ledger, job] = await Promise.all([
     env.BRAIN_DB.prepare("SELECT state FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first(),
-    env.BRAIN_DB.prepare("SELECT tran_ref, amount, currency, state FROM revenue_ledger WHERE order_id = ?").bind(orderId).first(),
-    env.BRAIN_DB.prepare("SELECT job_id, state FROM service_jobs WHERE order_id = ?").bind(orderId).first(),
+    env.BRAIN_DB.prepare("SELECT tran_ref, amount, currency, state FROM revenue_ledger WHERE order_id = ? AND tran_ref = ?").bind(orderId, paypalOrderId).first(),
+    env.BRAIN_DB.prepare("SELECT job_id, state FROM service_jobs WHERE job_id = ? AND order_id = ?").bind(jobId, orderId).first(),
   ]);
   if (!verifiedPayment || verifiedPayment.state !== "PAYMENT_VERIFIED") return { ok: false, error: "PAYPAL_PAYMENT_STATE_NOT_PERSISTED", status: 409 };
   if (!ledger || ledger.tran_ref !== paypalOrderId || Number(ledger.amount) !== amount || String(ledger.currency).toUpperCase() !== currency) return { ok: false, error: "PAYPAL_REVENUE_LEDGER_RECONCILIATION_FAILED", status: 409 };
