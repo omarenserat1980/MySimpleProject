@@ -112,9 +112,16 @@ def _evidence_matches_artifact(evidence: Any, manifest_result: dict[str, Any]) -
 def _signature_evidence_is_valid(evidence: Any, manifest_result: dict[str, Any]) -> bool:
     return bool(
         _evidence_matches_artifact(evidence, manifest_result)
-        and evidence.get("verification_method")
-        and evidence.get("verifier_identity")
-        and evidence.get("signature_subject")
+        and evidence.get("verification_method") in {"SIGNTOOL_VERIFY", "OS_TRUST_STORE"}
+        and isinstance(evidence.get("verifier_identity"), str)
+        and evidence.get("verifier_identity").strip()
+        and isinstance(evidence.get("signature_subject"), str)
+        and evidence.get("signature_subject").strip()
+        and evidence.get("signature_result") == "VALID"
+        and evidence.get("certificate_chain_result") == "VALID"
+        and evidence.get("revocation_result") in {"GOOD", "NOT_SUPPORTED"}
+        and isinstance(evidence.get("verified_at_utc"), str)
+        and UTC_SUFFIX.fullmatch(evidence.get("verified_at_utc", ""))
     )
 
 
