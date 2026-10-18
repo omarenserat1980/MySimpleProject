@@ -38,7 +38,7 @@ def parse_message(line: str | bytes) -> dict[str, Any]:
     if not isinstance(line, str) or len(line) > 1_000_000:
         raise StratumProtocolError("MESSAGE_INVALID_OR_TOO_LARGE")
     try:
-        message = json.loads(line)
+        message = json.loads(line, parse_float=Decimal)
     except (json.JSONDecodeError, TypeError) as exc:
         raise StratumProtocolError("INVALID_JSON") from exc
     if not isinstance(message, dict):
@@ -118,7 +118,7 @@ class StratumV1Session:
             if method == "mining.set_difficulty":
                 if len(params) != 1 or isinstance(params[0], bool):
                     raise StratumProtocolError("INVALID_DIFFICULTY")
-                if not isinstance(params[0], (int, float, str)):
+                if not isinstance(params[0], (int, float, str, Decimal)):
                     raise StratumProtocolError("INVALID_DIFFICULTY")
                 try:
                     exact_difficulty = Decimal(str(params[0]))
