@@ -139,6 +139,14 @@ assert.match(worker, /\/api\/payments\/paypal\/webhook/);
 assert.match(worker, /verify-webhook-signature/);
 assert.match(worker, /PAYPAL_WEBHOOK_ID_NOT_CONFIGURED/);
 assert.ok(worker.includes("provider IN ('paytabs','paypal')"), "delivery revenue gate must recognize verified PayPal payments");
+
+const paypalCaptureStart = worker.indexOf("async function capturePayPalPayment");
+const paypalWebhookStart = worker.indexOf("async function handlePayPalWebhook", paypalCaptureStart);
+const paypalCapture = worker.slice(paypalCaptureStart, paypalWebhookStart);
+assert.ok(paypalCaptureStart >= 0 && paypalWebhookStart > paypalCaptureStart, "PayPal capture handler must exist");
+assert.ok(paypalCapture.indexOf("PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH") < paypalCapture.indexOf('if (payment.state === "PAYMENT_VERIFIED")'), "PayPal capture must validate persisted order/payment amount and currency before idempotent success");
+assert.match(paypalCapture, /state: "PAYMENT_VERIFIED_PENDING_DELIVERY"/, "idempotent capture response must not imply delivery or realized revenue");
+
 // Regression guards: verified PayPal payment retries must repair dependent records.
 const paypalVerifierStart = worker.indexOf("async function markPayPalPaymentVerified");
 const paypalVerifierEnd = worker.indexOf("async function handlePayTabsReturn", paypalVerifierStart);
