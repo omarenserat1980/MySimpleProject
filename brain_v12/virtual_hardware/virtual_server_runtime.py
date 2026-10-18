@@ -125,3 +125,65 @@ class BrainVirtualServerRuntime:
 
     def _event(self, event_type: str, **details) -> None:
         self.events.append({"tick": self.tick, "type": event_type, **details})
+
+    def checkpoint(self) -> dict:
+        """Return a JSON-compatible snapshot of simulated service state."""
+        return {
+            "schema": "brain-virtual-server-checkpoint-v1",
+            "mode": "SIMULATED_VIRTUAL_SERVER_RUNTIME",
+            "server_id": self.server_id,
+            "tick": self.tick,
+            "services": [asdict(service) for service in self.services.values()],
+            "events": [dict(event) for event in self.events],
+            "network_listener_enabled": False,
+            "guest_os_boot_verified": False,
+        }
+
+    def restore_checkpoint(self, checkpoint: dict) -> dict:
+        """Validate a snapshot fully before atomically replacing runtime state."""
+        if not isinstance(checkpoint, dict) or checkpoint.get("schema") != "brain-virtual-server-checkpoint-v1":
+            raise ValueError("SERVER_CHECKPOINT_SCHEMA_UNSUPPORTED")
+        if checkpoint.get("mode") != "SIMULATED_VIRTUAL_SERVER_RUNTIME":
+            raise ValueError("SERVER_CHECKPOINT_MODE_INVALID")
+        try:
+            server_id = checkpoint["server_id"]
+            tick = checkpoint["tick"]
+            raw_services = checkpoint["services"]
+            raw_events = checkpoint["events"]
+        except KeyError as exc:
+            raise ValueError("SERVER_CHECKPOINT_MALFORMED") from exc
+        if not isinstance(server_id, str) or not server_id.strip():
+            raise ValueError("SERVER_CHECKPOINT_ID_INVALID")
+        if not isinstance(tick, int) or isinstance(tick, bool) or tick < 0:
+            raise ValueError("SERVER_CHECKPOINT_TICK_INVALID")
+        if not isinstance(raw_services, list) or not isinstance(raw_events, list):
+            raise ValueError("SERVER_CHECKPOINT_COLLECTIONS_INVALID")
+        candidate_services = {}
+        for item in raw_services:
+            if not isinstance(item, dict):
+                raise ValueError("SERVER_CHECKPOINT_SERVICE_INVALID")
+            try:
+                name, kind, state = item["name"], item["kind"], item["state"]
+                requests, failures = item["requests"], item["failures"]
+            except KeyError as exc:
+                raise ValueError("SERVER_CHECKPOINT_SERVICE_MALFORMED") from exc
+            if (not isinstance(name, str) or not name.strip() or kind not in _ALLOWED_KINDS
+                    or state not in _ALLOWED_STATES
+                    or not isinstance(requests, int) or isinstance(requests, bool) or requests < 0
+                    or not isinstance(failures, int) or isinstance(failures, bool) or failures < 0
+                    or name in candidate_services):
+                raise ValueError("SERVER_CHECKPOINT_SERVICE_INVALID")
+            candidate_services[name] = VirtualService(name, kind, state, requests, failures)
+        candidate_events = []
+        for event in raw_events:
+            if not isinstance(event, dict) or not isinstance(event.get("type"), str):
+                raise ValueError("SERVER_CHECKPOINT_EVENT_INVALID")
+            event_tick = event.get("tick")
+            if not isinstance(event_tick, int) or isinstance(event_tick, bool) or event_tick < 0 or event_tick > tick:
+                raise ValueError("SERVER_CHECKPOINT_EVENT_TICK_INVALID")
+            candidate_events.append(dict(event))
+        self.server_id = server_id.strip()
+        self.tick = tick
+        self.services = candidate_services
+        self.events = candidate_events
+        return self.health()
