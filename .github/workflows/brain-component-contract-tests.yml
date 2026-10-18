@@ -223,7 +223,7 @@ jobs:
           }
           out = pathlib.Path("artifacts/component-evidence-summary")
           out.mkdir(parents=True, exist_ok=True)
-          (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\\n", encoding="utf-8")
+          (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
           lines = [
               "# Brain component evidence summary",
               "",
@@ -240,7 +240,7 @@ jobs:
           if errors:
               lines.extend(["", "## Errors", *[f"- {e}" for e in errors]])
           lines.extend(["", summary["claim_boundary"]])
-          report = "\\n".join(lines) + "\\n"
+          report = "\n".join(lines) + "\n"
           pathlib.Path(os.environ["GITHUB_STEP_SUMMARY"]).write_text(report, encoding="utf-8")
           (out / "summary.md").write_text(report, encoding="utf-8")
           print(json.dumps({"passed": summary["passed"], "component_count": len(records), "errors": errors}, indent=2))
