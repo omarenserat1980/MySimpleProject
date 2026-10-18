@@ -346,3 +346,38 @@ def plan_execution(
             "cloud_fallback_requires_verified_capacity_and_free_cost_gate",
         ),
     )
+
+
+
+def eligible_fabric_resources(
+    fabric_snapshot: dict,
+    required_capabilities: Iterable[str] = (),
+    physical_execution: bool = False,
+) -> dict:
+    """Filter resource candidates for planning; this function never executes workloads."""
+    resources = fabric_snapshot.get("resources", []) if isinstance(fabric_snapshot, dict) else []
+    required = set(required_capabilities)
+    eligible, rejected = [], []
+    for resource in resources:
+        if not isinstance(resource, dict):
+            continue
+        resource_id = str(resource.get("resource_id", ""))
+        reasons = []
+        if not resource_id:
+            reasons.append("RESOURCE_ID_MISSING")
+        if not required.issubset(set(resource.get("capabilities", []))):
+            reasons.append("CAPABILITY_MISMATCH")
+        mode = resource.get("reality_mode")
+        if physical_execution:
+            if mode not in {"PHYSICAL", "HYBRID"}:
+                reasons.append("PHYSICAL_EXECUTION_REQUIRES_PHYSICAL_RESOURCE")
+            if resource.get("eligible_for_physical_work") is not True:
+                reasons.append("PHYSICAL_EVIDENCE_GATE_BLOCKED")
+        elif mode == "VIRTUAL" and resource.get("execution_claim") != "SIMULATION_ONLY":
+            reasons.append("VIRTUAL_RESOURCE_CLAIM_INVALID")
+        if reasons:
+            rejected.append({"resource_id": resource_id or None, "reasons": reasons})
+        else:
+            eligible.append(resource)
+    return {"status": "ELIGIBLE" if eligible else "NO_ELIGIBLE_RESOURCE",
+            "physical_execution": bool(physical_execution), "eligible": eligible, "rejected": rejected}
