@@ -37,6 +37,19 @@ assert.match(worker, /PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH/);
 assert.match(worker, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
 assert.ok(worker.includes("provider IN ('paytabs','paypal')"), "delivery revenue gate must recognize verified PayPal payments");
 assert.match(worker, /PAYPAL_WEBHOOK_ID_NOT_CONFIGURED/);
+// Regression guards: verified-payment retries must repair/verify dependent records.
+const paypalVerifierStart = worker.indexOf("async function markPayPalPaymentVerified");
+const paypalVerifierEnd = worker.indexOf("async function handlePayTabsReturn", paypalVerifierStart);
+const paypalVerifier = worker.slice(paypalVerifierStart, paypalVerifierEnd);
+assert.ok(paypalVerifierStart >= 0 && paypalVerifierEnd > paypalVerifierStart, "PayPal payment verifier must exist");
+assert.match(paypalVerifier, /paypal-order:\\"? \+ orderId/);
+assert.match(paypalVerifier, /await env\\.BRAIN_DB\\.batch\\(\\[/);
+assert.match(paypalVerifier, /INSERT OR IGNORE INTO revenue_ledger/);
+assert.match(paypalVerifier, /INSERT OR IGNORE INTO service_jobs/);
+assert.match(paypalVerifier, /PAYPAL_REVENUE_LEDGER_RECONCILIATION_FAILED/);
+assert.match(paypalVerifier, /PAYPAL_SERVICE_JOB_NOT_PERSISTED/);
+assert.match(paypalVerifier, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
+console.log("PAYPAL_PARTIAL_FAILURE_RECOVERY_GATES=PASS");
 console.log("PAYPAL_SANDBOX_STATIC_GATES=PASS");
 
 console.log("COMMERCIAL_WORKER_STATIC_TEST=PASS");
