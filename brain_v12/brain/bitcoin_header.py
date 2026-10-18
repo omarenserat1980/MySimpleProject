@@ -6,6 +6,7 @@ a pool, mine, or assert that a pool share has been accepted.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 import hashlib
 
 
@@ -81,6 +82,33 @@ def build_header_candidate(
     digest = sha256d(header)
     hash_int = int.from_bytes(digest, "little")
     return HeaderCandidate(header, nonce, digest[::-1].hex(), hash_int, hash_int <= share_target)
+
+
+# Bitcoin's conventional difficulty-1 target used by Stratum V1 pools.
+# Pool-specific difficulty conventions must be confirmed before live submission.
+STRATUM_DIFFICULTY_ONE_TARGET = 0x00000000FFFF0000000000000000000000000000000000000000000000000000
+
+
+def stratum_difficulty_to_share_target(difficulty: int | float | str | Decimal) -> int:
+    """Convert conventional Stratum V1 difficulty to an integer share target.
+
+    Uses Decimal(str(value)) to avoid introducing additional binary-float
+    rounding. The convention is target = floor(diff1_target / difficulty).
+    This helper does not infer a pool dialect or prove that a pool uses this
+    difficulty-1 target; callers must confirm that independently.
+    """
+    if isinstance(difficulty, bool) or not isinstance(difficulty, (int, float, str, Decimal)):
+        raise ValueError("INVALID_STRATUM_DIFFICULTY")
+    try:
+        value = Decimal(str(difficulty))
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError("INVALID_STRATUM_DIFFICULTY") from exc
+    if not value.is_finite() or value <= 0:
+        raise ValueError("INVALID_STRATUM_DIFFICULTY")
+    target = int(Decimal(STRATUM_DIFFICULTY_ONE_TARGET) / value)
+    if not 0 < target < 2**256:
+        raise ValueError("STRATUM_DIFFICULTY_TARGET_OUT_OF_RANGE")
+    return target
 
 
 def compact_nbits_to_target(nbits_hex: str) -> int:
