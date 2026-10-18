@@ -45,18 +45,20 @@
       "id": "ramulator2-memory",
       "component": "ram-memory-controller",
       "upstream": "https://github.com/CMU-SAFARI/ramulator2",
-      "role": "memory-system-simulation",
+      "role": "DDR3/DDR4/DDR5 and other supported DRAM memory-system simulation",
       "mode": "external-tool-or-adapter",
-      "status": "CANDIDATE",
+      "status": "ADAPTER_IMPLEMENTED_TOOL_NOT_VERIFIED_INSTALLED",
       "pin": null,
-      "license_review": "PENDING",
+      "license_review": "UPSTREAM_REPOSITORY_REPORTS_MIT; EXACT_COMMIT_AND_NOTICE_REVIEW_PENDING",
       "evidence_required": [
         "source-pin",
         "tool-version",
         "trace-id",
         "simulated-performance-report"
       ],
-      "physical_hardware_verified": false
+      "physical_hardware_verified": false,
+      "adapter_path": "brain_v12/hardware/ramulator_adapter.py",
+      "test_path": "brain_v12/hardware/test_ramulator_adapter.py"
     },
     {
       "id": "verilator-rtl",
