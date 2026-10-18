@@ -91,16 +91,15 @@ class BitcoinStratumBridgeTests(unittest.TestCase):
         }
         raw_socket = MagicMock()
         tls_socket = MagicMock()
-        tls_socket.makefile.side_effect = [
-            io.StringIO(json.dumps({"id": 1, "result": [[], "aabb", 4], "error": None}) + "\\n"
-                        + json.dumps({"id": 2, "result": True, "error": None}) + "\\n"),
-            io.StringIO(),
-        ]
         # Keep the writer's bytes inspectable after the probe returns.
-        writer = io.StringIO()
+        class CaptureWriter(io.StringIO):
+            def close(self):
+                self.flush()
+
+        writer = CaptureWriter()
         tls_socket.makefile.side_effect = [
-            io.StringIO(json.dumps({"id": 1, "result": [[], "aabb", 4], "error": None}) + "\\n"
-                        + json.dumps({"id": 2, "result": True, "error": None}) + "\\n"),
+            io.StringIO(json.dumps({"id": 1, "result": [[], "aabb", 4], "error": None}) + "\n"
+                        + json.dumps({"id": 2, "result": True, "error": None}) + "\n"),
             writer,
         ]
         tls_context = MagicMock()
