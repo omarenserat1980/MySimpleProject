@@ -30,4 +30,5 @@
 <script>
 const ids=['files','browser','settings','about'];function openWin(id){ids.forEach(x=>document.getElementById(x).classList.toggle('open',x===id));document.getElementById('start').classList.remove('open')}function closeWin(id){document.getElementById(id).classList.remove('open')}function minWin(id){closeWin(id)}function toggleStart(){document.getElementById('start').classList.toggle('open')}let timer;function notify(msg){const n=document.getElementById('notice');n.textContent=msg;n.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>n.classList.remove('show'),3000)}function tick(){const d=new Date();document.getElementById('time').textContent=d.toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'});document.getElementById('date').textContent=d.toLocaleDateString('ar')}tick();setInterval(tick,15000);document.addEventListener('keydown',e=>{if(e.key==='Escape'){ids.forEach(closeWin);document.getElementById('start').classList.remove('open')}if(e.key==='Meta'||(e.ctrlKey&&e.key==='Escape'))toggleStart()});
 </script>
+<script src="brain-windows-virtual-apps.js"></script>
 </body></html>
