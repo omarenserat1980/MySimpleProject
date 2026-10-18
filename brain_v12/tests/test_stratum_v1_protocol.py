@@ -272,3 +272,33 @@ def test_share_submit_enforces_negotiated_extranonce2_width():
     request = json.loads(session.request_submit("job", "00000001", "00000000", "00000000"))
     assert request["method"] == "mining.submit"
     assert request["params"][2] == "00000001"
+
+
+def test_stratum_difficulty_preserves_exact_decimal_for_share_target():
+    from brain_v12.brain.bitcoin_header import stratum_difficulty_to_share_target
+
+    exact = "0.12345678901234567890123456789"
+    session = StratumV1Session("worker", "secret")
+    session.receive(json.dumps({
+        "id": None, "method": "mining.set_difficulty", "params": [exact]
+    }))
+    assert session.difficulty_text == exact
+    assert session.current_share_target() == stratum_difficulty_to_share_target(exact)
+    assert session.snapshot()["share_target_hex"] == f"{stratum_difficulty_to_share_target(exact):064x}"
+
+
+def test_share_target_is_unavailable_until_difficulty_is_set():
+    session = StratumV1Session("worker", "secret")
+    with pytest.raises(StratumProtocolError, match="STRATUM_DIFFICULTY_NOT_SET"):
+        session.current_share_target()
+
+
+@pytest.mark.parametrize("difficulty", [True, False, 0, -1, "NaN", "Infinity", "bad", "1e-10000"])
+def test_set_difficulty_rejects_invalid_or_unrepresentable_values(difficulty):
+    session = StratumV1Session("worker", "secret")
+    with pytest.raises(StratumProtocolError, match="INVALID_DIFFICULTY"):
+        session.receive(json.dumps({
+            "id": None, "method": "mining.set_difficulty", "params": [difficulty]
+        }))
+    assert session.difficulty is None
+    assert session.difficulty_text is None
