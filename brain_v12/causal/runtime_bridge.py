@@ -9,23 +9,65 @@ for the same job is evidence about that workflow path.
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from brain_v12.causal.causal_engine import CausalEvidenceLedger
 
 ROOT = Path(__file__).resolve().parents[2]
-EVENTS = ROOT / "brain6_artifacts" / "control_plane" / "events.jsonl"
 STATE = ROOT / ".brain" / "state"
 LEDGER = STATE / "causal_evidence.json"
 
 
-def read_events() -> List[dict]:
-    if not EVENTS.exists():
+def resolve_events_path() -> Path:
+    """Resolve the authoritative event stream used by BrainSupervisor.
+
+    BRAIN_RUNTIME_HOME is authoritative when configured. Otherwise prefer the
+    persistent supervisor/control-plane stream, while retaining the legacy
+    repository-local path for standalone CI/control-plane runs.
+    """
+    configured_home = os.environ.get("BRAIN_RUNTIME_HOME")
+    if configured_home:
+        return (
+            Path(configured_home).expanduser()
+            / "brain6_artifacts"
+            / "supervisor"
+            / "control_plane"
+            / "events.jsonl"
+        )
+
+    runtime_events = (
+        Path("~/.brain/runtime").expanduser()
+        / "brain6_artifacts"
+        / "supervisor"
+        / "control_plane"
+        / "events.jsonl"
+    )
+    legacy_events = ROOT / "brain6_artifacts" / "control_plane" / "events.jsonl"
+
+    # Prefer a populated source over an empty stale file; never merge streams
+    # from different runtime roots into one evidence report.
+    if runtime_events.exists() and runtime_events.stat().st_size > 0:
+        return runtime_events
+    if legacy_events.exists() and legacy_events.stat().st_size > 0:
+        return legacy_events
+    if runtime_events.exists():
+        return runtime_events
+    return legacy_events
+
+
+# Compatibility alias for callers that imported the former module constant.
+EVENTS = resolve_events_path()
+
+
+def read_events(path: Optional[Path] = None) -> List[dict]:
+    events_path = path or resolve_events_path()
+    if not events_path.exists():
         return []
     rows = []
-    for line in EVENTS.read_text(encoding="utf-8").splitlines():
+    for line in events_path.read_text(encoding="utf-8").splitlines():
         try:
             row = json.loads(line)
             if isinstance(row, dict):
@@ -78,14 +120,16 @@ def build_report(events: List[dict], source: str = "") -> dict:
 
 
 def main() -> int:
-    events = read_events()
-    report = build_report(events, str(EVENTS))
+    events_path = resolve_events_path()
+    events = read_events(events_path)
+    report = build_report(events, str(events_path))
     STATE.mkdir(parents=True, exist_ok=True)
     LEDGER.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({
         "CAUSAL_EVIDENCE": report["status"],
         "events": report["event_count"],
         "records": report["record_count"],
+        "source": report["source"],
         "evidence_file": str(LEDGER),
     }, ensure_ascii=False))
     # Evidence absence is reported explicitly, but does not turn this
