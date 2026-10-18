@@ -17,7 +17,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 The execution-policy command only changes the current PowerShell process. Follow local organization policy; do not bypass policy where prohibited.
 
-For VHDX and FFU, the script requests index 1 as required by DISM. WIM queries return image metadata for the available indexes.
+For VHD, VHDX, and FFU, the script requests index 1 as required by DISM. WIM queries return image metadata for the available indexes.
 
 ## Output fields
 
