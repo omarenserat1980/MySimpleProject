@@ -95,3 +95,19 @@ def test_bitcoin_genesis_header_matches_independent_known_answer_vector():
     assert result.hash_hex == expected_raw_digest[::-1].hex()
     assert result.status == "NONCE_FOUND_UNSUBMITTED"
 
+def test_search_nonce_stops_at_uint32_max_without_wrapping():
+    # The final uint32 nonce is checked once; the search must not wrap to zero.
+    result = search_nonce(bytes(80), 1, start_nonce=0xFFFFFFFF, max_hashes=2)
+    assert result.found is False
+    assert result.nonce is None
+    assert result.hashes_checked == 1
+    assert result.status == "NONCE_NOT_FOUND_WITHIN_BOUND"
+
+
+def test_search_nonce_rejects_boolean_numeric_bounds():
+    import pytest
+
+    with pytest.raises(ValueError, match="START_NONCE_OUT_OF_RANGE"):
+        search_nonce(bytes(80), 1, start_nonce=True, max_hashes=1)
+    with pytest.raises(ValueError, match="MAX_HASHES_OUT_OF_RANGE"):
+        search_nonce(bytes(80), 1, start_nonce=0, max_hashes=True)
