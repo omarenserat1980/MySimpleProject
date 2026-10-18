@@ -19,20 +19,27 @@ class BrainVirtualHostTests(unittest.TestCase):
         self.assertFalse(health["network_listener_enabled"])
         self.assertFalse(health["physical_hardware"])
 
-    def test_checkpoint_restores_services_but_does_not_claim_task_resume(self):
+    def test_checkpoint_restores_services_and_resumes_task_programs(self):
         host = BrainVirtualHost(host_id="host-A", ram_cells_per_task=16)
         host.register_service("api", "api")
         host.start_service("api")
-        host.create_task("pending", [("JMP", 0)])
+        host.create_task("pending", [("MOVI", 0, 4), ("OUT", 0), ("JMP", 2)])
+        host.run_tasks(max_ticks=4)
         snapshot = host.checkpoint()
 
         restored = BrainVirtualHost(ram_cells_per_task=16)
         result = restored.restore_checkpoint(snapshot)
         self.assertEqual(result["host_id"], "host-A")
         self.assertEqual(result["server"]["running_services"], 1)
-        self.assertEqual(result["restored_task_snapshots"], 1)
-        self.assertFalse(result["tasks_resumed"])
-        self.assertEqual(result["reason"], "PROGRAMS_NOT_INCLUDED_IN_HOST_CHECKPOINT")
+        self.assertEqual(result["restored_task_count"], 1)
+        self.assertTrue(result["tasks_resumed"])
+        self.assertEqual(restored.checkpoint()["task_runner"], snapshot["task_runner"])
+
+        original_next = host.run_tasks(max_ticks=8)
+        restored_next = restored.run_tasks(max_ticks=8)
+        self.assertEqual(original_next["trace"], restored_next["trace"])
+        self.assertEqual(original_next["tasks"], restored_next["tasks"])
+        self.assertEqual(restored.request("api", "health")["request_number"], 1)
 
     def test_bad_checkpoint_is_rejected_without_mutating_host(self):
         host = BrainVirtualHost(host_id="stable", ram_cells_per_task=16)
@@ -46,9 +53,19 @@ class BrainVirtualHostTests(unittest.TestCase):
         host = BrainVirtualHost(ram_cells_per_task=16)
         host.create_task("loop", [("JMP", 0)])
         snapshot = copy.deepcopy(host.checkpoint())
-        snapshot["task_manifest"][0]["instructions_executed"] = 99
+        snapshot["task_runner"]["tasks"][0]["steps"] = 99
         restored = BrainVirtualHost(ram_cells_per_task=16)
-        with self.assertRaisesRegex(ValueError, "COUNTER_MISMATCH"):
+        before = restored.checkpoint()
+        with self.assertRaisesRegex(ValueError, "STEP_COUNT_MISMATCH"):
+            restored.restore_checkpoint(snapshot)
+        self.assertEqual(restored.checkpoint(), before)
+
+    def test_host_server_id_mismatch_is_rejected(self):
+        host = BrainVirtualHost(host_id="host-A", ram_cells_per_task=16)
+        snapshot = copy.deepcopy(host.checkpoint())
+        snapshot["host_id"] = "different-host"
+        restored = BrainVirtualHost(ram_cells_per_task=16)
+        with self.assertRaisesRegex(ValueError, "SERVER_ID_MISMATCH"):
             restored.restore_checkpoint(snapshot)
 
 
