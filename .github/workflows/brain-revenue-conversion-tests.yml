@@ -45,7 +45,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: brain-revenue-conversion-tests
+  # Isolate each ref so a main-branch run cannot cancel PR validation.
+  group: brain-revenue-conversion-tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
