@@ -45,6 +45,7 @@ def test_reconciles_pool_payout_with_independent_chain_output():
     assert result["received_sats"] == 125000
     assert result["received_btc"] == "0.00125000"
     assert result["proof_policy"]["network_calls_performed"] is False
+    assert result["proof_policy"]["evidence_freshness_verified"] is True
     assert result["proof_policy"]["pool_source_independently_verified"] is False
 
 
@@ -85,4 +86,39 @@ def test_rejects_same_source_url_for_pool_and_chain_evidence():
         audit_realized_bitcoin_payout(
             pool_payout=pool(source_url=url),
             chain_transaction=chain(source_url=url),
+        )
+
+
+@pytest.mark.parametrize(
+    ("timestamp", "message"),
+    [
+        ("not-a-timestamp", "valid ISO 8601"),
+        ("2026-10-14T10:00:00", "must include a timezone"),
+        ("2020-01-01T00:00:00Z", "evidence is stale"),
+        ("2099-01-01T00:00:00Z", "timestamp is in the future"),
+    ],
+)
+def test_rejects_invalid_stale_or_future_chain_evidence_timestamps(timestamp, message):
+    with pytest.raises(ValueError, match=message):
+        audit_realized_bitcoin_payout(
+            pool_payout=pool(),
+            chain_transaction=chain(observed_at=timestamp),
+        )
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"minimum_confirmations": True}, "minimum_confirmations must be an integer"),
+        ({"minimum_confirmations": 0}, "minimum_confirmations must be an integer"),
+        ({"max_evidence_age_seconds": True}, "max_evidence_age_seconds must be an integer"),
+        ({"max_evidence_age_seconds": 0}, "max_evidence_age_seconds must be an integer"),
+    ],
+)
+def test_rejects_invalid_freshness_and_confirmation_policy(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        audit_realized_bitcoin_payout(
+            pool_payout=pool(),
+            chain_transaction=chain(),
+            **kwargs,
         )
