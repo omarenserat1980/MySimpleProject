@@ -1,0 +1,35 @@
+name: Brain PayPal Sandbox Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "cloudflare/brain-api/src/index.js"
+      - "cloudflare/brain-api/test/**"
+      - "cloudflare/brain-api/migrations/**"
+      - ".github/workflows/brain-paypal-sandbox.yml"
+  push:
+    branches: ["fix/paypal-recovery-current-main-2026-10-18"]
+    paths:
+      - "cloudflare/brain-api/src/index.js"
+      - "cloudflare/brain-api/test/**"
+      - "cloudflare/brain-api/migrations/**"
+      - ".github/workflows/brain-paypal-sandbox.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paypal-sandbox-static-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax-check Cloudflare Worker
+        run: node --check cloudflare/brain-api/src/index.js
+      - name: Run commercial and PayPal static gates
+        working-directory: cloudflare/brain-api
+        run: node test/commercial_worker_static.test.js
