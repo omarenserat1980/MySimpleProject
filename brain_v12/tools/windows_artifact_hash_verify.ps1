@@ -10,7 +10,6 @@ param(
     [string] $ExpectedSha256,
 
     [Parameter(Mandatory = $true)]
-    [ValidatePattern('^https://')]
     [string] $TrustedReferenceUrl,
 
     [Parameter(Mandatory = $false)]
@@ -19,6 +18,14 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+$referenceUri = $null
+if (-not [System.Uri]::TryCreate($TrustedReferenceUrl, [System.UriKind]::Absolute, [ref]$referenceUri) -or
+    $referenceUri.Scheme -ne [System.Uri]::UriSchemeHttps -or
+    [string]::IsNullOrWhiteSpace($referenceUri.Host) -or
+    -not [string]::IsNullOrEmpty($referenceUri.UserInfo)) {
+    throw 'TRUSTED_REFERENCE_URL_MUST_BE_ABSOLUTE_HTTPS_WITH_HOST_AND_NO_USERINFO'
+}
 
 $resolved = Resolve-Path -LiteralPath $ArtifactPath -ErrorAction Stop
 $file = Get-Item -LiteralPath $resolved.Path
