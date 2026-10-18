@@ -128,12 +128,23 @@ def verify_payout(evidence: PayoutEvidence) -> dict[str, Any]:
     checks["evidence_integrity"] = (
         not evidence.evidence_sha256 or evidence.evidence_sha256 == expected_digest
     )
-    on_chain_proof = bool(evidence.txid.strip() and evidence.explorer_url.strip())
-    checks["on_chain_proof"] = on_chain_proof
+    # A caller-supplied txid/explorer URL is only a claim, never independent
+    # proof that a transaction exists, is confirmed, or paid this destination.
+    on_chain_reference = bool(evidence.txid.strip() and evidence.explorer_url.strip())
+    checks["on_chain_reference_present"] = on_chain_reference
+    checks["independent_chain_verification"] = False
 
-    if all(checks.values()) and on_chain_proof:
-        status = "VERIFIED_COMPLETED"
-        financial_state = "REVENUE_REALIZED"
+    basic_payout_evidence = (
+        checks["provider_identified"]
+        and checks["withdrawal_requested"]
+        and checks["destination_identified"]
+        and checks["received_amount_present"]
+        and checks["received_not_greater_than_requested"]
+        and checks["evidence_integrity"]
+    )
+    if basic_payout_evidence and on_chain_reference:
+        status = "CLAIMED_PAYOUT_EVIDENCE"
+        financial_state = "UNVERIFIED"
     elif checks["withdrawal_requested"] and not checks["received_amount_present"]:
         status = "PENDING_WITHDRAWAL_EVIDENCE"
         financial_state = "EXPECTED"
