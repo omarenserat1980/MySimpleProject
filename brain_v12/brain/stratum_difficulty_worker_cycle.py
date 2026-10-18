@@ -1,38 +1,34 @@
-"""One bounded offline Stratum cycle bound to an explicit pool difficulty.
+"""One bounded offline Stratum cycle bound to the session's current difficulty.
 
-This wrapper derives a conventional SHA256d share target from the supplied
-session difficulty and passes that target into the existing offline cycle.
-The caller is responsible for sourcing difficulty from the authenticated
-session's current mining.set_difficulty notification. This module performs no
-network I/O and never claims live mining, accepted shares, or revenue.
+Difficulty is read from StratumV1Session after its protocol parser accepts a
+mining.set_difficulty notification. Callers cannot pass an unrelated target or
+difficulty. This remains offline-only: no network I/O, share submission, or
+claim of live mining or revenue.
 """
 from __future__ import annotations
-
-from typing import Any
 
 from .stratum_difficulty_target import share_target_from_difficulty
 from .stratum_offline_worker_cycle import run_offline_worker_cycle
 from .stratum_v1_jobs import StratumJob
-from .stratum_v1_protocol import StratumV1Session
+from .stratum_v1_protocol import StratumProtocolError, StratumV1Session
 
 
 def run_difficulty_bound_offline_cycle(
     session: StratumV1Session,
     job: StratumJob,
     *,
-    pool_reported_difficulty: Any,
     extranonce2: str,
     ntime_hex: str,
     nonce_start: int,
     max_attempts: int,
     prevhash_dialect_confirmed: bool = False,
-) -> dict[str, Any]:
-    """Run a bounded offline search using the supplied pool difficulty.
-
-    The difficulty must be the current value reported by the authenticated
-    Stratum V1 session; this pure function cannot verify its provenance.
-    """
-    target_evidence = share_target_from_difficulty(pool_reported_difficulty)
+) -> dict[str, object]:
+    """Search using only the difficulty stored by the validated session."""
+    if not isinstance(session, StratumV1Session):
+        raise StratumProtocolError("STRATUM_V1_SESSION_REQUIRED")
+    if session.difficulty is None:
+        raise StratumProtocolError("SESSION_DIFFICULTY_REQUIRED")
+    target_evidence = share_target_from_difficulty(session.difficulty)
     cycle = run_offline_worker_cycle(
         session,
         job,
@@ -45,10 +41,10 @@ def run_difficulty_bound_offline_cycle(
     )
     return {
         **cycle,
-        "evidence_class": "OFFLINE_DIFFICULTY_BOUND_STRATUM_WORKER_CYCLE",
+        "evidence_class": "OFFLINE_SESSION_DIFFICULTY_BOUND_STRATUM_WORKER_CYCLE",
         "difficulty_target": target_evidence,
-        "difficulty_bound_to_current_session_by_this_function": False,
-        "pool_difficulty_provenance_verified": False,
+        "difficulty_bound_to_validated_session_state": True,
+        "difficulty_provenance_independently_verified": False,
         "transport_connected": False,
         "pool_submission_sent": False,
         "pool_acceptance_verified": False,
