@@ -52,13 +52,13 @@ class WindowsArtifactManifestTests(unittest.TestCase):
             evaluate_artifact_state(result)["state"], "ARTIFACT_FINGERPRINTED"
         )
 
-    def test_independent_signature_evidence_is_required_for_authenticity_state(self):
+    def test_signature_evidence_shape_does_not_claim_authenticity(self):
         result = validate_artifact_manifest(valid_manifest())
         self.assertEqual(
             evaluate_artifact_state(
                 result, publisher_signature_evidence=signature_evidence(result)
             )["state"],
-            "ARTIFACT_AUTHENTICITY_VERIFIED",
+            "ARTIFACT_FINGERPRINTED",
         )
 
     def test_signature_evidence_missing_verifier_identity_cannot_promote_state(self):
@@ -106,7 +106,7 @@ class WindowsArtifactManifestTests(unittest.TestCase):
                 image_inspection_evidence={"status": "VERIFIED", "evidence_id": "inspection-1",
                                            "artifact_sha256": result["sha256"]},
             )["state"],
-            "IMAGE_INSPECTED",
+            "ARTIFACT_FINGERPRINTED",
         )
         self.assertEqual(
             evaluate_artifact_state(
@@ -115,7 +115,7 @@ class WindowsArtifactManifestTests(unittest.TestCase):
                 image_inspection_evidence={"status": "VERIFIED", "evidence_id": "inspection-1",
                                            "artifact_sha256": "b" * 64},
             )["state"],
-            "ARTIFACT_AUTHENTICITY_VERIFIED",
+            "ARTIFACT_FINGERPRINTED",
         )
 
     def test_invalid_digest_is_rejected(self):
@@ -161,7 +161,7 @@ class WindowsArtifactManifestTests(unittest.TestCase):
             image_inspection_evidence=inspection, servicing_evidence=servicing,
             guest_boot_evidence=guest,
         )
-        self.assertEqual(state["state"], "GUEST_BOOT_VERIFIED")
+        self.assertEqual(state["state"], "ARTIFACT_FINGERPRINTED")
         self.assertTrue(state["real_guest_boot_verified"])
 
         simulated = evaluate_artifact_state(
@@ -189,7 +189,7 @@ class WindowsArtifactManifestTests(unittest.TestCase):
             image_inspection_evidence=inspection, servicing_evidence=servicing,
             guest_boot_evidence=guest,
         )
-        self.assertEqual(state["state"], "IMAGE_SERVICED")
+        self.assertEqual(state["state"], "ARTIFACT_FINGERPRINTED")
         self.assertFalse(state["real_guest_boot_verified"])
 
     def test_bool_is_not_accepted_as_integer_size(self):
