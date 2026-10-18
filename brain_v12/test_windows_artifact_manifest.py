@@ -59,6 +59,24 @@ class WindowsArtifactManifestTests(unittest.TestCase):
             "ARTIFACT_AUTHENTICITY_VERIFIED",
         )
 
+    def test_signature_evidence_missing_verifier_identity_cannot_promote_state(self):
+        result = validate_artifact_manifest(valid_manifest())
+        evidence = signature_evidence(result)
+        evidence.pop("verifier_identity")
+        self.assertEqual(
+            evaluate_artifact_state(result, publisher_signature_evidence=evidence)["state"],
+            "ARTIFACT_FINGERPRINTED",
+        )
+
+    def test_signature_evidence_for_different_artifact_cannot_promote_state(self):
+        result = validate_artifact_manifest(valid_manifest())
+        evidence = signature_evidence(result)
+        evidence["artifact_sha256"] = "b" * 64
+        self.assertEqual(
+            evaluate_artifact_state(result, publisher_signature_evidence=evidence)["state"],
+            "ARTIFACT_FINGERPRINTED",
+        )
+
     def test_image_inspection_requires_matching_evidence_record(self):
         result = validate_artifact_manifest(valid_manifest())
         self.assertEqual(
