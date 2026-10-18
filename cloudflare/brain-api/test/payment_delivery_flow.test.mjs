@@ -51,7 +51,7 @@ try {
   assert.match(ledgerUpdate.sql, /amount = \?/);
   assert.match(ledgerUpdate.sql, /currency = \?/);
   assert.match(ledgerUpdate.sql, /state = 'PAYMENT_VERIFIED_PENDING_DELIVERY'/);
-  assert.deepEqual(ledgerUpdate.values.slice(1), ["O1", "T1", 9, "JOD"]);
+  assert.deepEqual(ledgerUpdate.values.slice(1), ["O1", "T1", 9, "JOD", "D1", "O1"]);
   assert.ok(!calls.some(x => x.sql.includes("UPDATE revenue_ledger SET state = 'REALIZED'")),
     "delivery alone must never realize revenue");
   console.log("PAYMENT_DELIVERY_SETTLEMENT_ORDERING=PASS");
