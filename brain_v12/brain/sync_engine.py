@@ -62,6 +62,7 @@ class BrainSyncStore:
         self._records: dict[str, SyncRecord] = {}
         self._events: list[SyncEvent] = []
         self._seen_events: set[str] = set()
+        self._events_by_id: dict[str, SyncEvent] = {}
 
     def revision(self, key: str) -> int:
         return self._records.get(key, SyncRecord(key, {}, 0)).revision
@@ -72,6 +73,19 @@ class BrainSyncStore:
     def _next_revision(self, key: str) -> int:
         return self.revision(key) + 1
 
+    def _existing_event(
+        self, event_id: str, *, key: str, operation: str,
+        value: Mapping[str, Any], deleted: bool,
+    ) -> SyncEvent | None:
+        """Return an identical prior event; reject reuse of its ID for other content."""
+        if event_id not in self._seen_events:
+            return None
+        existing = self._events_by_id[event_id]
+        if (existing.key != key or existing.operation != operation
+                or existing.value != dict(value) or existing.deleted != deleted):
+            raise ValueError(f"EVENT_ID_REUSE_CONFLICT: {event_id}")
+        return existing
+
     def _event(self, key: str, operation: str, record: SyncRecord, event_id: str) -> SyncEvent:
         return SyncEvent(
             event_id=event_id, key=key, operation=operation, revision=record.revision,
@@ -81,28 +95,32 @@ class BrainSyncStore:
         )
 
     def put(self, key: str, value: Mapping[str, Any], *, expected_revision: int | None = None, event_id: str) -> SyncEvent:
+        existing = self._existing_event(event_id, key=key, operation="upsert", value=value, deleted=False)
+        if existing is not None:
+            return existing
         current = self.revision(key)
         if expected_revision is not None and expected_revision != current:
             raise SyncConflict(key, expected_revision, current)
-        if event_id in self._seen_events:
-            return next(e for e in self._events if e.event_id == event_id)
         record = SyncRecord(key, dict(value), self._next_revision(key), False, time.time(), self.replica_id)
         event = self._event(key, "upsert", record, event_id)
         self._records[key] = record
         self._seen_events.add(event_id)
+        self._events_by_id[event_id] = event
         self._events.append(event)
         return event
 
     def delete(self, key: str, *, expected_revision: int | None = None, event_id: str) -> SyncEvent:
+        existing = self._existing_event(event_id, key=key, operation="delete", value={}, deleted=True)
+        if existing is not None:
+            return existing
         current = self.revision(key)
         if expected_revision is not None and expected_revision != current:
             raise SyncConflict(key, expected_revision, current)
-        if event_id in self._seen_events:
-            return next(e for e in self._events if e.event_id == event_id)
         record = SyncRecord(key, {}, self._next_revision(key), True, time.time(), self.replica_id)
         event = self._event(key, "delete", record, event_id)
         self._records[key] = record
         self._seen_events.add(event_id)
+        self._events_by_id[event_id] = event
         self._events.append(event)
         return event
 
@@ -113,18 +131,23 @@ class BrainSyncStore:
         applied = duplicate = ignored = 0
         for event in events:
             if event.event_id in self._seen_events:
+                existing = self._events_by_id[event.event_id]
+                if existing.canonical() != event.canonical():
+                    raise ValueError(f"EVENT_ID_REUSE_CONFLICT: {event.event_id}")
                 duplicate += 1
                 continue
             current = self.revision(event.key)
             if event.revision <= current:
                 ignored += 1
                 self._seen_events.add(event.event_id)
+                self._events_by_id[event.event_id] = event
                 continue
             self._records[event.key] = SyncRecord(
                 event.key, dict(event.value), event.revision, event.deleted,
                 event.timestamp, event.origin,
             )
             self._seen_events.add(event.event_id)
+            self._events_by_id[event.event_id] = event
             self._events.append(event)
             applied += 1
         return {"applied": applied, "duplicate": duplicate, "ignored": ignored}
