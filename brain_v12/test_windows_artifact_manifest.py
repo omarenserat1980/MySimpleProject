@@ -10,7 +10,9 @@ from brain_v12.brain.windows_artifact_manifest import (
 def signature_evidence(result):
     return {"status": "VERIFIED", "evidence_id": "signature-1",
             "artifact_sha256": result["sha256"], "verification_method": "OS_TRUST_STORE",
-            "verifier_identity": "test-verifier", "signature_subject": "Microsoft Corporation"}
+            "verifier_identity": "test-verifier", "signature_subject": "Microsoft Corporation",
+            "signature_result": "VALID", "certificate_chain_result": "VALID",
+            "revocation_result": "GOOD", "verified_at_utc": "2026-10-18T10:30:00Z"}
 
 
 def valid_manifest(**overrides):
