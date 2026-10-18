@@ -15,6 +15,8 @@ on:
       - 'brain_v12/tests/test_bitcoin_hash_benchmark.py'
       - 'brain_v12/tests/test_stratum_v1_protocol.py'
       - 'brain_v12/brain/bitcoin_stratum_worker.py'
+      - 'brain_v12/brain/stratum_share_submission_contract.py'
+      - 'brain_v12/tests/test_stratum_share_submission_contract.py'
       - 'brain_v12/tests/test_bitcoin_stratum_worker.py'
       - 'brain_v12/tests/test_mining_diagnostic_classifier.py'
       - 'brain_v12/tests/test_mining_runtime_evidence_validator.py'
@@ -47,12 +49,15 @@ jobs:
             brain_v12/brain/bitcoin_hash_benchmark.py \
             brain_v12/brain/stratum_v1_protocol.py \
             brain_v12/brain/bitcoin_stratum_worker.py \
+            brain_v12/brain/stratum_share_submission_contract.py \
             brain_v12/brain/mining_diagnostic_classifier.py \
             brain_v12/brain/mining_runtime_evidence_validator.py \
             brain_v12/tests/test_bitcoin_mining_intelligence_api.py \
             brain_v12/tests/test_bitcoin_hash_benchmark.py \
             brain_v12/tests/test_stratum_v1_protocol.py \
+            brain_v12/tests/test_stratum_share_submission_contract.py \
             brain_v12/tests/test_bitcoin_stratum_worker.py \
+            brain_v12/tests/test_stratum_share_submission_contract.py \
             brain_v12/tests/test_mining_diagnostic_classifier.py \
             brain_v12/tests/test_mining_runtime_evidence_validator.py
       - name: Run mining regression tests
