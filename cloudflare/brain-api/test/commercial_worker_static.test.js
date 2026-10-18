@@ -131,10 +131,68 @@ assert.match(worker, /SANDBOX_PAYMENT_VERIFIED_PENDING_DELIVERY/, "sandbox payme
 assert.match(worker, /environment = 'live'/, "revenue realization must require live environment");
 console.log("SANDBOX_CANNOT_REALIZE_REVENUE=PASS");
 
+assert.match(worker, /PAYPAL_CLIENT_ID/);
+assert.match(worker, /PAYPAL_CLIENT_SECRET/);
+assert.match(worker, /\/api\/payments\/paypal\/create/);
+assert.match(worker, /\/api\/payments\/paypal\/capture/);
+assert.match(worker, /\/api\/payments\/paypal\/webhook/);
+assert.match(worker, /verify-webhook-signature/);
+assert.match(worker, /PAYPAL_WEBHOOK_ID_NOT_CONFIGURED/);
+assert.match(worker, /"PayPal-Request-Id": createRequestId/, "PayPal order creation must use a stable idempotency key");
+assert.match(worker, /"PayPal-Request-Id": captureRequestId/, "PayPal capture retries must use a stable idempotency key");
+assert.match(worker, /PAYPAL_CAPTURE_NOT_COMPLETED/, "webhook must reject capture events whose resource status is not COMPLETED");
+assert.match(worker, /Number\(order\.amount\) !== amount/, "verified capture must match the current order amount");
+assert.ok(worker.includes("provider IN ('paytabs','paypal')"), "delivery revenue gate must recognize verified PayPal payments");
+
+const paypalCaptureStart = worker.indexOf("async function capturePayPalPayment");
+const paypalWebhookStart = worker.indexOf("async function handlePayPalWebhook", paypalCaptureStart);
+const paypalCapture = worker.slice(paypalCaptureStart, paypalWebhookStart);
+assert.ok(paypalCaptureStart >= 0 && paypalWebhookStart > paypalCaptureStart, "PayPal capture handler must exist");
+assert.ok(paypalCapture.indexOf("PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH") < paypalCapture.indexOf('if (payment.state === "PAYMENT_VERIFIED")'), "PayPal capture must validate persisted order/payment amount and currency before idempotent success");
+assert.match(paypalCapture, /state: "PAYMENT_VERIFIED_PENDING_DELIVERY"/, "idempotent capture response must not imply delivery or realized revenue");
+
+// Regression guards: verified PayPal payment retries must repair dependent records.
+const paypalVerifierStart = worker.indexOf("async function markPayPalPaymentVerified");
+const paypalVerifierEnd = worker.indexOf("async function handlePayTabsReturn", paypalVerifierStart);
+const paypalVerifier = worker.slice(paypalVerifierStart, paypalVerifierEnd);
+assert.ok(paypalVerifierStart >= 0 && paypalVerifierEnd > paypalVerifierStart, "PayPal payment verifier must exist");
+assert.ok(paypalVerifier.includes('new TextEncoder().encode("paypal-order:" + orderId)'), "stable recovery key missing");
+assert.ok(paypalVerifier.includes("await env.BRAIN_DB.batch(["), "atomic D1 batch missing");
+assert.match(paypalVerifier, /INSERT OR IGNORE INTO revenue_ledger/);
+assert.match(paypalVerifier, /INSERT OR IGNORE INTO service_jobs/);
+assert.match(paypalVerifier, /PAYPAL_REVENUE_LEDGER_RECONCILIATION_FAILED/);
+assert.match(paypalVerifier, /PAYPAL_SERVICE_JOB_NOT_PERSISTED/);
+assert.match(paypalVerifier, /SELECT tran_ref, amount, currency, state FROM revenue_ledger WHERE order_id = \? AND tran_ref = \?/, "PayPal recovery must read back its exact revenue ledger row");
+assert.match(paypalVerifier, /SELECT job_id, state FROM service_jobs WHERE job_id = \? AND order_id = \?/, "PayPal recovery must read back its exact service job");
+assert.match(paypalVerifier, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
+// Keep PayPal webhook trust checks scoped to the webhook handler, not just present elsewhere in the Worker.
+const paypalWebhookGuardStart = worker.indexOf("async function handlePayPalWebhook");
+const paypalWebhookGuardEnd = worker.indexOf("async function markPayPalPaymentVerified", paypalWebhookGuardStart);
+const paypalWebhookGuard = worker.slice(paypalWebhookGuardStart, paypalWebhookGuardEnd);
+assert.ok(paypalWebhookGuardStart >= 0 && paypalWebhookGuardEnd > paypalWebhookGuardStart, "PayPal webhook handler must exist");
+for (const header of ["PAYPAL-AUTH-ALGO", "PAYPAL-CERT-URL", "PAYPAL-TRANSMISSION-ID", "PAYPAL-TRANSMISSION-SIG", "PAYPAL-TRANSMISSION-TIME"]) {
+  assert.ok(paypalWebhookGuard.includes(header), `PayPal webhook must pass ${header} into signature verification`);
+}
+assert.match(paypalWebhookGuard, /verification_status !== "SUCCESS"/, "webhook must reject failed provider signature verification");
+assert.match(paypalWebhookGuard, /event\.event_type !== "PAYMENT\.CAPTURE\.COMPLETED"/, "unrelated PayPal webhook event types must not verify payments");
+assert.match(paypalWebhookGuard, /resource\.status \|\| ""\)\.toUpperCase\(\) !== "COMPLETED"/, "webhook must require a completed capture");
+assert.match(paypalWebhookGuard, /amount !== Number\(payment\.amount\)/, "webhook must match capture amount to persisted payment");
+assert.match(paypalWebhookGuard, /currency !== String\(payment\.currency\)\.toUpperCase\(\)/, "webhook must match capture currency to persisted payment");
+assert.match(paypalWebhookGuard, /PAYPAL_CAPTURE_IDENTIFIERS_MISSING/, "webhook must reject captures without stable identifiers");
+console.log("PAYPAL_WEBHOOK_SIGNATURE_AND_CAPTURE_GATES=PASS");
+
+console.log("PAYPAL_PARTIAL_FAILURE_RECOVERY_GATES=PASS");
+console.log("PAYPAL_SANDBOX_STATIC_GATES=PASS");
+
+
 
 assert.match(worker, /payload\.payment_result \|\| payload/, "PayTabs callback must support top-level response_status");
 assert.match(worker, /transactionType !== "sale"/, "authorization/refund callbacks must not verify a sale payment");
-assert.ok(worker.indexOf("PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH") < worker.indexOf('if (payment.state === "PAYMENT_VERIFIED")'), "amount/currency must be validated before idempotent success");
+const payTabsCallbackStart = worker.indexOf("async function handlePayTabsCallback");
+const payTabsReturnStart = worker.indexOf("async function handlePayTabsReturn");
+const payTabsCallback = worker.slice(payTabsCallbackStart, worker.indexOf("async function ", payTabsCallbackStart + 10));
+assert.ok(payTabsCallbackStart >= 0 && payTabsReturnStart >= 0, "PayTabs callback/return handlers must exist");
+assert.ok(payTabsCallback.indexOf("PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH") < payTabsCallback.indexOf('if (payment.state === "PAYMENT_VERIFIED")'), "PayTabs callback must validate amount/currency before idempotent success");
 assert.match(worker, /revenue_realized: false/, "delivery confirmation must not claim settlement");
 assert.match(worker, /settlement_required: settlementRequired/, "delivery response must surface the outstanding settlement gate");
 console.log("PAYTABS_CALLBACK_AMOUNT_IDEMPOTENCY_GATES=PASS");
