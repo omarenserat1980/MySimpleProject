@@ -104,9 +104,7 @@ class BitcoinStratumBridgeTests(unittest.TestCase):
         ]
         tls_context = MagicMock()
         tls_context.wrap_socket.return_value = tls_socket
-        with patch.dict(os.environ, env, clear=True), \\
-             patch("brain_v12.brain.bitcoin_stratum_bridge.socket.create_connection", return_value=raw_socket), \\
-             patch("brain_v12.brain.bitcoin_stratum_bridge.ssl.create_default_context", return_value=tls_context):
+        with (patch.dict(os.environ, env, clear=True), patch("brain_v12.brain.bitcoin_stratum_bridge.socket.create_connection", return_value=raw_socket), patch("brain_v12.brain.bitcoin_stratum_bridge.ssl.create_default_context", return_value=tls_context)):
             result = probe_stratum_connection()
 
         self.assertEqual(result["status"], "STRATUM_SESSION_AUTHENTICATED")
@@ -144,9 +142,7 @@ class BitcoinStratumBridgeTests(unittest.TestCase):
         ]
         tls_context = MagicMock()
         tls_context.wrap_socket.return_value = tls_socket
-        with patch.dict(os.environ, env, clear=True), \\
-             patch("brain_v12.brain.bitcoin_stratum_bridge.socket.create_connection", return_value=raw_socket), \\
-             patch("brain_v12.brain.bitcoin_stratum_bridge.ssl.create_default_context", return_value=tls_context):
+        with (patch.dict(os.environ, env, clear=True), patch("brain_v12.brain.bitcoin_stratum_bridge.socket.create_connection", return_value=raw_socket), patch("brain_v12.brain.bitcoin_stratum_bridge.ssl.create_default_context", return_value=tls_context)):
             with self.assertRaisesRegex(StratumBridgeError, "SUBSCRIBE_REJECTED"):
                 probe_stratum_connection()
 
