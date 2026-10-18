@@ -13,6 +13,9 @@ on:
       - "brain_v12/tests/test_run_evidence_store.py"
       - "brain_v12/tests/test_android_executor_adapter.py"
       - "brain_v12/tests/test_device_bridge_android_capacity.py"
+      - "brain_v12/brain/device_preflight.py"
+      - "brain_v12/tests/test_device_preflight.py"
+      - "docs/BRAIN_DEVICE_PREFLIGHT.md"
       - "brain_v12/brain/asic_resource_adapter.py"
       - "brain_v12/brain/asic_hardware_simulator.py"
       - "brain_v12/brain/mining_engine.py"
@@ -64,6 +67,8 @@ jobs:
             brain_v12/brain/executor_contract.py \
             brain_v12/brain/run_evidence_store.py \
             brain_v12/brain/android_executor_adapter.py \
+            brain_v12/brain/device_preflight.py \
+            brain_v12/tests/test_device_preflight.py \
             brain_v12/brain/asic_resource_adapter.py \
             brain_v12/brain/asic_hardware_simulator.py \
             brain_v12/brain/mining_engine.py \
@@ -212,6 +217,7 @@ jobs:
             brain_v12.tests.test_executor_contract \
             brain_v12.tests.test_run_evidence_store \
             brain_v12.tests.test_android_executor_adapter \
+            brain_v12.tests.test_device_preflight \
             brain_v12.tests.test_device_bridge_android_capacity -v \
             2>&1 | tee artifacts/asic/focused-tests.log
 
