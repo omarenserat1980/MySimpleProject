@@ -302,3 +302,11 @@ def test_set_difficulty_rejects_invalid_or_unrepresentable_values(difficulty):
         }))
     assert session.difficulty is None
     assert session.difficulty_text is None
+
+
+def test_json_numeric_difficulty_is_parsed_without_binary_float_rounding():
+    session = StratumV1Session("worker", "secret")
+    session.receive(
+        '{"id":null,"method":"mining.set_difficulty","params":[0.12345678901234567890123456789]}'
+    )
+    assert session.difficulty_text == "0.12345678901234567890123456789"
