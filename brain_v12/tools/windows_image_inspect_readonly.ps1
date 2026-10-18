@@ -27,6 +27,21 @@ if ($extension -notin $allowed) {
     throw ('UNSUPPORTED_READ_ONLY_INSPECTION_FORMAT:' + $extension)
 }
 
+$outputFullPath = $null
+if ($OutputPath) {
+    $outputFullPath = [System.IO.Path]::GetFullPath($OutputPath)
+    if ([string]::Equals($outputFullPath, $file.FullName, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'OUTPUT_PATH_MUST_NOT_OVERWRITE_IMAGE'
+    }
+    if (Test-Path -LiteralPath $outputFullPath) {
+        throw 'OUTPUT_PATH_ALREADY_EXISTS'
+    }
+    $outputDirectory = [System.IO.Path]::GetDirectoryName($outputFullPath)
+    if (-not (Test-Path -LiteralPath $outputDirectory -PathType Container)) {
+        throw 'OUTPUT_DIRECTORY_NOT_FOUND'
+    }
+}
+
 $dism = Join-Path $env:SystemRoot 'System32\Dism.exe'
 if (-not (Test-Path -LiteralPath $dism -PathType Leaf)) {
     throw 'DISM_NOT_FOUND'
@@ -73,10 +88,6 @@ $report = [ordered]@{
 
 $json = $report | ConvertTo-Json -Depth 5
 if ($OutputPath) {
-    $outputFullPath = [System.IO.Path]::GetFullPath($OutputPath)
-    if ($outputFullPath -eq $file.FullName) {
-        throw 'OUTPUT_PATH_MUST_NOT_OVERWRITE_IMAGE'
-    }
     $json | Set-Content -LiteralPath $outputFullPath -Encoding utf8
 } else {
     $json
