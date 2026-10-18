@@ -221,6 +221,25 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             }
         )
 
+    def authorize_mcp_request(request: Request) -> JSONResponse | None:
+        expected = os.getenv("BRAIN_MCP_TOKEN", "").strip()
+        if not expected:
+            return JSONResponse(
+                {"ok": False, "status": "MCP_NOT_CONFIGURED"},
+                status_code=503,
+            )
+        authorization = request.headers.get("authorization", "")
+        scheme, _, supplied = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not supplied or not hmac.compare_digest(
+            supplied, expected
+        ):
+            return JSONResponse(
+                {"ok": False, "status": "MCP_AUTH_REQUIRED"},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return None
+
     @router.get("/mcp")
     async def mcp_get(request: Request):
         auth_response = authorize_mcp_request(request)
