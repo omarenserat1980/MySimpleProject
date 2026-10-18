@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import os
 from typing import Any, Callable
 
 from fastapi import APIRouter, Request
@@ -221,6 +224,9 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
 
     @router.get("/mcp")
     async def mcp_get(request: Request):
+        auth_response = authorize_mcp_request(request)
+        if auth_response is not None:
+            return auth_response
         # Stateless MCP does not require an event stream for these read-only
         # request/response tools. A GET is kept for discovery/health clients.
         version = request.headers.get("MCP-Protocol-Version", PROTOCOL_VERSION)
@@ -239,6 +245,9 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
 
     @router.post("/mcp")
     async def mcp_post(request: Request):
+        auth_response = authorize_mcp_request(request)
+        if auth_response is not None:
+            return auth_response
         version = request.headers.get("MCP-Protocol-Version")
         if version not in SUPPORTED_PROTOCOL_VERSIONS:
             return JSONResponse(
