@@ -70,8 +70,8 @@ jobs:
           python examples/example_config.py 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/ramulator/example-run.log"
           test -s "$GITHUB_WORKSPACE/artifacts/ramulator/example-run.log"
           python - <<'PY'
-          import pathlib, re
-          log = pathlib.Path("$GITHUB_WORKSPACE/artifacts/ramulator/example-run.log")
+          import os, pathlib, re
+          log = pathlib.Path(os.environ["GITHUB_WORKSPACE"]) / "artifacts/ramulator/example-run.log"
           text = log.read_text(encoding="utf-8", errors="replace")
           required = ("Controller cycles:", "Avg read latency:", "Read requests:")
           missing = [item for item in required if item not in text]
