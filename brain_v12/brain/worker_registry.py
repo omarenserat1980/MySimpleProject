@@ -4,7 +4,7 @@ Only software workers may be registered or routed. Physical-device and Termux
 agents are intentionally disabled; the legacy constructor flag is ignored.
 """
 from __future__ import annotations
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 import time
 from .workload_router import WorkerTarget
 
@@ -84,7 +84,6 @@ class WorkerRegistry:
                     "kind": w.kind,
                     "capabilities": sorted(w.capabilities),
                     "online": w.online,
-                    "last_seen": w.last_seen,
                     "lease_until": w.lease_until,
                 }
                 for w in self._workers.values()
