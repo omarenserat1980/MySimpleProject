@@ -1,5 +1,7 @@
 import hashlib
 
+# Regression coverage for software-only identity claims and strict challenge expiry.
+
 from brain_v12.brain.software_node_identity_gate import SoftwareNodeIdentityGate, sign_node_response
 
 
