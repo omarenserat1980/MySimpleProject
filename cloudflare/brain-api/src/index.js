@@ -692,9 +692,13 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
   ).bind(delivery.order_id).first();
   let settlementRequired = Boolean(payment);
   if (payment) {
+    // A D1 batch can succeed even when a conditional statement changes zero rows.
+    // The ledger transition must independently prove that this exact delivery is
+    // DELIVERED and its order is COMPLETED; delivery/order updates alone are not
+    // sufficient evidence for advancing the revenue lifecycle.
     await env.BRAIN_DB.prepare(
-      "UPDATE revenue_ledger SET state = 'DELIVERY_CONFIRMED_PENDING_SETTLEMENT', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND environment = 'live' AND amount = ? AND currency = ?"
-    ).bind(JSON.stringify({ delivery_id: deliveryId, delivery_state: "DELIVERED", delivery_verified_at: new Date().toISOString(), delivery_verified_by: client.email, settlement_status: "NOT_YET_VERIFIED" }), delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency)).run();
+      "UPDATE revenue_ledger SET state = 'DELIVERY_CONFIRMED_PENDING_SETTLEMENT', evidence = json_patch(evidence, ?) WHERE order_id = ? AND tran_ref = ? AND state = 'PAYMENT_VERIFIED_PENDING_DELIVERY' AND environment = 'live' AND amount = ? AND currency = ? AND EXISTS (SELECT 1 FROM deliveries d JOIN orders o ON o.order_id = d.order_id WHERE d.delivery_id = ? AND d.order_id = ? AND d.state = 'DELIVERED' AND o.state = 'COMPLETED')"
+    ).bind(JSON.stringify({ delivery_id: deliveryId, delivery_state: "DELIVERED", delivery_verified_at: new Date().toISOString(), delivery_verified_by: client.email, settlement_status: "NOT_YET_VERIFIED" }), delivery.order_id, payment.tran_ref, Number(payment.amount), String(payment.currency), deliveryId, delivery.order_id).run();
   }
   await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: false, settlement_required: settlementRequired });
   return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId, revenue_realized: false, settlement_required: settlementRequired }, 200, requestOrigin, allowedOrigin);
