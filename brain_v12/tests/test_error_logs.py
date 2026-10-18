@@ -55,3 +55,23 @@ def test_default_store_uses_writable_runtime_home(tmp_path, monkeypatch):
     assert store.path.is_file()
     assert store.get(event["event_id"])["message"] == "writable"
 
+
+def test_redacts_secrets_from_exception_traceback_and_message(tmp_path):
+    store = BrainErrorLogStore(tmp_path / "errors.jsonl")
+    secret = "exception-secret-value"
+    try:
+        raise RuntimeError(f"upstream failed with password={secret}")
+    except RuntimeError as exc:
+        event = store.record(
+            category="exception_redaction_test",
+            message=f"failure token={secret}",
+            exception=exc,
+        )
+
+    serialized = json.dumps(event)
+    assert secret not in serialized
+    assert "password=[REDACTED]" in serialized
+    assert "token=[REDACTED]" in serialized
+    stored = store.get(event["event_id"])
+    assert stored is not None
+    assert secret not in json.dumps(stored)
