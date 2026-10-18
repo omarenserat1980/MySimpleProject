@@ -5,6 +5,7 @@ proof. Aggregate pool telemetry can satisfy only pool_connection and observed_ha
 """
 from __future__ import annotations
 
+import math
 from typing import Any, Mapping
 
 
@@ -31,6 +32,8 @@ def braiins_telemetry_to_proof_records(result: Mapping[str, Any]) -> list[dict[s
     worker_id = result.get("worker_id")
     hashrate = result.get("hashrate_5m_provider_units")
     unit = result.get("hashrate_unit")
+    shares = result.get("shares_5m_pool_reported")
+    last_share_age = result.get("last_share_age_seconds")
     if (
         not isinstance(digest, str)
         or len(digest) != 64
@@ -41,7 +44,18 @@ def braiins_telemetry_to_proof_records(result: Mapping[str, Any]) -> list[dict[s
         or not worker_id.strip()
         or isinstance(hashrate, bool)
         or not isinstance(hashrate, (int, float))
+        or not math.isfinite(hashrate)
         or hashrate <= 0
+        or isinstance(shares, bool)
+        or not isinstance(shares, (int, float))
+        or not math.isfinite(shares)
+        or shares < 1
+        or not float(shares).is_integer()
+        or isinstance(last_share_age, bool)
+        or not isinstance(last_share_age, (int, float))
+        or not math.isfinite(last_share_age)
+        or last_share_age < -30
+        or last_share_age > 300
         or not isinstance(unit, str)
         or not unit.strip()
     ):
