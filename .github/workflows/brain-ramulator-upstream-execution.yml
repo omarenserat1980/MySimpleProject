@@ -1,0 +1,148 @@
+name: Brain Ramulator Upstream Execution
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/brain-ramulator-upstream-execution.yml"
+      - "brain_v12/hardware/ramulator_adapter.py"
+      - "docs/BRAIN_HARDWARE_REALITY_AUDIT.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-ramulator-upstream-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ramulator-upstream:
+    name: Build and run upstream Ramulator 2.1 example
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout Brain
+        uses: actions/checkout@v4
+
+      - name: Checkout upstream Ramulator
+        uses: actions/checkout@v4
+        with:
+          repository: CMU-SAFARI/ramulator2
+          ref: c6c7a5de0cef35935d6fad7369e6271406798865
+          path: .evidence/upstream/ramulator2
+
+      - name: Record toolchain and upstream revision
+        run: |
+          mkdir -p artifacts/ramulator
+          {
+            echo "brain_commit=$GITHUB_SHA"
+            echo "upstream_repository=https://github.com/CMU-SAFARI/ramulator2"
+            echo "upstream_commit=$(git -C .evidence/upstream/ramulator2 rev-parse HEAD)"
+            echo "runner_image=ubuntu-24.04"
+            cmake --version
+            c++ --version
+            python3 --version
+          } > artifacts/ramulator/environment.txt
+          cat artifacts/ramulator/environment.txt
+
+      - name: Install build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake python3-dev python3-venv
+          cmake --version
+
+      - name: Build upstream Ramulator
+        working-directory: .evidence/upstream/ramulator2
+        run: |
+          set -o pipefail
+          mkdir -p build
+          cmake -S . -B build -DRAMULATOR_PYTHON_BINDINGS=ON 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/ramulator/cmake-configure.log"
+          cmake --build build --parallel 2 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/ramulator/build.log"
+
+      - name: Install Python package and run upstream example
+        working-directory: .evidence/upstream/ramulator2
+        run: |
+          set -o pipefail
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install -e . 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/ramulator/python-install.log"
+          python examples/example_config.py 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/ramulator/example-run.log"
+          test -s "$GITHUB_WORKSPACE/artifacts/ramulator/example-run.log"
+          python - <<'PY'
+          import os, pathlib, re
+          log = pathlib.Path(os.environ["GITHUB_WORKSPACE"]) / "artifacts/ramulator/example-run.log"
+          text = log.read_text(encoding="utf-8", errors="replace")
+          required = ("Controller cycles:", "Avg read latency:", "Read requests:")
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit("Ramulator output missing expected summary fields: " + ", ".join(missing))
+          match = re.search(r"Controller cycles:\s*(\d+)", text)
+          if not match or int(match.group(1)) <= 0:
+              raise SystemExit("Ramulator controller cycle count missing or not positive")
+          print("Ramulator known-output assertions passed")
+          PY
+
+      - name: Validate execution evidence
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, sys
+          root = pathlib.Path("artifacts/ramulator")
+          upstream = pathlib.Path(".evidence/upstream/ramulator2")
+          def sha(path):
+              p = pathlib.Path(path)
+              return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else None
+          def tail(path, limit=6000):
+              p = root / path
+              return p.read_text(encoding="utf-8", errors="replace")[-limit:] if p.exists() else ""
+          try:
+              upstream_sha = subprocess.check_output(
+                  ["git", "-C", str(upstream), "rev-parse", "HEAD"], text=True
+              ).strip()
+          except Exception:
+              upstream_sha = None
+          example = upstream / "examples/example_config.py"
+          run_log = root / "example-run.log"
+          run_text = run_log.read_text(encoding="utf-8", errors="replace") if run_log.exists() else ""
+          build_ok = (root / "build.log").exists() and "error:" not in tail("build.log").lower()
+          # The actual step exit status is represented by the job conclusion; never infer success from log presence alone.
+          evidence = {
+              "schema_version": "1.0",
+              "component": "ram-dram",
+              "upstream_repository": "https://github.com/CMU-SAFARI/ramulator2",
+              "upstream_revision": upstream_sha,
+              "brain_commit": os.environ.get("GITHUB_SHA"),
+              "example_path": "examples/example_config.py",
+              "example_sha256": sha(example),
+              "cmake_log_sha256": sha(root / "cmake-configure.log"),
+              "build_log_sha256": sha(root / "build.log"),
+              "install_log_sha256": sha(root / "python-install.log"),
+              "run_log_sha256": sha(run_log),
+              "run_log_tail": run_text[-6000:],
+              "workflow_job_status": os.environ.get("JOB_STATUS", "unknown"),
+              "evidence_class": "UPSTREAM_TOOL_EXECUTION",
+              "physical_ram_verified": False,
+              "limitations": [
+                  "Upstream source is pinned to the reviewed immutable commit recorded by the initial successful execution.",
+                  "This is a DRAM simulation, not a measurement of physical RAM or host memory performance.",
+                  "Successful execution is only established when the workflow job concludes successfully."
+              ]
+          }
+          (root / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps({k: evidence[k] for k in (
+              "upstream_revision", "example_sha256", "evidence_class",
+              "physical_ram_verified", "workflow_job_status"
+          )}, indent=2))
+          PY
+        env:
+          JOB_STATUS: ${{ job.status }}
+
+      - name: Upload upstream execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-ramulator-upstream-evidence
+          path: artifacts/ramulator/
+          if-no-files-found: error
+          retention-days: 30
