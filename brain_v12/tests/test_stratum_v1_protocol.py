@@ -52,6 +52,14 @@ def test_unknown_or_stale_job_is_rejected():
         session.request_submit("job-1", "00", "00000000", "00000000")
 
 
+@pytest.mark.parametrize("job_id", [None, "", 7, [], {}])
+def test_malformed_submit_job_identifiers_fail_closed(job_id):
+    session = StratumV1Session("worker", "secret", authorized=True, current_job_id="job")
+    with pytest.raises(StratumProtocolError, match="UNKNOWN_OR_STALE_JOB"):
+        session.request_submit(job_id, "00000001", "00000000", "00000000")
+    assert not session.pending
+
+
 @pytest.mark.parametrize("line", ["{", "[]", "null", "x" * 1_000_001])
 def test_malformed_messages_fail_closed(line):
     with pytest.raises(StratumProtocolError):
