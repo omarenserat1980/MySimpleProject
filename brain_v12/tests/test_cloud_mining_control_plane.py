@@ -29,6 +29,14 @@ def test_github_actions_is_never_admitted():
     assert reason == "github_actions_mining_forbidden"
 
 
+def test_worker_identity_and_owner_are_canonicalized_before_storage():
+    cp = CloudMiningControlPlane()
+    cp.register_worker(CloudWorker("  w1  ", " VM ", "region-a", " owner-a ", enabled=True))
+    assert list(cp.workers) == ["w1"]
+    assert cp.workers["w1"].owner == "owner-a"
+    assert cp.plan("w1").worker_id == "w1"
+
+
 def test_worker_identity_cannot_be_reassigned_to_another_owner_or_kind():
     cp = CloudMiningControlPlane()
     cp.register_worker(CloudWorker("w1", "vm", "region-a", "owner-a", enabled=True))
