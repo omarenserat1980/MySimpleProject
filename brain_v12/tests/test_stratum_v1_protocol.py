@@ -52,11 +52,6 @@ def test_unknown_or_stale_job_is_rejected():
         session.request_submit("job-1", "00", "00000000", "00000000")
 
 
-def test_malformed_messages_fail_closed(line):
-    with pytest.raises(StratumProtocolError):
-        parse_message(line)
-
-
 @pytest.mark.parametrize("line", ["{", "[]", "null", "x" * 1_000_001])
 def test_malformed_messages_fail_closed(line):
     with pytest.raises(StratumProtocolError):
