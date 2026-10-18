@@ -75,6 +75,9 @@ jobs:
           node --check src/index.js
           node test/commercial_worker_static.test.js
 
+      - name: Test settlement gate SQL contracts with SQLite
+        run: python cloudflare/brain-api/test/settlement_gate_sqlite_test.py
+
       - name: Compile revenue and payment path
         run: python -m compileall -q brain_v12/brain/client_revenue_guardian.py brain_v12/brain/income_lifecycle.py brain_v12/brain/live_opportunity_researcher.py brain_v12/brain/payment_gateway.py brain_v12/brain/commerce_api.py brain_v12/brain/economic_reconciliation.py
 
