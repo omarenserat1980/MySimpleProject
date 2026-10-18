@@ -49,6 +49,9 @@ class MiningVerificationCycle:
     state: VerificationState = VerificationState.DISCOVERED
     evidence: dict[str, Any] = field(default_factory=dict)
     history: list[str] = field(default_factory=lambda: [VerificationState.DISCOVERED.value])
+    _chain_verifier: Callable[[BlockchainProof, dict[str, Any]], bool] | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def advance(self, new_state: VerificationState, reason: str) -> dict[str, Any]:
         allowed = {
@@ -86,11 +89,7 @@ class MiningVerificationCycle:
                 self.advance(VerificationState.REJECTED, result["status"])
         return self.snapshot()
 
-    def submit_blockchain_proof(
-        self,
-        proof: BlockchainProof,
-        chain_verifier: Callable[[BlockchainProof, dict[str, Any]], bool] | None = None,
-    ) -> dict[str, Any]:
+    def submit_blockchain_proof(self, proof: BlockchainProof) -> dict[str, Any]:
         """Accept a chain proof only when an independent verifier is injected.
 
         The verifier must query an authoritative source or validate a verifiable
@@ -111,9 +110,9 @@ class MiningVerificationCycle:
             raise ValueError("claimed payout evidence is required before blockchain proof")
         if proof.txid != expected_txid:
             raise ValueError("blockchain proof txid does not match payout evidence")
-        if chain_verifier is None:
-            raise ValueError("independent chain verifier is required; caller-supplied proof is unverified")
-        if not chain_verifier(proof, payout):
+        if self._chain_verifier is None:
+            raise ValueError("independent chain verifier is not configured; proof remains unverified")
+        if not self._chain_verifier(proof, payout):
             raise ValueError("independent chain verification failed")
 
         self.evidence["blockchain_proof"] = {
@@ -147,7 +146,17 @@ class MiningVerificationCycle:
         }
 
 
-def start_cloud_mining_verification(provider: str, opportunity_id: str) -> MiningVerificationCycle:
+def start_cloud_mining_verification(
+    provider: str,
+    opportunity_id: str,
+    *,
+    chain_verifier: Callable[[BlockchainProof, dict[str, Any]], bool] | None = None,
+) -> MiningVerificationCycle:
+    """Create a cycle; production verifier injection must come from trusted wiring."""
     if not provider.strip() or not opportunity_id.strip():
         raise ValueError("provider and opportunity_id are required")
-    return MiningVerificationCycle(opportunity_id=opportunity_id, provider=provider)
+    return MiningVerificationCycle(
+        opportunity_id=opportunity_id,
+        provider=provider,
+        _chain_verifier=chain_verifier,
+    )
