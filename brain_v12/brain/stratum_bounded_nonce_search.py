@@ -5,7 +5,6 @@ submission occurs here. Results are local computation evidence only.
 """
 from __future__ import annotations
 
-import hashlib
 from typing import Any
 
 from .bitcoin_header import sha256d
