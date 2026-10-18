@@ -7,6 +7,7 @@ identity or license eligibility.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -18,6 +19,17 @@ SIGNATURE_STATES = frozenset(
 HEX_SHA256 = re.compile(r"^[0-9a-fA-F]{64}$")
 SAFE_FILENAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._ -]{0,199}$")
 UTC_SUFFIX = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
+
+
+def _is_valid_utc_timestamp(value: Any) -> bool:
+    """Require UTC-Z format and a real calendar timestamp."""
+    if not isinstance(value, str) or not UTC_SUFFIX.fullmatch(value):
+        return False
+    try:
+        datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError:
+        return False
+    return True
 
 
 def validate_artifact_manifest(manifest: Any) -> dict[str, Any]:
@@ -72,7 +84,7 @@ def validate_artifact_manifest(manifest: Any) -> dict[str, Any]:
             errors.append("SOURCE_URL_MUST_BE_HTTPS")
 
     acquired = manifest.get("acquired_at_utc")
-    if not isinstance(acquired, str) or not UTC_SUFFIX.fullmatch(acquired):
+    if not _is_valid_utc_timestamp(acquired):
         errors.append("ACQUIRED_AT_MUST_BE_UTC_ISO8601")
 
     provenance = manifest.get("license_provenance")
@@ -120,8 +132,7 @@ def _signature_evidence_is_valid(evidence: Any, manifest_result: dict[str, Any])
         and evidence.get("signature_result") == "VALID"
         and evidence.get("certificate_chain_result") == "VALID"
         and evidence.get("revocation_result") in {"GOOD", "NOT_SUPPORTED"}
-        and isinstance(evidence.get("verified_at_utc"), str)
-        and UTC_SUFFIX.fullmatch(evidence.get("verified_at_utc", ""))
+        and _is_valid_utc_timestamp(evidence.get("verified_at_utc"))
     )
 
 
@@ -133,7 +144,7 @@ def _guest_boot_evidence_is_valid(evidence: Any, manifest_result: dict[str, Any]
         evidence.get("source") == "IN_GUEST"
         and evidence.get("os_edition")
         and evidence.get("os_build")
-        and evidence.get("boot_time_utc")
+        and _is_valid_utc_timestamp(evidence.get("boot_time_utc"))
         and isinstance(vm_hash, str)
         and HEX_SHA256.fullmatch(vm_hash)
         and evidence.get("independent_verification") is True
