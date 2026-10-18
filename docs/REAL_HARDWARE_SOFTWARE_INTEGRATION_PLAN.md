@@ -38,7 +38,11 @@ These are candidates to evaluate, not tools already installed or integrated. Pin
 - Unconfigured integrations default to NOT_CONFIGURED, never ready.
 
 ### Stage 2 — RAM and server simulation
-- Integrate one memory simulator first, initially Ramulator 2.0, behind a Brain-owned adapter.
+- Initial adapter implemented: `brain_v12/hardware/ramulator_adapter.py`, with contract tests in `brain_v12/hardware/test_ramulator_adapter.py` and CI matrix registration.
+- The adapter probes for `ramulator2`, accepts a local config file, hashes the config, bounds execution time, and returns a structured simulated-evidence record. It does not install/download the upstream tool.
+- Next acceptance gate: CI must pass, then a pinned Ramulator 2.1 build and known example trace must run in an authorized runner with the tool version, config hash, trace identity and output artifact recorded.
+- Keep model outputs separate from OS memory telemetry. A simulated 64 GiB configuration must never be reported as installed physical RAM.
+- Integrate QEMU only after the runner has adequate resources and VM isolation.
 - Keep model outputs separate from OS memory telemetry. A simulated 64 GiB configuration must never be reported as installed physical RAM.
 - Integrate QEMU only after the runner has adequate resources and VM isolation.
 
@@ -56,6 +60,7 @@ This document is a plan, not evidence any candidate has been installed, built, e
 
 ## Done criteria for each adapter
 - [ ] Exact upstream source/version pinned
+- [ ] Adapter and contract tests implemented (Ramulator initial adapter exists; real upstream run still pending)
 - [ ] License and redistribution decision recorded
 - [ ] Reproducible build/invocation documented
 - [ ] Resource and permission limits enforced
