@@ -63,3 +63,24 @@ test("PayPal create fails closed when client identity provider is not configured
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), { ok: false, error: "CLIENT_AUTH_ORIGIN_NOT_CONFIGURED" });
 });
+
+
+test("PayPal webhook rejects malformed JSON before attempting provider authentication", async () => {
+  const response = await worker.fetch(new Request("https://brain.test/api/payments/paypal/webhook", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{not-json",
+  }), { BRAIN_DB: {}, PAYPAL_WEBHOOK_ID: "synthetic-webhook-id" });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { ok: false, error: "INVALID_JSON" });
+});
+
+
+test("PayPal webhook rejects missing signature headers before OAuth credentials or provider calls", async () => {
+  const response = await post("/api/payments/paypal/webhook", {
+    BRAIN_DB: {},
+    PAYPAL_WEBHOOK_ID: "synthetic-webhook-id",
+  }, { event_type: "PAYMENT.CAPTURE.COMPLETED" });
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { ok: false, error: "PAYPAL_WEBHOOK_HEADERS_REQUIRED" });
+});
