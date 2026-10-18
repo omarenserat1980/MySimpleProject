@@ -54,5 +54,22 @@ class CloudExecutorAttestationClientTests(unittest.TestCase):
         self.assertNotIn("example.invalid", message)
 
 
+    def test_allowlisted_challenge_replay_error_is_preserved(self):
+        body = json.dumps({"detail": "CLOUD_EXECUTOR_ISSUER_CHALLENGE_REPLAY"}).encode()
+        error = HTTPError("https://example.invalid/attestation/issue", 403, "Forbidden", {}, io.BytesIO(body))
+        self.assertEqual(
+            str(_safe_http_error(error)),
+            "CLOUD_EXECUTOR_HTTP_403:CLOUD_EXECUTOR_ISSUER_CHALLENGE_REPLAY",
+        )
+
+    def test_allowlisted_registry_error_is_preserved(self):
+        body = json.dumps({"detail": "CLOUD_EXECUTOR_ATTESTATION_REGISTRY_UNAVAILABLE"}).encode()
+        error = HTTPError("https://example.invalid/attestation/consume", 503, "Unavailable", {}, io.BytesIO(body))
+        self.assertEqual(
+            str(_safe_http_error(error)),
+            "CLOUD_EXECUTOR_HTTP_503:CLOUD_EXECUTOR_ATTESTATION_REGISTRY_UNAVAILABLE",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
