@@ -82,7 +82,8 @@ class StratumV1Session:
                        nonce: str) -> bytes:
         if not self.authorized:
             raise StratumProtocolError("POOL_AUTHORIZATION_REQUIRED")
-        if not self.current_job_id or job_id not in self.active_job_ids:
+        if (not isinstance(job_id, str) or not job_id or not self.current_job_id
+                or job_id not in self.active_job_ids):
             raise StratumProtocolError("UNKNOWN_OR_STALE_JOB")
         if (not isinstance(extranonce2, str) or not 2 <= len(extranonce2) <= 64
                 or len(extranonce2) % 2
