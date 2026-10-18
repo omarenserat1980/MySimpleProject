@@ -164,10 +164,10 @@ assert.match(paypalVerifier, /PAYPAL_REVENUE_LEDGER_RECONCILIATION_FAILED/);
 assert.match(paypalVerifier, /PAYPAL_SERVICE_JOB_NOT_PERSISTED/);
 assert.match(paypalVerifier, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
 // Keep PayPal webhook trust checks scoped to the webhook handler, not just present elsewhere in the Worker.
-const paypalWebhookGuardGuardStart = worker.indexOf("async function handlePayPalWebhook");
-const paypalWebhookGuardGuardEnd = worker.indexOf("async function markPayPalPaymentVerified", paypalWebhookGuardGuardStart);
-const paypalWebhookGuard = worker.slice(paypalWebhookGuardGuardStart, paypalWebhookGuardGuardEnd);
-assert.ok(paypalWebhookGuardGuardStart >= 0 && paypalWebhookGuardGuardEnd > paypalWebhookGuardGuardStart, "PayPal webhook handler must exist");
+const paypalWebhookGuardStart = worker.indexOf("async function handlePayPalWebhook");
+const paypalWebhookGuardEnd = worker.indexOf("async function markPayPalPaymentVerified", paypalWebhookGuardStart);
+const paypalWebhookGuard = worker.slice(paypalWebhookGuardStart, paypalWebhookGuardEnd);
+assert.ok(paypalWebhookGuardStart >= 0 && paypalWebhookGuardEnd > paypalWebhookGuardStart, "PayPal webhook handler must exist");
 for (const header of ["PAYPAL-AUTH-ALGO", "PAYPAL-CERT-URL", "PAYPAL-TRANSMISSION-ID", "PAYPAL-TRANSMISSION-SIG", "PAYPAL-TRANSMISSION-TIME"]) {
   assert.ok(paypalWebhookGuard.includes(header), `PayPal webhook must pass ${header} into signature verification`);
 }
