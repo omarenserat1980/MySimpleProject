@@ -244,7 +244,7 @@ from .integration.api import build_router as mission_router_builder
 app.include_router(brain_git_router(brain_git))
 app.include_router(brain_ai_router(brain_ai, chat_session_store))
 app.include_router(ai_fabric_router(fabric))
-app.include_router(brain_chat_router(brain_ai, chat_session_store))
+app.include_router(brain_chat_router(brain_ai, chat_session_store, event_sink=store.event))
 app.include_router(brain_stream_router(brain_ai, store))
 app.include_router(commerce_router(os.path.join(ROOT, "brain_v12_commerce.json")))
 app.include_router(revenue_conversion_router(income_lifecycle))
@@ -3252,6 +3252,66 @@ def brain_life_certificate():
 def brain_liveness():
     """Read-only evidence-based Brain liveness assessment."""
     return assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
+
+@app.get("/api/brain-avatar/state")
+def brain_avatar_state():
+    """Return liveness/events and a rate-limited persisted pulse; never triggers execution."""
+    try:
+        from .brain.human_presence_pulse import evaluate_pulse
+        pulse_status = None
+        try:
+            pulse_status = evaluate_pulse(store, display_target="brain-avatar-ui")
+        except Exception as pulse_exc:
+            pulse_status = {
+                "pulse_id": "HUMAN_PRESENCE",
+                "enabled": False,
+                "visual_state": "UNCERTAIN",
+                "last_render_status": "PULSE_EVALUATION_FAILED",
+                "error": str(pulse_exc)[:160],
+            }
+        assessment = assess_brain_liveness(store=store, device_bridge=device_bridge, cognitive=cognitive)
+        checks = assessment.get("checks", {})
+        core_alive = bool(assessment.get("brain_alive"))
+        device = checks.get("device_bridge", {})
+        avatar_state = "IDLE"
+        event_type = None
+        event_age_seconds = None
+        event_source = "none"
+        if not core_alive:
+            avatar_state = "ERROR"
+            event_source = "liveness_assessment"
+        else:
+            from .brain.avatar_state import resolve_avatar_event
+            event_result = resolve_avatar_event(store.events(50))
+            avatar_state = event_result["state"]
+            event_type = event_result["event_type"]
+            event_age_seconds = event_result["event_age_seconds"]
+            event_source = event_result["source"]
+            if event_source != "recent_runtime_event" and (assessment.get("status") == "DEGRADED" or not device.get("ok")):
+                avatar_state = "UNCERTAIN"
+                event_source = "liveness_assessment"
+        return {
+            "ok": True,
+            "source": event_source,
+            "state": avatar_state,
+            "event_type": event_type,
+            "event_age_seconds": event_age_seconds,
+            "brain_status": assessment.get("status", "UNKNOWN"),
+            "brain_alive": core_alive,
+            "device_bridge_configured": bool(device.get("configured")),
+            "agents_online": bool(device.get("agents_online")),
+            "human_presence_pulse": pulse_status,
+            "checked_at": assessment.get("checked_at"),
+            "note": "Expressions reflect recorded runtime status/events, not subjective feelings or consciousness.",
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "source": "live_brain_liveness_assessment",
+            "state": "ERROR",
+            "brain_status": "UNKNOWN",
+            "error": str(exc)[:240],
+        }
 
 # Simulation-first remote fabric. All routes operate on the virtual twin unless a
 # separately configured, independently validated real-device probe is supplied.
