@@ -37,6 +37,8 @@ on:
       - "brain_v12/tests/test_software_capability_gap_audit.py"
       - "brain_v12/tests/test_software_capability_candidate_catalog.py"
       - "brain_v12/tests/test_software_capability_promotion_gate.py"
+      - "brain_v12/hardware/**"
+      - "docs/BRAIN_HARDWARE_REALITY_AUDIT.md"
       - ".github/workflows/brain-component-contract-tests.yml"
 
 permissions:
