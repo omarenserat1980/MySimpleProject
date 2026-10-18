@@ -225,5 +225,6 @@ assert.ok(verifiedRetryStart >= 0 && verifiedRetryEnd > verifiedRetryStart, "ver
 const verifiedRetry = paypalCaptureRecovery.slice(verifiedRetryStart, verifiedRetryEnd);
 assert.match(verifiedRetry, /markPayPalPaymentVerified\(/, "verified PayPal retries must reconcile ledger and service job rows");
 assert.match(verifiedRetry, /priorEvidence\?\.capture_id/, "verified retry must recover the persisted capture identifier");
+assert.match(paypalCaptureRecovery, /SELECT tran_ref, order_id, amount, currency, state, raw_evidence FROM payments WHERE tran_ref = \? AND order_id = \? AND provider = 'paypal'/, "verified retry must read persisted raw_evidence from the payment row");
 assert.match(verifiedRetry, /PAYPAL_VERIFIED_EVIDENCE_INCOMPLETE/, "verified retry must fail closed when prior evidence is incomplete");
 console.log("PAYPAL_VERIFIED_RETRY_RECOVERY_GATES=PASS");
