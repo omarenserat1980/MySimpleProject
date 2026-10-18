@@ -74,6 +74,11 @@ def run_config(
     stdout/stderr are truncated before returning. Callers should execute this
     adapter in a sandbox/container for stronger resource and filesystem limits.
     """
+    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool):
+        raise ValueError("timeout_seconds must be an integer")
+    if not 1 <= timeout_seconds <= MAX_TIMEOUT_SECONDS:
+        raise ValueError(f"timeout_seconds must be between 1 and {MAX_TIMEOUT_SECONDS}")
+
     resolved = shutil.which(executable)
     if not resolved:
         return {
@@ -82,11 +87,6 @@ def run_config(
             "evidence_class": "SIMULATED",
             "physical_hardware_verified": False,
         }
-
-    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool):
-        raise ValueError("timeout_seconds must be an integer")
-    if not 1 <= timeout_seconds <= MAX_TIMEOUT_SECONDS:
-        raise ValueError(f"timeout_seconds must be between 1 and {MAX_TIMEOUT_SECONDS}")
 
     path = Path(config_path).expanduser().resolve(strict=True)
     if not path.is_file() or path.stat().st_size > MAX_CONFIG_BYTES:
