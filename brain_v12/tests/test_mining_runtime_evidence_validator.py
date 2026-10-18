@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from copy import deepcopy
-
 from brain_v12.brain.mining_runtime_evidence_validator import (
+    canonical_payload_sha256,
     validate_mining_runtime_evidence,
 )
 
 
 def valid_envelope():
-    return {
+    evidence = {
         "schema_version": 1,
         "evidence_id": "test-evidence-001",
         "source": {
@@ -35,11 +34,13 @@ def valid_envelope():
             "account_match": "UNKNOWN",
         },
         "integrity": {
-            "payload_sha256": "a" * 64,
+            "payload_sha256": "",
             "signature": None,
             "signing_key_id": None,
         },
     }
+    evidence["integrity"]["payload_sha256"] = canonical_payload_sha256(evidence)
+    return evidence
 
 
 def test_valid_envelope_is_only_structurally_valid_not_authenticated():
@@ -47,7 +48,7 @@ def test_valid_envelope_is_only_structurally_valid_not_authenticated():
     assert report["valid"] is True
     assert report["errors"] == []
     assert report["source_authenticated"] is False
-    assert report["integrity_hash_verified"] is False
+    assert report["integrity_hash_verified"] is True
     assert report["real_mining_verified"] is False
     assert report["brain_work_attribution_verified"] is False
     assert report["revenue_verified"] is False
@@ -110,6 +111,26 @@ def test_reported_shares_never_promote_real_mining_or_revenue():
     evidence["observations"]["accepted_shares"] = "ACCEPTED_REPORTED"
     report = validate_mining_runtime_evidence(evidence)
     assert report["valid"] is True
+    assert report["real_mining_verified"] is False
+    assert report["brain_work_attribution_verified"] is False
+    assert report["revenue_verified"] is False
+
+
+
+def test_payload_mutation_is_detected_by_hash():
+    evidence = valid_envelope()
+    evidence["observations"]["dns"] = "PASS"
+    report = validate_mining_runtime_evidence(evidence)
+    assert report["valid"] is False
+    assert report["integrity_hash_verified"] is False
+    assert "INTEGRITY_HASH_MISMATCH" in report["errors"]
+
+
+def test_hash_does_not_authenticate_source_or_prove_mining():
+    evidence = valid_envelope()
+    report = validate_mining_runtime_evidence(evidence)
+    assert report["integrity_hash_verified"] is True
+    assert report["source_authenticated"] is False
     assert report["real_mining_verified"] is False
     assert report["brain_work_attribution_verified"] is False
     assert report["revenue_verified"] is False
