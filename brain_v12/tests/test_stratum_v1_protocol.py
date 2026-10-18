@@ -188,3 +188,74 @@ def test_share_submit_rejects_invalid_or_oversized_extranonce2(extranonce2):
     with pytest.raises(StratumProtocolError, match="INVALID_EXTRANONCE2_HEX_WIDTH"):
         session.request_submit("job", extranonce2, "00000000", "00000000")
     assert not session.pending
+
+
+@pytest.mark.parametrize(
+    ("extranonce1", "extranonce2_size", "expected_error"),
+    [
+        ("a1b", 4, "MALFORMED_SUBSCRIBE_EXTRANONCE1"),
+        ("zzzz", 4, "MALFORMED_SUBSCRIBE_EXTRANONCE1"),
+        ("00" * 65, 4, "MALFORMED_SUBSCRIBE_EXTRANONCE1"),
+        ("abcd", True, "MALFORMED_SUBSCRIBE_EXTRANONCE2_SIZE"),
+        ("abcd", 0, "MALFORMED_SUBSCRIBE_EXTRANONCE2_SIZE"),
+        ("abcd", 33, "MALFORMED_SUBSCRIBE_EXTRANONCE2_SIZE"),
+    ],
+)
+def test_invalid_subscribe_extranonce_parameters_do_not_consume_request(
+    extranonce1, extranonce2_size, expected_error
+):
+    session = StratumV1Session("worker", "secret")
+    request = json.loads(session.request_subscribe())
+    response = {"id": request["id"], "result": [[], extranonce1, extranonce2_size], "error": None}
+    with pytest.raises(StratumProtocolError, match=expected_error):
+        session.receive(json.dumps(response))
+    assert request["id"] in session.pending
+    assert session.subscribed is False
+    assert session.extranonce1_hex is None
+    assert session.extranonce2_size is None
+
+
+def test_valid_subscribe_stores_normalized_extranonce_parameters():
+    session = StratumV1Session("worker", "secret")
+    request = json.loads(session.request_subscribe())
+    session.receive(json.dumps({
+        "id": request["id"], "result": [[], "A1B2", 4], "error": None
+    }))
+    assert session.subscribed is True
+    assert session.extranonce1_hex == "a1b2"
+    assert session.extranonce2_size == 4
+    snapshot = session.snapshot()
+    assert snapshot["extranonce1_configured"] is True
+    assert snapshot["extranonce2_size"] == 4
+    assert "extranonce1_hex" not in snapshot
+
+
+@pytest.mark.parametrize(
+    ("params", "expected_error"),
+    [
+        (["a1b", 4], "INVALID_EXTRANONCE1_HEX"),
+        (["zzzz", 4], "INVALID_EXTRANONCE1_HEX"),
+        (["00" * 65, 4], "INVALID_EXTRANONCE1_HEX"),
+        (["abcd", True], "INVALID_EXTRANONCE2_SIZE"),
+        (["abcd", 0], "INVALID_EXTRANONCE2_SIZE"),
+        (["abcd", 33], "INVALID_EXTRANONCE2_SIZE"),
+        (["abcd"], "INVALID_EXTRANONCE"),
+    ],
+)
+def test_set_extranonce_notification_rejects_invalid_fields_without_mutation(params, expected_error):
+    session = StratumV1Session("worker", "secret", extranonce1_hex="beef", extranonce2_size=2)
+    before = (session.extranonce1_hex, session.extranonce2_size)
+    with pytest.raises(StratumProtocolError, match=expected_error):
+        session.receive(json.dumps({
+            "id": None, "method": "mining.set_extranonce", "params": params
+        }))
+    assert (session.extranonce1_hex, session.extranonce2_size) == before
+
+
+def test_set_extranonce_notification_updates_only_after_full_validation():
+    session = StratumV1Session("worker", "secret", extranonce1_hex="beef", extranonce2_size=2)
+    session.receive(json.dumps({
+        "id": None, "method": "mining.set_extranonce", "params": ["A1B2", 8]
+    }))
+    assert session.extranonce1_hex == "a1b2"
+    assert session.extranonce2_size == 8
