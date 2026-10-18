@@ -28,14 +28,21 @@ class BrainVMExecutionBoard:
         self.instructions_executed = 0
         return self.status()
 
+    def step(self, program) -> dict:
+        """Execute exactly one instruction and advance one logical tick."""
+        if self.cpu.halted:
+            return {"ok": True, "halted": True, "pc": self.cpu.pc, "executed": False}
+        result = self.cpu.step(program, self.ram)
+        self.clock.pulse()
+        self.instructions_executed += 1
+        return {**result, "executed": True, "logical_tick": self.clock.ticks}
+
     def run(self, program, max_instructions: int = 10000) -> dict:
         if not isinstance(max_instructions, int) or max_instructions <= 0:
             raise ValueError("BOARD_INSTRUCTION_BUDGET_MUST_BE_POSITIVE")
         trace = []
         while not self.cpu.halted and len(trace) < max_instructions:
-            step = self.cpu.step(program, self.ram)
-            self.clock.pulse()
-            self.instructions_executed += 1
+            step = self.step(program)
             trace.append(step)
         if not self.cpu.halted:
             raise RuntimeError("BOARD_INSTRUCTION_BUDGET_EXHAUSTED")
