@@ -1,0 +1,169 @@
+name: Brain Isolated Cloudflare Staging Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/brain-isolated-staging-gate.yml"
+      - "cloudflare/brain-api/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-isolated-cloudflare-staging
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Worker and commercial safety gates
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          node --check src/index.js
+          node test/commercial_worker_static.test.js
+      - name: Test delivery/revenue SQL gates locally
+        run: python cloudflare/brain-api/test/delivery_concurrency_sqlite_test.py -v
+
+  deploy-staging:
+    needs: validate
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    environment: brain-staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STAGING_CLOUDFLARE_ACCOUNT_ID }}
+      STAGING_D1_DATABASE_ID: ${{ secrets.STAGING_D1_DATABASE_ID }}
+      PAYTABS_SERVER_KEY: ${{ secrets.PAYTABS_SANDBOX_SERVER_KEY }}
+      PAYTABS_PROFILE_ID: ${{ secrets.PAYTABS_SANDBOX_PROFILE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Fail closed unless isolated staging configuration exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID STAGING_D1_DATABASE_ID PAYTABS_SERVER_KEY PAYTABS_PROFILE_ID; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error title=Missing staging configuration::$name is required; production fallback is forbidden."
+              exit 1
+            fi
+          done
+          if [[ ! "$STAGING_D1_DATABASE_ID" =~ ^[0-9a-fA-F-]{36}$ ]]; then
+            echo "::error::STAGING_D1_DATABASE_ID must be a dedicated D1 database UUID."
+            exit 1
+          fi
+          echo "STAGING_CONFIGURATION=COMPLETE"
+      - name: Generate isolated Wrangler configuration
+        working-directory: cloudflare/brain-api
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > wrangler.staging.toml <<EOF
+          name = "brain-cloud-api-staging"
+          main = "src/index.js"
+          compatibility_date = "2026-10-02"
+          account_id = "$CLOUDFLARE_ACCOUNT_ID"
+          [vars]
+          BRAIN_ALLOWED_ORIGIN = "https://omarenserat1980.github.io"
+          BRAIN_RETURN_PAGE = "https://omarenserat1980.github.io/MySimpleProject/cinema.html"
+          PAYTABS_PROFILE_ID = "$PAYTABS_PROFILE_ID"
+          [[d1_databases]]
+          binding = "BRAIN_DB"
+          database_name = "brain-commercial-staging"
+          database_id = "$STAGING_D1_DATABASE_ID"
+          migrations_dir = "migrations"
+          [[r2_buckets]]
+          binding = "CINEMA_MEDIA"
+          bucket_name = "brain-cinema-media-staging"
+          EOF
+          echo "STAGING_CONFIG_GENERATED=TRUE"
+      - name: Apply migrations to dedicated staging D1 only
+        working-directory: cloudflare/brain-api
+        run: npx --yes wrangler@4 d1 migrations apply brain-commercial-staging --config wrangler.staging.toml --remote
+      - name: Ensure isolated staging R2 bucket
+        working-directory: cloudflare/brain-api
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! npx --yes wrangler@4 r2 bucket create brain-cinema-media-staging --config wrangler.staging.toml; then
+            npx --yes wrangler@4 r2 bucket list --config wrangler.staging.toml --json | node -e '
+              let s = "";
+              process.stdin.on("data", d => s += d).on("end", () => {
+                let rows;
+                try { rows = JSON.parse(s); } catch { process.exit(1); }
+                if (!Array.isArray(rows) || !rows.some(x => x.name === "brain-cinema-media-staging")) process.exit(1);
+              });'
+          fi
+          echo "STAGING_R2_READY=TRUE"
+      - name: Configure PayTabs Sandbox secret
+        working-directory: cloudflare/brain-api
+        run: printf '%s' "$PAYTABS_SERVER_KEY" | npx --yes wrangler@4 secret put PAYTABS_SERVER_KEY --config wrangler.staging.toml
+      - name: Deploy staging Worker
+        id: deploy
+        working-directory: cloudflare/brain-api
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy --config wrangler.staging.toml 2>&1 | tee /tmp/staging-deploy.log
+          url=$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' /tmp/staging-deploy.log | tail -1 || true)
+          if [ -z "$url" ]; then echo "::error::STAGING_WORKER_URL_NOT_FOUND"; exit 1; fi
+          echo "worker_url=$url" >> "$GITHUB_OUTPUT"
+          echo "STAGING_WORKER_URL=$url"
+      - name: Smoke test staging health
+        env:
+          STAGING_WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error "$STAGING_WORKER_URL/health" > /tmp/staging-health.json
+          node -e 'const fs=require("fs"); const x=JSON.parse(fs.readFileSync("/tmp/staging-health.json","utf8")); if (!x || x.ok === false) process.exit(1);'
+          echo "STAGING_HEALTH_CHECK=PASS"
+      - name: Save sanitized staging evidence
+        if: always()
+        env:
+          STAGING_WORKER_URL: ${{ steps.deploy.outputs.worker_url }}
+        run: |
+          mkdir -p staging-evidence
+          python - <<'PY'
+          import json, os, pathlib, time
+          run = {
+            "run_id": os.environ.get("GITHUB_RUN_ID"),
+            "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+            "commit_sha": os.environ.get("GITHUB_SHA"),
+            "ref": os.environ.get("GITHUB_REF"),
+            "worker_url": os.environ.get("STAGING_WORKER_URL") or None,
+            "staging_only": True,
+            "paytabs_transaction_performed": False,
+            "delivery_confirmed": False,
+            "revenue_realized": False,
+            "recorded_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+          }
+          pathlib.Path("staging-evidence/run-metadata.json").write_text(json.dumps(run, indent=2)+"\n")
+          health = pathlib.Path("/tmp/staging-health.json")
+          if health.exists():
+            try:
+              pathlib.Path("staging-evidence/health.json").write_text(json.dumps(json.loads(health.read_text()), indent=2)+"\n")
+            except Exception:
+              pathlib.Path("staging-evidence/health.txt").write_text("Health endpoint responded; JSON parsing failed.\n")
+          PY
+      - name: Upload sanitized staging evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-staging-evidence-${{ github.run_id }}
+          path: staging-evidence/
+          if-no-files-found: warn
+          retention-days: 30
