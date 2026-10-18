@@ -9,11 +9,13 @@ on:
       - 'brain_v12/brain/bitcoin_hash_benchmark.py'
       - 'brain_v12/brain/stratum_v1_protocol.py'
       - 'brain_v12/brain/mining_diagnostic_classifier.py'
+      - 'brain_v12/brain/mining_runtime_evidence_validator.py'
       - 'brain_v12/tests/test_bitcoin_mining_intelligence_api.py'
       - 'brain_v12/tests/test_mining_engine.py'
       - 'brain_v12/tests/test_bitcoin_hash_benchmark.py'
       - 'brain_v12/tests/test_stratum_v1_protocol.py'
       - 'brain_v12/tests/test_mining_diagnostic_classifier.py'
+      - 'brain_v12/tests/test_mining_runtime_evidence_validator.py'
       - '.github/workflows/bitcoin-mining-intelligence-tests.yml'
   push:
     branches: [brain-bitcoin-mining-intelligence, feat/brain-bitcoin-hash-benchmark]
@@ -43,10 +45,12 @@ jobs:
             brain_v12/brain/bitcoin_hash_benchmark.py \
             brain_v12/brain/stratum_v1_protocol.py \
             brain_v12/brain/mining_diagnostic_classifier.py \
+            brain_v12/brain/mining_runtime_evidence_validator.py \
             brain_v12/tests/test_bitcoin_mining_intelligence_api.py \
             brain_v12/tests/test_bitcoin_hash_benchmark.py \
             brain_v12/tests/test_stratum_v1_protocol.py \
-            brain_v12/tests/test_mining_diagnostic_classifier.py
+            brain_v12/tests/test_mining_diagnostic_classifier.py \
+            brain_v12/tests/test_mining_runtime_evidence_validator.py
       - name: Run mining regression tests
         run: |
           python -m pytest -q \
@@ -54,4 +58,5 @@ jobs:
             brain_v12/tests/test_mining_engine.py \
             brain_v12/tests/test_bitcoin_hash_benchmark.py \
             brain_v12/tests/test_stratum_v1_protocol.py \
-            brain_v12/tests/test_mining_diagnostic_classifier.py
+            brain_v12/tests/test_mining_diagnostic_classifier.py \
+            brain_v12/tests/test_mining_runtime_evidence_validator.py
