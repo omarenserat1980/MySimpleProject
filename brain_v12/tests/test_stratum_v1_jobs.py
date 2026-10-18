@@ -125,3 +125,39 @@ def test_merkle_branch_uses_stratum_left_to_right_hash_order_known_vector():
     root = merkle_root_from_coinbase(coinbase, job.merkle_branch_hex)
     assert root.hex() == "bdb7f7bef1722cbf09f26099e917eb8221ce6be935a10a5e4e2ee8560bf4134d"
     assert root.hex() != "d060837045e3dbf879b392bb661b83466438ae8222e4cf20a3dac4dc62f42734"
+
+
+@pytest.mark.parametrize(
+    "malformed",
+    [
+        {"id": 1, "result": True},
+        {"id": 1, "error": None},
+        {"id": True, "result": True, "error": None},
+        {"id": "1", "result": True, "error": None},
+    ],
+)
+def test_malformed_share_responses_do_not_consume_pending_candidate(malformed):
+    lifecycle = ShareLifecycle()
+    request_id = lifecycle.register_candidate("job-1", "fingerprint-1")
+    # Use the pending ID except for cases specifically testing ID type confusion.
+    response = dict(malformed)
+    if response.get("id") == 1 and not isinstance(response.get("id"), bool):
+        response["id"] = request_id
+    result = lifecycle.resolve(request_id, response)
+    assert result["status"] == "MALFORMED_OR_MISMATCHED_RESPONSE"
+    assert result["pool_acceptance_verified"] is False
+    valid = lifecycle.resolve(
+        request_id, {"id": request_id, "result": True, "error": None}
+    )
+    assert valid["status"] == "POOL_RESPONSE_SAYS_ACCEPTED"
+    assert valid["pool_acceptance_verified"] is False
+
+
+def test_non_null_json_rpc_error_cannot_be_counted_as_acceptance():
+    lifecycle = ShareLifecycle()
+    request_id = lifecycle.register_candidate("job-1", "fingerprint-1")
+    result = lifecycle.resolve(
+        request_id, {"id": request_id, "result": True, "error": {"code": 20}}
+    )
+    assert result["status"] == "SHARE_REJECTED_OR_ERROR"
+    assert result["pool_acceptance_verified"] is False
