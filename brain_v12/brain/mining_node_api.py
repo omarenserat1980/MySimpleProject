@@ -12,6 +12,7 @@ from fastapi import APIRouter
 
 from .brain_owned_mining_contract import build_plan, execution_gate
 from .brain_owned_compute_runtime import double_sha256, execution_host_gate
+from .compute_resource_manager import build_compute_resource_report
 from .braiins_pool_evidence_collector import BRAIINS_WORKERS_URL
 
 router = APIRouter(prefix="/api/mining-node", tags=["Brain Mining Node"])
@@ -158,6 +159,19 @@ def compute_backend_preflight() -> dict[str, Any]:
     }
 
 
+
+def compute_resource_status() -> dict[str, Any]:
+    """Report local CPU/RAM capacity without starting work or touching networks."""
+    report = build_compute_resource_report()
+    report["status"] = "READ_ONLY_RESOURCE_INVENTORY_AVAILABLE"
+    report["endpoint_execution_performed"] = False
+    report["pool_contacted"] = False
+    report["share_submitted"] = False
+    report["real_mining_verified"] = False
+    report["revenue_verified"] = False
+    return report
+
+
 def pool_evidence_status() -> dict[str, Any]:
     """Describe the read-only collector without making a pool request or inspecting credentials."""
     return {
@@ -253,6 +267,12 @@ def get_mining_node_status() -> dict[str, Any]:
 @router.get("/compute-preflight")
 def get_compute_backend_preflight() -> dict[str, Any]:
     return compute_backend_preflight()
+
+
+@router.get("/compute-resources")
+def get_compute_resource_status() -> dict[str, Any]:
+    """Expose a read-only host resource inventory; never launches a compute job."""
+    return compute_resource_status()
 
 
 @router.get("/pool-evidence/status")
