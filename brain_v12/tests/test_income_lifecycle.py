@@ -159,6 +159,17 @@ class IncomeLifecycleTests(unittest.TestCase):
         self.life.request_payment("LIVE-test", 25, currency="JOD", order_id="ORDER-1")
         self.assertEqual(self.life.reconcile_payment("LIVE-test", float("nan"), "JOD", "TX-NAN", {}, order_id="ORDER-1")["status"], "INVALID_AMOUNT")
 
+
+    def test_prepare_cannot_reset_completed_opportunity(self):
+        self.life.qualify("LIVE-test")
+        self.life.prepare("LIVE-test")
+        for status, evidence in [("SUBMITTED","receipt-1"),("CLIENT_RESPONDED","client-1"),("ACCEPTED","accepted-1"),("DELIVERING","delivery-start-1"),("COMPLETED","delivery-final-1")]:
+            self.life.record_external("LIVE-test", status, evidence)
+        result = self.life.prepare("LIVE-test", "retry proposal")
+        self.assertEqual(result["status"], "INVALID_PREPARATION_STATE")
+        self.assertEqual(self.store.rows[0]["status"], "COMPLETED")
+
+
 if __name__=="__main__":
     unittest.main()
 

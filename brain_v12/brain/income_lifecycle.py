@@ -97,6 +97,9 @@ class IncomeLifecycle:
         if not row:
             return {"ok": False, "status": "NOT_FOUND"}
         data = dict(row.get("data") or {})
+        current = str(row.get("status") or data.get("status") or "DISCOVERY")
+        if current not in {"QUALIFIED", "READY_TO_APPLY"}:
+            return {"ok": False, "status": "INVALID_PREPARATION_STATE", "current": current}
         title = str(data.get("title") or row.get("title") or "").strip()
         requirements = str(data.get("requirements") or "").strip()
         if not proposal.strip():
