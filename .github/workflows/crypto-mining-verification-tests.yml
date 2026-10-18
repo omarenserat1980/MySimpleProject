@@ -6,7 +6,9 @@ on:
     paths:
       - "brain_v12/business/crypto_mining_intelligence.py"
       - "brain_v12/business/crypto_mining_verification.py"
+      - "brain_v12/business/revenue_ledger.py"
       - "brain_v12/business/test_crypto_mining_verification.py"
+      - "brain_v12/business/test_revenue_ledger.py"
       - ".github/workflows/crypto-mining-verification-tests.yml"
   push:
     branches: [main]
@@ -38,6 +40,8 @@ jobs:
           python -m py_compile \
             brain_v12/business/crypto_mining_intelligence.py \
             brain_v12/business/crypto_mining_verification.py \
-            brain_v12/business/test_crypto_mining_verification.py
+            brain_v12/business/revenue_ledger.py \
+            brain_v12/business/test_crypto_mining_verification.py \
+            brain_v12/business/test_revenue_ledger.py
       - name: Run payout verification regression tests
-        run: python -m pytest -q brain_v12/business/test_crypto_mining_verification.py
+        run: python -m pytest -q brain_v12/business/test_crypto_mining_verification.py brain_v12/business/test_revenue_ledger.py
