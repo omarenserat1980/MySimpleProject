@@ -163,6 +163,22 @@ assert.match(paypalVerifier, /INSERT OR IGNORE INTO service_jobs/);
 assert.match(paypalVerifier, /PAYPAL_REVENUE_LEDGER_RECONCILIATION_FAILED/);
 assert.match(paypalVerifier, /PAYPAL_SERVICE_JOB_NOT_PERSISTED/);
 assert.match(paypalVerifier, /PAYMENT_VERIFIED_PENDING_DELIVERY/);
+// Keep PayPal webhook trust checks scoped to the webhook handler, not just present elsewhere in the Worker.
+const paypalWebhookStart = worker.indexOf("async function handlePayPalWebhook");
+const paypalWebhookEnd = worker.indexOf("async function markPayPalPaymentVerified", paypalWebhookStart);
+const paypalWebhook = worker.slice(paypalWebhookStart, paypalWebhookEnd);
+assert.ok(paypalWebhookStart >= 0 && paypalWebhookEnd > paypalWebhookStart, "PayPal webhook handler must exist");
+for (const header of ["PAYPAL-AUTH-ALGO", "PAYPAL-CERT-URL", "PAYPAL-TRANSMISSION-ID", "PAYPAL-TRANSMISSION-SIG", "PAYPAL-TRANSMISSION-TIME"]) {
+  assert.ok(paypalWebhook.includes(header), `PayPal webhook must pass ${header} into signature verification`);
+}
+assert.match(paypalWebhook, /verification_status !== "SUCCESS"/, "webhook must reject failed provider signature verification");
+assert.match(paypalWebhook, /event\.event_type !== "PAYMENT\.CAPTURE\.COMPLETED"/, "unrelated PayPal webhook event types must not verify payments");
+assert.match(paypalWebhook, /resource\.status \|\| ""\)\.toUpperCase\(\) !== "COMPLETED"/, "webhook must require a completed capture");
+assert.match(paypalWebhook, /Number\(payment\.amount\) !== amount/, "webhook must match capture amount to persisted payment");
+assert.match(paypalWebhook, /currency !== String\(payment\.currency\)\.toUpperCase\(\)/, "webhook must match capture currency to persisted payment");
+assert.match(paypalWebhook, /PAYPAL_CAPTURE_IDENTIFIERS_MISSING/, "webhook must reject captures without stable identifiers");
+console.log("PAYPAL_WEBHOOK_SIGNATURE_AND_CAPTURE_GATES=PASS");
+
 console.log("PAYPAL_PARTIAL_FAILURE_RECOVERY_GATES=PASS");
 console.log("PAYPAL_SANDBOX_STATIC_GATES=PASS");
 
