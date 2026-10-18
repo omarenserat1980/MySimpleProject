@@ -7,6 +7,12 @@ from brain_v12.brain.windows_artifact_manifest import (
 )
 
 
+def signature_evidence(result):
+    return {"status": "VERIFIED", "evidence_id": "signature-1",
+            "artifact_sha256": result["sha256"], "verification_method": "OS_TRUST_STORE",
+            "verifier_identity": "test-verifier", "signature_subject": "Microsoft Corporation"}
+
+
 def valid_manifest(**overrides):
     manifest = {
         "schema_version": 1,
@@ -48,7 +54,7 @@ class WindowsArtifactManifestTests(unittest.TestCase):
         result = validate_artifact_manifest(valid_manifest())
         self.assertEqual(
             evaluate_artifact_state(
-                result, publisher_signature_independently_verified=True
+                result, publisher_signature_evidence=signature_evidence(result)
             )["state"],
             "ARTIFACT_AUTHENTICITY_VERIFIED",
         )
