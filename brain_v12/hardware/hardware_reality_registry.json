@@ -21,13 +21,14 @@
       "name": "RAM / DRAM controller",
       "reality_status": "ADAPTER_IMPLEMENTED",
       "evidence": [
-        "Ramulator adapter code and mocked contract tests in PR #989"
+        "Ramulator adapter code and mocked contract tests in PR #989",
+        "GitHub Actions run 39149359971 successfully built upstream CMU-SAFARI/ramulator2 revision c6c7a5de0cef35935d6fad7369e6271406798865 and executed examples/example_config.py; artifact 12144911469"
       ],
       "not_proven": [
-        "Ramulator upstream execution",
-        "physical RAM inventory"
+        "Reproducible execution from an immutable pinned upstream revision",
+        "Physical RAM inventory or physical memory performance"
       ],
-      "next_gate": "Run pinned Ramulator release and reviewed example in isolated CI; preserve version, input hash, logs and expected output."
+      "next_gate": "Pin the reviewed upstream commit, add a deterministic output assertion and rerun the example; then evaluate a representative reviewed trace. Keep all results labeled simulation."
     },
     {
       "id": "virtual-server",
@@ -160,4 +161,4 @@
       "next_gate": "Collect real accepted-share records and payout evidence; do not derive revenue from simulated hashrate."
     }
   ]
-}\n
+}
