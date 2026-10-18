@@ -1,7 +1,12 @@
 """Tests for disjoint nonce scheduling and explicit checkpoint-style resume."""
 import pytest
 
-from brain_v12.brain.brain_owned_compute_runtime import partition_nonce_range, search_nonce
+from brain_v12.brain.brain_owned_compute_runtime import (
+    MAX_NONCE_SEARCH_HASHES,
+    PowResult,
+    partition_nonce_range,
+    search_nonce,
+)
 
 
 def test_partitions_cover_interval_exactly_without_gaps_or_overlap():
@@ -142,3 +147,23 @@ def test_authenticated_checkpoint_requires_strong_caller_key_and_exact_fields():
     signed = sign_nonce_search_checkpoint(unsigned, header, target, "job-auth", _AUTH_TEST_KEY)
     with pytest.raises(ValueError, match="INVALID_SIGNED_CHECKPOINT_FIELDS"):
         validate_authenticated_nonce_search_checkpoint(dict(signed, unexpected=True), header, target, "job-auth", _AUTH_TEST_KEY)
+
+
+def test_checkpoint_rejects_hash_counts_above_the_search_bound():
+    header = bytes(80)
+    target = 1
+    excessive = PowResult(
+        False, None, MAX_NONCE_SEARCH_HASHES + 1, None,
+        "NONCE_NOT_FOUND_WITHIN_BOUND",
+    )
+    with pytest.raises(ValueError, match="INVALID_CHECKPOINT_HASH_COUNT"):
+        build_nonce_search_checkpoint(header, target, "job-bound", 0, excessive)
+
+    valid = build_nonce_search_checkpoint(
+        header, target, "job-bound", 0,
+        search_nonce(header, target, start_nonce=0, max_hashes=1),
+    )
+    valid["hashes_checked"] = MAX_NONCE_SEARCH_HASHES + 1
+    valid["next_nonce"] = MAX_NONCE_SEARCH_HASHES + 1
+    with pytest.raises(ValueError, match="INVALID_CHECKPOINT_HASH_COUNT"):
+        validate_nonce_search_checkpoint(valid, header, target, "job-bound")
