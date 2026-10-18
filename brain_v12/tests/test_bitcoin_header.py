@@ -5,6 +5,8 @@ from brain_v12.brain.bitcoin_header import (
     compact_nbits_to_target,
     verify_candidate_against_target,
     stratum_v1_prevhash_to_header_wire_hex,
+    STRATUM_DIFFICULTY_ONE_TARGET,
+    stratum_difficulty_to_share_target,
 )
 
 
@@ -239,3 +241,30 @@ def test_compact_target_rejects_small_exponent_that_decodes_to_zero():
     # exponent 1 with mantissa 1 shifts right by 16 bits, producing zero.
     with pytest.raises(ValueError, match="COMPACT_TARGET_OUT_OF_RANGE"):
         compact_nbits_to_target((0x01000001).to_bytes(4, "little").hex())
+
+
+
+def test_stratum_difficulty_one_maps_to_conventional_diff1_target():
+    assert stratum_difficulty_to_share_target(1) == STRATUM_DIFFICULTY_ONE_TARGET
+    assert stratum_difficulty_to_share_target("1.0") == STRATUM_DIFFICULTY_ONE_TARGET
+
+
+def test_stratum_difficulty_two_halves_target_with_floor_rounding():
+    assert stratum_difficulty_to_share_target(2) == STRATUM_DIFFICULTY_ONE_TARGET // 2
+
+
+@pytest.mark.parametrize("difficulty", [True, False, 0, -1, "0", "NaN", "Infinity", float("nan"), float("inf"), "not-a-number"])
+def test_stratum_difficulty_rejects_invalid_values(difficulty):
+    with pytest.raises(ValueError, match="INVALID_STRATUM_DIFFICULTY"):
+        stratum_difficulty_to_share_target(difficulty)
+
+
+def test_stratum_difficulty_rejects_target_outside_256_bit_range():
+    with pytest.raises(ValueError, match="STRATUM_DIFFICULTY_TARGET_OUT_OF_RANGE"):
+        stratum_difficulty_to_share_target("1e-100")
+
+
+def test_stratum_difficulty_conversion_does_not_claim_pool_acceptance():
+    # The conversion only derives a candidate target; it is not pool evidence.
+    target = stratum_difficulty_to_share_target("4.25")
+    assert 0 < target < STRATUM_DIFFICULTY_ONE_TARGET
