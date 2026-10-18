@@ -98,10 +98,20 @@ class BrainBladeServerFabric:
 
     def blade_status(self, blade_id: str) -> dict:
         blade = self._get_blade(blade_id)
+        tasks_registered = sum(
+            len(n["host"].tasks._tasks) for n in blade["cluster"].nodes.values()
+        )
+        logical_ram_capacity = self.task_slots_per_blade * self.ram_cells_per_task
+        logical_ram_assigned = tasks_registered * self.ram_cells_per_task
         return {"blade_id": blade_id, "state": blade["state"],
                 "cluster_health": blade["cluster"].health(),
                 "task_slots": self.task_slots_per_blade,
-                "tasks_registered": sum(len(n["host"].tasks._tasks) for n in blade["cluster"].nodes.values()),
+                "tasks_registered": tasks_registered,
+                "task_slots_available": max(0, self.task_slots_per_blade - tasks_registered),
+                "logical_ram_cells_capacity": logical_ram_capacity,
+                "logical_ram_cells_assigned": logical_ram_assigned,
+                "logical_ram_utilization": logical_ram_assigned / logical_ram_capacity,
+                "resource_accounting_mode": "SIMULATED_LOGICAL_ESTIMATE",
                 "physical_hardware": False}
 
     def health(self) -> dict:
@@ -113,6 +123,9 @@ class BrainBladeServerFabric:
                 "fabric_id": self.fabric_id, "blade_count": len(statuses),
                 "online_blades": online, "failed_blades": failed,
                 "blades": statuses, "task_slots_per_blade": self.task_slots_per_blade,
+                "logical_ram_cells_capacity": sum(s["logical_ram_cells_capacity"] for s in statuses),
+                "logical_ram_cells_assigned": sum(s["logical_ram_cells_assigned"] for s in statuses),
+                "resource_accounting_mode": "SIMULATED_LOGICAL_ESTIMATE",
                 "cloud_resources_provisioned": False, "network_listener_enabled": False,
                 "physical_hardware": False}
 
