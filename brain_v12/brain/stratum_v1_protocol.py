@@ -91,6 +91,9 @@ class StratumV1Session:
                 or len(extranonce2) % 2
                 or any(ch not in "0123456789abcdefABCDEF" for ch in extranonce2)):
             raise StratumProtocolError("INVALID_EXTRANONCE2_HEX_WIDTH")
+        if (self.extranonce2_size is not None
+                and len(extranonce2) != self.extranonce2_size * 2):
+            raise StratumProtocolError("INVALID_EXTRANONCE2_NEGOTIATED_WIDTH")
         for field_name, value in (("NTIME", ntime), ("NONCE", nonce)):
             if (not isinstance(value, str) or len(value) != 8
                     or any(ch not in "0123456789abcdefABCDEF" for ch in value)):
