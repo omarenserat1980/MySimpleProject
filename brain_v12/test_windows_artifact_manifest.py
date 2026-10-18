@@ -192,6 +192,21 @@ class WindowsArtifactManifestTests(unittest.TestCase):
         self.assertEqual(state["state"], "ARTIFACT_FINGERPRINTED")
         self.assertFalse(state["real_guest_boot_verified"])
 
+    def test_impossible_utc_calendar_timestamp_is_rejected(self):
+        result = validate_artifact_manifest(
+            valid_manifest(acquired_at_utc="2026-02-30T10:00:00Z")
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("ACQUIRED_AT_MUST_BE_UTC_ISO8601", result["errors"])
+
+    def test_impossible_signature_verification_timestamp_is_rejected(self):
+        result = validate_artifact_manifest(valid_manifest())
+        evidence = signature_evidence(result)
+        evidence["verified_at_utc"] = "2026-13-18T10:30:00Z"
+        state = evaluate_artifact_state(result, publisher_signature_evidence=evidence)
+        self.assertFalse(state["signature_evidence_shape_valid"])
+        self.assertEqual(state["state"], "ARTIFACT_FINGERPRINTED")
+
     def test_bool_is_not_accepted_as_integer_size(self):
         result = validate_artifact_manifest(valid_manifest(size_bytes=True))
         self.assertFalse(result["ok"])
