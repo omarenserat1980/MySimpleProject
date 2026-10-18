@@ -11,6 +11,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
+from brain_v12.brain.stratum_v1_jobs import StratumJob
+
 
 class StratumProtocolError(ValueError):
     """Raised when a Stratum V1 message is malformed or out of sequence."""
@@ -54,7 +56,10 @@ class StratumV1Session:
     subscribed: bool = False
     authorized: bool = False
     difficulty: float | None = None
+    extranonce1_hex: str | None = None
+    extranonce2_size: int | None = None
     current_job_id: str | None = None
+    active_job_ids: set[str] = field(default_factory=set)
     pending: dict[int, str] = field(default_factory=dict)
     accepted_shares: int = 0
     rejected_shares: int = 0
@@ -64,6 +69,8 @@ class StratumV1Session:
             raise StratumProtocolError("POOL_USERNAME_REQUIRED")
         if not isinstance(self.password, str) or not self.password:
             raise StratumProtocolError("POOL_PASSWORD_REQUIRED")
+        if self.current_job_id:
+            self.active_job_ids.add(self.current_job_id)
 
     def request_subscribe(self, agent: str = "ElectronicBrain/BitcoinLab") -> bytes:
         return self._request("mining.subscribe", [agent], "subscribe")
@@ -77,13 +84,20 @@ class StratumV1Session:
                        nonce: str) -> bytes:
         if not self.authorized:
             raise StratumProtocolError("POOL_AUTHORIZATION_REQUIRED")
-        if not self.current_job_id or job_id != self.current_job_id:
+        if (not isinstance(job_id, str) or not job_id or not self.current_job_id
+                or job_id not in self.active_job_ids):
             raise StratumProtocolError("UNKNOWN_OR_STALE_JOB")
-        fields = (extranonce2, ntime, nonce)
-        if any(not isinstance(value, str) or not value or len(value) % 2
-               or any(ch not in "0123456789abcdefABCDEF" for ch in value)
-               for value in fields):
-            raise StratumProtocolError("INVALID_SHARE_HEX_FIELDS")
+        if (not isinstance(extranonce2, str) or not 2 <= len(extranonce2) <= 64
+                or len(extranonce2) % 2
+                or any(ch not in "0123456789abcdefABCDEF" for ch in extranonce2)):
+            raise StratumProtocolError("INVALID_EXTRANONCE2_HEX_WIDTH")
+        if (self.extranonce2_size is not None
+                and len(extranonce2) != self.extranonce2_size * 2):
+            raise StratumProtocolError("INVALID_EXTRANONCE2_NEGOTIATED_WIDTH")
+        for field_name, value in (("NTIME", ntime), ("NONCE", nonce)):
+            if (not isinstance(value, str) or len(value) != 8
+                    or any(ch not in "0123456789abcdefABCDEF" for ch in value)):
+                raise StratumProtocolError("INVALID_" + field_name + "_HEX_WIDTH")
         return self._request("mining.submit",
                              [self.username, job_id, extranonce2, ntime, nonce],
                              "share")
@@ -109,14 +123,30 @@ class StratumV1Session:
                     raise StratumProtocolError("INVALID_DIFFICULTY")
                 self.difficulty = difficulty
             elif method == "mining.notify":
-                if len(params) < 9 or not isinstance(params[0], str) or not params[0]:
-                    raise StratumProtocolError("INVALID_MINING_JOB")
-                if not isinstance(params[4], list):
-                    raise StratumProtocolError("INVALID_MERKLE_BRANCHES")
-                self.current_job_id = params[0]
+                try:
+                    job = StratumJob.from_notify(params)
+                except (TypeError, ValueError) as exc:
+                    raise StratumProtocolError("INVALID_MINING_JOB") from exc
+                if job.clean_jobs:
+                    self.active_job_ids.clear()
+                self.active_job_ids.add(job.job_id)
+                self.current_job_id = job.job_id
             elif method == "mining.set_extranonce":
-                if len(params) != 2 or not isinstance(params[0], str):
+                if len(params) != 2:
                     raise StratumProtocolError("INVALID_EXTRANONCE")
+                extranonce1_hex, extranonce2_size = params
+                if (not isinstance(extranonce1_hex, str)
+                        or len(extranonce1_hex) % 2
+                        or len(extranonce1_hex) > 128
+                        or any(ch not in "0123456789abcdefABCDEF" for ch in extranonce1_hex)):
+                    raise StratumProtocolError("INVALID_EXTRANONCE1_HEX")
+                if (isinstance(extranonce2_size, bool)
+                        or not isinstance(extranonce2_size, int)
+                        or not 1 <= extranonce2_size <= 32):
+                    raise StratumProtocolError("INVALID_EXTRANONCE2_SIZE")
+                # Commit state only after every field has passed validation.
+                self.extranonce1_hex = extranonce1_hex.lower()
+                self.extranonce2_size = extranonce2_size
             elif method == "client.reconnect":
                 return {"event": "RECONNECT_REQUESTED", "action_required": True}
             else:
@@ -141,9 +171,21 @@ class StratumV1Session:
             if error is not None:
                 self.pending.pop(request_id, None)
                 raise StratumProtocolError("SUBSCRIBE_REJECTED_OR_MALFORMED")
-            if not isinstance(result, list) or len(result) < 3:
+            if not isinstance(result, list) or len(result) < 3 or not isinstance(result[0], list):
                 raise StratumProtocolError("MALFORMED_SUBSCRIBE_RESPONSE")
+            extranonce1_hex, extranonce2_size = result[1], result[2]
+            if (not isinstance(extranonce1_hex, str)
+                    or len(extranonce1_hex) % 2
+                    or len(extranonce1_hex) > 128
+                    or any(ch not in "0123456789abcdefABCDEF" for ch in extranonce1_hex)):
+                raise StratumProtocolError("MALFORMED_SUBSCRIBE_EXTRANONCE1")
+            if (isinstance(extranonce2_size, bool)
+                    or not isinstance(extranonce2_size, int)
+                    or not 1 <= extranonce2_size <= 32):
+                raise StratumProtocolError("MALFORMED_SUBSCRIBE_EXTRANONCE2_SIZE")
             self.pending.pop(request_id, None)
+            self.extranonce1_hex = extranonce1_hex.lower()
+            self.extranonce2_size = extranonce2_size
             self.subscribed = True
         elif purpose == "authorize":
             if error is not None or result is False:
@@ -175,7 +217,10 @@ class StratumV1Session:
             "subscribed": self.subscribed,
             "authorized": self.authorized,
             "difficulty": self.difficulty,
+            "extranonce1_configured": self.extranonce1_hex is not None,
+            "extranonce2_size": self.extranonce2_size,
             "current_job_id": self.current_job_id,
+            "active_job_count": len(self.active_job_ids),
             "pending_requests": len(self.pending),
             "accepted_shares_reported_by_pool": self.accepted_shares,
             "rejected_shares_reported_by_pool": self.rejected_shares,

@@ -71,3 +71,67 @@ def test_android_termux_is_not_accepted_as_compute_host(monkeypatch):
     )
     assert result["execution_allowed"] is False
     assert "PHYSICAL_ANDROID_GATEWAY_COMPUTATION_FORBIDDEN" in result["blockers"]
+
+def test_bitcoin_genesis_header_matches_independent_known_answer_vector():
+    # Bitcoin genesis block header, with the nonce encoded little-endian.
+    header_prefix = bytes.fromhex(
+        "01000000" + "00" * 32
+        + "3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa"
+        + "4b1e5e4a29ab5f49ffff001d"
+    )
+    nonce = 0x7C2BAC1D
+    header = header_prefix + nonce.to_bytes(4, "little")
+    expected_raw_digest = bytes.fromhex(
+        "6fe28c0ab6f1b372c1a6a246ae63f74f"
+        "931e8365e15a089c68d6190000000000"
+    )
+
+    assert len(header) == 80
+    assert double_sha256(header) == expected_raw_digest
+    target = int.from_bytes(expected_raw_digest, "little")
+    result = search_nonce(header_prefix + bytes(4), target, start_nonce=nonce, max_hashes=1)
+    assert result.found is True
+    assert result.nonce == nonce
+    assert result.hash_hex == expected_raw_digest[::-1].hex()
+    assert result.status == "NONCE_FOUND_UNSUBMITTED"
+
+def test_search_nonce_stops_at_uint32_max_without_wrapping():
+    # The final uint32 nonce is checked once; the search must not wrap to zero.
+    result = search_nonce(bytes(80), 1, start_nonce=0xFFFFFFFF, max_hashes=2)
+    assert result.found is False
+    assert result.nonce is None
+    assert result.hashes_checked == 1
+    assert result.status == "NONCE_NOT_FOUND_WITHIN_BOUND"
+
+
+def test_search_nonce_rejects_boolean_numeric_bounds():
+    import pytest
+
+    with pytest.raises(ValueError, match="START_NONCE_OUT_OF_RANGE"):
+        search_nonce(bytes(80), 1, start_nonce=True, max_hashes=1)
+    with pytest.raises(ValueError, match="MAX_HASHES_OUT_OF_RANGE"):
+        search_nonce(bytes(80), 1, start_nonce=0, max_hashes=True)
+
+def test_execution_host_gate_blocks_ci_even_when_other_gates_pass(monkeypatch):
+    import pytest
+
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("CI", raising=False)
+    for marker in ("GITHUB_ACTIONS", "CI"):
+        monkeypatch.setenv(marker, "true")
+        monkeypatch.delenv("ANDROID_ROOT", raising=False)
+        monkeypatch.delenv("ANDROID_DATA", raising=False)
+        monkeypatch.delenv("TERMUX_VERSION", raising=False)
+        monkeypatch.setenv("PREFIX", "/usr")
+        result = execution_host_gate(
+            attested_brain_compute_host=True,
+            explicit_approval=True,
+            pool_adapter_ready=True,
+            resource_budget_verified=True,
+            physical_gateway_only=True,
+        )
+        assert result["status"] == "BLOCKED"
+        assert result["execution_allowed"] is False
+        assert result["execution_started"] is False
+        assert "CI_AND_GITHUB_ACTIONS_MINING_FORBIDDEN" in result["blockers"]
+        monkeypatch.delenv(marker, raising=False)

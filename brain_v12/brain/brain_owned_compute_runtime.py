@@ -17,6 +17,7 @@ import platform
 from typing import Any
 
 GITHUB_ACTION_MARKERS = ("GITHUB_ACTIONS", "CI")
+MAX_NONCE_SEARCH_HASHES = 10_000_000
 
 
 @dataclass(frozen=True)
@@ -94,7 +95,7 @@ def search_nonce(
     validate_target(target)
     if isinstance(start_nonce, bool) or not isinstance(start_nonce, int) or not 0 <= start_nonce <= 0xFFFFFFFF:
         raise ValueError("START_NONCE_OUT_OF_RANGE")
-    if isinstance(max_hashes, bool) or not isinstance(max_hashes, int) or not 1 <= max_hashes <= 10_000_000:
+    if isinstance(max_hashes, bool) or not isinstance(max_hashes, int) or not 1 <= max_hashes <= MAX_NONCE_SEARCH_HASHES:
         raise ValueError("MAX_HASHES_OUT_OF_RANGE")
 
     prefix = header[:76]
@@ -132,7 +133,7 @@ def build_nonce_search_checkpoint(
         raise ValueError("START_NONCE_OUT_OF_RANGE")
     if not isinstance(result, PowResult) or result.found or result.nonce is not None or result.status != "NONCE_NOT_FOUND_WITHIN_BOUND":
         raise ValueError("CHECKPOINT_REQUIRES_EXHAUSTED_NO_HIT_RESULT")
-    if isinstance(result.hashes_checked, bool) or not isinstance(result.hashes_checked, int) or result.hashes_checked < 1:
+    if isinstance(result.hashes_checked, bool) or not isinstance(result.hashes_checked, int) or not 1 <= result.hashes_checked <= MAX_NONCE_SEARCH_HASHES:
         raise ValueError("INVALID_CHECKPOINT_HASH_COUNT")
     next_nonce = start_nonce + result.hashes_checked
     if next_nonce > 0xFFFFFFFF:
@@ -179,7 +180,7 @@ def validate_nonce_search_checkpoint(
     if isinstance(next_nonce, bool) or not isinstance(next_nonce, int) or not 0 <= next_nonce <= 0xFFFFFFFF:
         raise ValueError("INVALID_CHECKPOINT_NEXT_NONCE")
     checked = checkpoint.get("hashes_checked")
-    if isinstance(checked, bool) or not isinstance(checked, int) or checked < 1:
+    if isinstance(checked, bool) or not isinstance(checked, int) or not 1 <= checked <= MAX_NONCE_SEARCH_HASHES:
         raise ValueError("INVALID_CHECKPOINT_HASH_COUNT")
     start_nonce = checkpoint.get("start_nonce")
     if isinstance(start_nonce, bool) or not isinstance(start_nonce, int) or not 0 <= start_nonce <= 0xFFFFFFFF:
