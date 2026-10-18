@@ -1,5 +1,7 @@
 import hashlib
 
+# Regression coverage for software-only identity claims and strict challenge expiry.
+
 from brain_v12.brain.software_node_identity_gate import SoftwareNodeIdentityGate, sign_node_response
 
 
@@ -62,6 +64,21 @@ def test_expired_challenge_is_rejected():
     gate = SoftwareNodeIdentityGate({"worker-1": secret}, ttl_seconds=5, clock=lambda: now[0], nonce_factory=lambda: "nonce-4")
     challenge = gate.issue_challenge("worker-1")
     now[0] += 6
+    result_hash = hashlib.sha256(b"result").hexdigest()
+    signature = sign_node_response(secret, node_id="worker-1", nonce=challenge["nonce"],
+                                   issued_at=challenge["issued_at"], task_id="task-1", result_sha256=result_hash)
+    result = gate.verify_response(node_id="worker-1", nonce=challenge["nonce"], issued_at=challenge["issued_at"],
+                                  task_id="task-1", result_sha256=result_hash, signature=signature)
+    assert result["status"] == "BLOCKED"
+    assert result["reason"] == "CHALLENGE_EXPIRED"
+
+
+def test_challenge_is_expired_at_exact_expiry_boundary():
+    now = [1_800_000_000]
+    secret = b"trusted-secret"
+    gate = SoftwareNodeIdentityGate({"worker-1": secret}, ttl_seconds=5, clock=lambda: now[0], nonce_factory=lambda: "nonce-exact-expiry")
+    challenge = gate.issue_challenge("worker-1")
+    now[0] = challenge["expires_at"]
     result_hash = hashlib.sha256(b"result").hexdigest()
     signature = sign_node_response(secret, node_id="worker-1", nonce=challenge["nonce"],
                                    issued_at=challenge["issued_at"], task_id="task-1", result_sha256=result_hash)
