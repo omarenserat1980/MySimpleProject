@@ -47,19 +47,31 @@
       "upstream": "https://github.com/CMU-SAFARI/ramulator2",
       "role": "Ramulator 2.1 Python API for DDR3/DDR4/DDR5, GDDR, LPDDR and HBM models",
       "mode": "trusted-local-python-script",
-      "status": "ADAPTER_IMPLEMENTED_TOOL_NOT_VERIFIED_INSTALLED",
-      "pin": null,
-      "license_review": "UPSTREAM_REPOSITORY_REPORTS_MIT; EXACT_COMMIT_AND_NOTICE_REVIEW_PENDING",
+      "status": "TOOL_EXECUTION_VERIFIED_SIMULATION_ONLY",
+      "pin": "c6c7a5de0cef35935d6fad7369e6271406798865",
+      "license_review": "UPSTREAM_REPOSITORY_REPORTS_MIT; reviewed commit pinned for CI execution; exact dependency/notice review still required before redistribution",
       "evidence_required": [
         "source-pin",
         "tool-version",
+        "workflow-run-and-artifact",
         "trace-id",
         "simulated-performance-report"
       ],
       "physical_hardware_verified": false,
       "adapter_path": "brain_v12/hardware/ramulator_adapter.py",
       "test_path": "brain_v12/hardware/test_ramulator_adapter.py",
-      "runtime_entrypoint": "reviewed local Ramulator Python example/configuration script"
+      "runtime_entrypoint": "reviewed local Ramulator Python example/configuration script",
+      "evidence": {
+        "upstream_revision": "c6c7a5de0cef35935d6fad7369e6271406798865",
+        "successful_workflow_runs": [
+          "39149727846",
+          "39149941417"
+        ],
+        "latest_artifact_id": "12144078894",
+        "example": "examples/example_config.py",
+        "physical_hardware_verified": false,
+        "accepted_as_physical_measurement": false
+      }
     },
     {
       "id": "verilator-rtl",
