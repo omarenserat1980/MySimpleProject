@@ -214,3 +214,16 @@ assert.match(worker, /Number\(result\?\.meta\?\.changes\) !== 1/, "settlement mu
 assert.match(worker, /SETTLEMENT_STATE_CONFLICT/, "a concurrent ledger state change must not be reported as realized revenue");
 assert.match(settlementMigration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_revenue_settlement_reference_unique/, "settlement reference must be unique");
 assert.match(worker, /settlementDate/);
+
+// A verified capture retry must reconcile dependent rows rather than return success blindly.
+const paypalCaptureRecoveryStart = worker.indexOf("async function capturePayPalPayment");
+const paypalCaptureRecoveryEnd = worker.indexOf("async function handlePayPalWebhook", paypalCaptureRecoveryStart);
+const paypalCaptureRecovery = worker.slice(paypalCaptureRecoveryStart, paypalCaptureRecoveryEnd);
+const verifiedRetryStart = paypalCaptureRecovery.indexOf('if (payment.state === "PAYMENT_VERIFIED") {');
+const verifiedRetryEnd = paypalCaptureRecovery.indexOf("\n  }", verifiedRetryStart);
+assert.ok(verifiedRetryStart >= 0 && verifiedRetryEnd > verifiedRetryStart, "verified PayPal retry recovery branch must exist");
+const verifiedRetry = paypalCaptureRecovery.slice(verifiedRetryStart, verifiedRetryEnd);
+assert.match(verifiedRetry, /markPayPalPaymentVerified\(/, "verified PayPal retries must reconcile ledger and service job rows");
+assert.match(verifiedRetry, /priorEvidence\?\.capture_id/, "verified retry must recover the persisted capture identifier");
+assert.match(verifiedRetry, /PAYPAL_VERIFIED_EVIDENCE_INCOMPLETE/, "verified retry must fail closed when prior evidence is incomplete");
+console.log("PAYPAL_VERIFIED_RETRY_RECOVERY_GATES=PASS");

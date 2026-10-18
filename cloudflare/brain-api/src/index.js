@@ -466,13 +466,26 @@ async function capturePayPalPayment(request, env, requestOrigin, allowedOrigin) 
   const order = await env.BRAIN_DB.prepare("SELECT order_id, amount, currency, state, client_email FROM orders WHERE order_id = ?").bind(orderId).first();
   if (!order) return json({ ok: false, error: "ORDER_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
   if (String(order.client_email || "").toLowerCase() !== client.email.toLowerCase()) return json({ ok: false, error: "ORDER_ACCESS_DENIED" }, 403, requestOrigin, allowedOrigin);
-  const payment = await env.BRAIN_DB.prepare("SELECT tran_ref, order_id, amount, currency, state FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first();
+  const payment = await env.BRAIN_DB.prepare("SELECT tran_ref, order_id, amount, currency, state, raw_evidence FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first();
   if (!payment) return json({ ok: false, error: "PAYPAL_ORDER_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
   // Validate persisted order/payment amount and currency before any idempotent success.
   if (Number(order.amount) !== Number(payment.amount) || String(order.currency || "").toUpperCase() !== String(payment.currency || "").toUpperCase()) {
     return json({ ok: false, error: "PAYMENT_AMOUNT_OR_CURRENCY_MISMATCH" }, 409, requestOrigin, allowedOrigin);
   }
-  if (payment.state === "PAYMENT_VERIFIED") return json({ ok: true, state: "PAYMENT_VERIFIED_PENDING_DELIVERY", order_id: orderId, paypal_order_id: paypalOrderId, idempotent: true }, 200, requestOrigin, allowedOrigin);
+  if (payment.state === "PAYMENT_VERIFIED") {
+    // Reconcile dependent ledger/job rows even on retry; never return verified state blindly.
+    let priorEvidence;
+    try { priorEvidence = JSON.parse(String(payment.raw_evidence || "")); } catch { priorEvidence = null; }
+    const priorCaptureId = String(priorEvidence?.capture_id || "");
+    const amount = Number(payment.amount);
+    const currency = String(payment.currency || "").toUpperCase();
+    if (!priorCaptureId || !Number.isFinite(amount) || !currency) {
+      return json({ ok: false, error: "PAYPAL_VERIFIED_EVIDENCE_INCOMPLETE" }, 409, requestOrigin, allowedOrigin);
+    }
+    const marked = await markPayPalPaymentVerified(env, orderId, paypalOrderId, priorCaptureId, amount, currency, priorEvidence);
+    if (!marked.ok) return json({ ok: false, error: marked.error }, marked.status || 409, requestOrigin, allowedOrigin);
+    return json({ ok: true, state: "PAYMENT_VERIFIED_PENDING_DELIVERY", order_id: orderId, paypal_order_id: paypalOrderId, capture_id: priorCaptureId, idempotent: true }, 200, requestOrigin, allowedOrigin);
+  }
   const access = await getPayPalAccessToken(env);
   if (!access.ok) return json({ ok: false, error: access.error }, access.status ? 502 : 503, requestOrigin, allowedOrigin);
   const captureRequestId = (await sha256Hex(new TextEncoder().encode("paypal-capture:" + paypalOrderId))).slice(0, 32);
@@ -542,7 +555,7 @@ async function handlePayPalWebhook(request, env, requestOrigin, allowedOrigin) {
 }
 
 async function markPayPalPaymentVerified(env, orderId, paypalOrderId, captureId, amount, currency, evidenceObject) {
-  const payment = await env.BRAIN_DB.prepare("SELECT tran_ref, order_id, amount, currency, state FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first();
+  const payment = await env.BRAIN_DB.prepare("SELECT tran_ref, order_id, amount, currency, state, raw_evidence FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first();
   if (!payment) return { ok: false, error: "PAYPAL_PAYMENT_NOT_FOUND", status: 404 };
   const order = await env.BRAIN_DB.prepare("SELECT amount, currency FROM orders WHERE order_id = ?").bind(orderId).first();
   if (!order) return { ok: false, error: "ORDER_NOT_FOUND", status: 404 };
