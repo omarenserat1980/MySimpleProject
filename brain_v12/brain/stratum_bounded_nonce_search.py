@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .bitcoin_header import sha256d
 from .stratum_session_header_candidate import build_session_header_candidate
 from .stratum_v1_jobs import StratumJob
 from .stratum_v1_protocol import StratumV1Session
@@ -28,9 +29,9 @@ def search_session_nonce_range(
 ) -> dict[str, Any]:
     """Try a finite, caller-bounded sequence of 32-bit nonce values.
 
-    The upper bound is deliberately small to keep this helper suitable for
-    tests and diagnostics. No nonce wrapping occurs. A found candidate means
-    only that its computed SHA256d integer met the caller-supplied target.
+    Build the session-bound header prefix once, then vary only the four-byte
+    nonce and hash each candidate. This avoids rebuilding coinbase and merkle
+    data for every attempt. A match is local target evidence only.
     """
     if isinstance(nonce_start, bool) or not isinstance(nonce_start, int):
         raise ValueError("INVALID_NONCE_START")
@@ -43,41 +44,65 @@ def search_session_nonce_range(
     if nonce_start + max_attempts - 1 > 0xFFFFFFFF:
         raise ValueError("NONCE_RANGE_OVERFLOWS_UINT32")
 
-    last: dict[str, Any] | None = None
+    # Reuse the existing builder as the single validation and serialization
+    # boundary for session/job authorization, dialect, fields, and target.
+    seed = build_session_header_candidate(
+        session,
+        job,
+        extranonce2=extranonce2,
+        ntime_hex=ntime_hex,
+        nonce_hex=f"{nonce_start:08x}",
+        share_target=share_target,
+        prevhash_dialect_confirmed=prevhash_dialect_confirmed,
+    )
+    header_prefix = bytes.fromhex(seed["header_hex"][: 76 * 2])
     attempts = 0
+
     for nonce in range(nonce_start, nonce_start + max_attempts):
-        last = build_session_header_candidate(
-            session,
-            job,
-            extranonce2=extranonce2,
-            ntime_hex=ntime_hex,
-            nonce_hex=f"{nonce:08x}",
-            share_target=share_target,
-            prevhash_dialect_confirmed=prevhash_dialect_confirmed,
-        )
+        header = header_prefix + nonce.to_bytes(4, "little")
+        digest = sha256d(header)
+        hash_integer = int.from_bytes(digest, "little")
+        meets_target = hash_integer <= share_target
+        candidate = {
+            "evidence_class": "OFFLINE_SESSION_BOUND_HEADER_CANDIDATE",
+            "job_id": job.job_id,
+            "header_hex": header.hex(),
+            "header_bytes": len(header),
+            "nonce_hex": f"{nonce:08x}",
+            "sha256d_display_hex": digest[::-1].hex(),
+            "hash_integer": hash_integer,
+            "share_target": share_target,
+            "meets_supplied_share_target": meets_target,
+            "session_authorized": True,
+            "job_current_for_session": True,
+            "prevhash_dialect_confirmed_by_caller": True,
+            "pool_submission_sent": False,
+            "pool_acceptance_verified": False,
+            "real_mining_verified": False,
+            "revenue_verified": False,
+        }
         attempts += 1
-        if last["meets_supplied_share_target"]:
+        if meets_target:
             return {
                 "evidence_class": "BOUNDED_OFFLINE_NONCE_SEARCH",
                 "status": "LOCAL_TARGET_MATCH",
                 "attempts": attempts,
                 "nonce_start": nonce_start,
                 "nonce_found": nonce,
-                "candidate": last,
+                "candidate": candidate,
                 "pool_submission_sent": False,
                 "pool_acceptance_verified": False,
                 "real_mining_verified": False,
                 "revenue_verified": False,
             }
 
-    assert last is not None
     return {
         "evidence_class": "BOUNDED_OFFLINE_NONCE_SEARCH",
         "status": "NO_LOCAL_TARGET_MATCH_IN_RANGE",
         "attempts": attempts,
         "nonce_start": nonce_start,
         "nonce_found": None,
-        "last_candidate": last,
+        "last_candidate": candidate,
         "pool_submission_sent": False,
         "pool_acceptance_verified": False,
         "real_mining_verified": False,
