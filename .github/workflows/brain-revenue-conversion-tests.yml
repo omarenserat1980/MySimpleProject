@@ -2,6 +2,26 @@ name: Brain Revenue Conversion Tests
 
 on:
   workflow_call:
+  pull_request:
+    paths:
+      - "brain_v12/brain/client_revenue_guardian.py"
+      - "brain_v12/brain/income_lifecycle.py"
+      - "brain_v12/brain/live_opportunity_researcher.py"
+      - "brain_v12/brain/payment_gateway.py"
+      - "brain_v12/brain/commerce_api.py"
+      - "brain_v12/brain/economic_reconciliation.py"
+      - "brain_v12/tests/test_client_revenue_guardian.py"
+      - "brain_v12/tests/test_income_lifecycle.py"
+      - "brain_v12/tests/test_live_opportunity_researcher.py"
+      - "brain_v12/tests/test_payment_gateway.py"
+      - "brain_v12/tests/test_commerce_api.py"
+      - "brain_v12/tests/test_economic_reconciliation.py"
+      - ".github/workflows/brain-revenue-conversion-tests.yml"
+      - "brain_v12/ci/dispatch_workflow.py"
+      - "cloudflare/brain-api/src/**"
+      - "cloudflare/brain-api/test/**"
+      - "cloudflare/brain-api/migrations/**"
+      - "cloudflare/brain-api/wrangler.toml"
   push:
     paths:
       - "brain_v12/brain/client_revenue_guardian.py"
