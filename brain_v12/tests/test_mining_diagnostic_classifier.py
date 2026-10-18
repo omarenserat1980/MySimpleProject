@@ -80,3 +80,57 @@ def test_all_reports_preserve_safety_boundary():
         assert report["miner_started_or_stopped"] is False
         assert report["real_mining_verified"] is False
         assert report["revenue_verified"] is False
+
+
+
+def test_unrecognized_input_fields_and_secret_like_values_are_never_echoed():
+    marker = "do-not-echo-secret-marker"
+    report = classify_mining_runtime_diagnosis({
+        "dns": "FAIL",
+        "password": marker,
+        "token": marker,
+        "authorization_payload": marker,
+        "raw_response": marker,
+        "pool_url": "stratum+tcp://example.invalid:3333",
+        "accepted_shares": {"count": 999, "verified": True},
+    })
+    serialized = str(report)
+    assert marker not in serialized
+    assert "stratum+tcp://" not in serialized
+    assert report["diagnosis"] == "DNS_RESOLUTION_FAILURE"
+    assert report["observations"]["accepted_shares"] == "UNKNOWN"
+    assert report["real_mining_verified"] is False
+    assert report["revenue_verified"] is False
+
+
+def test_concrete_transport_failure_takes_precedence_over_reported_share_claim():
+    report = classify_mining_runtime_diagnosis({
+        "dns": "FAIL",
+        "accepted_shares": "ACCEPTED_REPORTED",
+    })
+    assert report["diagnosis"] == "DNS_RESOLUTION_FAILURE"
+    assert report["real_mining_verified"] is False
+    assert report["brain_work_attribution_verified"] is False
+    assert report["revenue_verified"] is False
+
+
+def test_enum_values_are_exact_and_case_sensitive():
+    report = classify_mining_runtime_diagnosis({
+        "dns": "fail",
+        "tcp": " PASS ",
+        "tls": True,
+        "stratum": 1,
+        "authorization": "accepted",
+        "accepted_shares": "accepted_reported",
+        "account_match": "match",
+        "process_inventory": "none_found",
+    })
+    assert report["diagnosis"] == "INSUFFICIENT_EVIDENCE"
+    assert report["observations"]["connection_stages"] == {
+        "dns": "UNKNOWN",
+        "tcp": "UNKNOWN",
+        "tls": "UNKNOWN",
+        "stratum": "UNKNOWN",
+    }
+    assert report["observations"]["accepted_shares"] == "UNKNOWN"
+    assert report["observations"]["process_inventory"] == "UNKNOWN"
