@@ -29,6 +29,25 @@ def test_github_actions_is_never_admitted():
     assert reason == "github_actions_mining_forbidden"
 
 
+def test_worker_identity_cannot_be_reassigned_to_another_owner_or_kind():
+    cp = CloudMiningControlPlane()
+    cp.register_worker(CloudWorker("w1", "vm", "region-a", "owner-a", enabled=True))
+    for replacement in (
+        CloudWorker("w1", "vm", "region-b", "owner-b", enabled=True),
+        CloudWorker("w1", "android", "region-a", "owner-a", enabled=True),
+    ):
+        try:
+            cp.register_worker(replacement)
+        except ValueError as exc:
+            assert "worker identity conflict" in str(exc)
+        else:
+            raise AssertionError("worker identity must not be reassigned")
+    # Safe operational updates for the same owner and kind are allowed.
+    cp.register_worker(CloudWorker("w1", "VM", "region-b", "owner-a", enabled=False))
+    assert cp.workers["w1"].kind == "vm"
+    assert cp.workers["w1"].enabled is False
+
+
 def test_disabled_worker_cannot_run_a_previously_planned_job():
     cp, job = _planned_job()
     cp.register_worker(CloudWorker("w1", "vm", "user-region", "owner", enabled=False))
