@@ -49,7 +49,9 @@ class CloudMiningControlPlane:
         self.jobs: dict[str, MiningJob] = {}
 
     def register_worker(self, worker: CloudWorker) -> None:
-        if not worker.worker_id.strip() or not worker.owner.strip():
+        worker_id = str(worker.worker_id).strip()
+        owner = str(worker.owner).strip()
+        if not worker_id or not owner:
             raise ValueError("worker identity and owner are required")
         kind = str(worker.kind).strip().lower()
         if kind in FORBIDDEN_PHYSICAL_KINDS or kind not in ALLOWED_SOFTWARE_NODE_KINDS:
@@ -70,20 +72,20 @@ class CloudMiningControlPlane:
             or not 0 < worker.max_cpu_percent <= 100
         ):
             raise ValueError("max_cpu_percent must be finite and in (0, 100]")
-        existing = self.workers.get(worker.worker_id)
+        existing = self.workers.get(worker_id)
         if existing is not None and (
-            existing.owner != worker.owner
+            existing.owner != owner
             or str(existing.kind).strip().lower() != kind
         ):
             raise ValueError("worker identity conflict: owner and kind are immutable")
         # Normalize the accepted kind before persisting so later checks use one
         # canonical identity. Updating limits/enabled state for the same owner
         # and kind remains supported.
-        self.workers[worker.worker_id] = CloudWorker(
-            worker_id=worker.worker_id,
+        self.workers[worker_id] = CloudWorker(
+            worker_id=worker_id,
             kind=kind,
             region=worker.region,
-            owner=worker.owner,
+            owner=owner,
             enabled=worker.enabled,
             max_temperature_c=worker.max_temperature_c,
             max_cpu_percent=worker.max_cpu_percent,
