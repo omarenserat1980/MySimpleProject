@@ -1,0 +1,40 @@
+name: Brain ASIC Evidence Gate
+
+on:
+  pull_request:
+    paths:
+      - 'brain_v12/brain/asic_hosting_evidence.py'
+      - 'brain_v12/test_asic_hosting_evidence.py'
+      - '.github/workflows/brain-asic-evidence-gate.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'brain_v12/brain/asic_hosting_evidence.py'
+      - 'brain_v12/test_asic_hosting_evidence.py'
+      - '.github/workflows/brain-asic-evidence-gate.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-asic-evidence-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Compile evidence gate and tests
+        run: python -m compileall -q brain_v12/brain/asic_hosting_evidence.py brain_v12/test_asic_hosting_evidence.py
+      - name: Run ASIC hosting evidence gate tests
+        run: python -m pytest -q brain_v12/test_asic_hosting_evidence.py
