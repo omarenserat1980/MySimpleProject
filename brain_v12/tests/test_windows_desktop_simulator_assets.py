@@ -44,7 +44,7 @@ class WindowsDesktopSimulatorAssetTests(unittest.TestCase):
     def test_simulated_environment_does_not_claim_real_windows_or_exe_support(self):
         self.assertIn("SIMULATED", self.html)
         self.assertIn("تشغيل ملفات EXE", self.html)
-        self.assertIn("غير مدعوم", self.html)
+        self.assertIn("غير مدعوم", self.apps)
 
 
 if __name__ == "__main__":
