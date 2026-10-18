@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unittest
 from datetime import datetime, timezone
 
 from brain_v12.brain.braiins_proof_gate_adapter import braiins_telemetry_to_proof_records
@@ -24,40 +25,42 @@ def live_result(**overrides):
     return result
 
 
-def test_live_pool_aggregate_yields_only_connection_and_hashrate_proofs():
-    records = braiins_telemetry_to_proof_records(live_result())
-    assert [item["proof_type"] for item in records] == ["pool_connection", "observed_hashrate"]
-    assert all(item["status"] == "VERIFIED" for item in records)
-    assert all(item["source_type"] == "braiins_pool_readonly_api" for item in records)
-    assert not any(item["proof_type"] == "accepted_share" for item in records)
-    assert not any(item["proof_type"] in {"provider_payout", "blockchain_confirmation"} for item in records)
+class BraiinsProofGateAdapterTests(unittest.TestCase):
+    def test_live_pool_aggregate_yields_only_connection_and_hashrate_proofs(self):
+        records = braiins_telemetry_to_proof_records(live_result())
+        self.assertEqual([item["proof_type"] for item in records], ["pool_connection", "observed_hashrate"])
+        self.assertTrue(all(item["status"] == "VERIFIED" for item in records))
+        self.assertTrue(all(item["source_type"] == "braiins_pool_readonly_api" for item in records))
+        self.assertFalse(any(item["proof_type"] == "accepted_share" for item in records))
+        self.assertFalse(any(item["proof_type"] in {"provider_payout", "blockchain_confirmation"} for item in records))
+
+    def test_aggregate_telemetry_cannot_unlock_live_mining_gate(self):
+        records = braiins_telemetry_to_proof_records(live_result())
+        result = ProofGateRegistry().evaluate(
+            "bitcoin_mining_live",
+            records,
+            now=datetime(2026, 10, 18, 20, 0, tzinfo=timezone.utc),
+        )
+        self.assertNotEqual(result["status"], "PASS")
+        self.assertEqual(result["missing_proof_types"], ["accepted_share"])
+
+    def test_test_fixture_and_blocked_snapshots_produce_no_evidence(self):
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(
+            status="TEST_FIXTURE_ONLY",
+            pool_activity_verified=False,
+            pool_source_authenticated_over_https=False,
+            evidence_origin="INJECTED_TEST_FIXTURE",
+            proof_level="SYNTHETIC_TEST_FIXTURE",
+        )), [])
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(ok=False, status="BLOCKED")), [])
+
+    def test_malformed_provenance_or_metrics_produce_no_evidence(self):
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(pool_response_sha256="bad")), [])
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(observed_at_utc="")), [])
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(worker_id="")), [])
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(hashrate_5m_provider_units=True)), [])
+        self.assertEqual(braiins_telemetry_to_proof_records(live_result(hashrate_5m_provider_units=0)), [])
 
 
-def test_aggregate_telemetry_cannot_unlock_live_mining_gate():
-    records = braiins_telemetry_to_proof_records(live_result())
-    result = ProofGateRegistry().evaluate(
-        "bitcoin_mining_live",
-        records,
-        now=datetime(2026, 10, 18, 20, 0, tzinfo=timezone.utc),
-    )
-    assert result["status"] != "PASS"
-    assert result["missing_proof_types"] == ["accepted_share"]
-
-
-def test_test_fixture_and_blocked_snapshots_produce_no_evidence():
-    assert braiins_telemetry_to_proof_records(live_result(
-        status="TEST_FIXTURE_ONLY",
-        pool_activity_verified=False,
-        pool_source_authenticated_over_https=False,
-        evidence_origin="INJECTED_TEST_FIXTURE",
-        proof_level="SYNTHETIC_TEST_FIXTURE",
-    )) == []
-    assert braiins_telemetry_to_proof_records(live_result(ok=False, status="BLOCKED")) == []
-
-
-def test_malformed_provenance_or_metrics_produce_no_evidence():
-    assert braiins_telemetry_to_proof_records(live_result(pool_response_sha256="bad")) == []
-    assert braiins_telemetry_to_proof_records(live_result(observed_at_utc="")) == []
-    assert braiins_telemetry_to_proof_records(live_result(worker_id="")) == []
-    assert braiins_telemetry_to_proof_records(live_result(hashrate_5m_provider_units=True)) == []
-    assert braiins_telemetry_to_proof_records(live_result(hashrate_5m_provider_units=0)) == []
+if __name__ == "__main__":
+    unittest.main()
