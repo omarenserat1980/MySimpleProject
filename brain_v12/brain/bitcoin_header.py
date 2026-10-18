@@ -105,7 +105,11 @@ def stratum_difficulty_to_share_target(difficulty: int | float | str | Decimal) 
         raise ValueError("INVALID_STRATUM_DIFFICULTY") from exc
     if not value.is_finite() or value <= 0:
         raise ValueError("INVALID_STRATUM_DIFFICULTY")
-    target = int(Decimal(STRATUM_DIFFICULTY_ONE_TARGET) / value)
+    # Convert the finite decimal to an exact rational before integer division.
+    # Decimal division under the default context would round this 224-bit target
+    # to only 28 significant digits and could silently change the accepted range.
+    numerator, denominator = value.as_integer_ratio()
+    target = (STRATUM_DIFFICULTY_ONE_TARGET * denominator) // numerator
     if not 0 < target < 2**256:
         raise ValueError("STRATUM_DIFFICULTY_TARGET_OUT_OF_RANGE")
     return target
