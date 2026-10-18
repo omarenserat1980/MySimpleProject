@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "default_status": "NOT_CONFIGURED",
+    "simulation_first": true,
+    "allow_unverified_provenance": false,
+    "allow_implicit_physical_hardware_claims": false,
+    "license_review_required_before_import": true
+  },
+  "integrations": [
+    {
+      "id": "qemu-vm",
+      "component": "virtual-server",
+      "upstream": "https://www.qemu.org/",
+      "role": "disposable-vm-execution",
+      "mode": "external-tool",
+      "status": "CANDIDATE",
+      "pin": null,
+      "license_review": "PENDING",
+      "evidence_required": [
+        "tool-version",
+        "vm-config-fingerprint",
+        "host-run-log",
+        "guest-side-evidence"
+      ],
+      "physical_hardware_verified": false
+    },
+    {
+      "id": "gem5-system",
+      "component": "cpu-system",
+      "upstream": "https://www.gem5.org/",
+      "role": "architectural-system-simulation",
+      "mode": "external-tool-or-adapter",
+      "status": "CANDIDATE",
+      "pin": null,
+      "license_review": "PENDING",
+      "evidence_required": [
+        "tool-version",
+        "workload-id",
+        "reproducible-report"
+      ],
+      "physical_hardware_verified": false
+    },
+    {
+      "id": "ramulator2-memory",
+      "component": "ram-memory-controller",
+      "upstream": "https://github.com/CMU-SAFARI/ramulator2",
+      "role": "memory-system-simulation",
+      "mode": "external-tool-or-adapter",
+      "status": "CANDIDATE",
+      "pin": null,
+      "license_review": "PENDING",
+      "evidence_required": [
+        "source-pin",
+        "tool-version",
+        "trace-id",
+        "simulated-performance-report"
+      ],
+      "physical_hardware_verified": false
+    },
+    {
+      "id": "verilator-rtl",
+      "component": "asic-rtl-simulation",
+      "upstream": "https://www.veripool.org/verilator/",
+      "role": "rtl-testbench-execution",
+      "mode": "external-tool",
+      "status": "CANDIDATE",
+      "pin": null,
+      "license_review": "PENDING",
+      "evidence_required": [
+        "tool-version",
+        "compile-log",
+        "run-log",
+        "known-answer-results"
+      ],
+      "physical_hardware_verified": false
+    },
+    {
+      "id": "yosys-synthesis",
+      "component": "asic-synthesis",
+      "upstream": "https://yosyshq.net/yosys/",
+      "role": "rtl-to-netlist-synthesis",
+      "mode": "external-tool",
+      "status": "CANDIDATE",
+      "pin": null,
+      "license_review": "PENDING",
+      "evidence_required": [
+        "tool-version",
+        "synthesis-log",
+        "netlist-sha256",
+        "warnings-review"
+      ],
+      "physical_hardware_verified": false
+    },
+    {
+      "id": "openroad-pd",
+      "component": "asic-physical-design",
+      "upstream": "https://theopenroadproject.org/",
+      "role": "exploratory-place-and-route",
+      "mode": "external-tool",
+      "status": "CANDIDATE",
+      "pin": null,
+      "license_review": "PENDING",
+      "evidence_required": [
+        "tool-version",
+        "pdk-provenance",
+        "flow-log",
+        "design-rule-results"
+      ],
+      "physical_hardware_verified": false
+    }
+  ]
+}
