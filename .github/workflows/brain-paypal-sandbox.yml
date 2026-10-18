@@ -33,3 +33,6 @@ jobs:
       - name: Run commercial and PayPal static gates
         working-directory: cloudflare/brain-api
         run: node test/commercial_worker_static.test.js
+      - name: Run PayPal runtime fail-closed tests
+        working-directory: cloudflare/brain-api
+        run: node --test test/paypal_runtime.test.mjs
