@@ -28,3 +28,14 @@ layout for this prototype. It does **not** by itself establish:
 The current RTL is a small ALU/datapath prototype, not a complete mining ASIC.
 All constraints are initial estimates and must be reviewed against actual reports.
 Never report fabricated silicon without independent foundry and lab evidence.
+
+## Bitcoin nonce-search experiment
+
+The separate workflow `.github/workflows/brain-bitcoin-openroad-physical-flow.yml` evaluates the bounded Bitcoin nonce-search RTL on the pinned `sky130hd` platform using a pinned OpenROAD-flow-scripts commit and a container image pinned by digest:
+
+- Flow source: `9c431405a71909ca9aa5b9000d3d11fa36b2a32a`
+- Container: `openroad/orfs@sha256:2979b97bd739d39e2369e76e3763a7b1a5de5e4d12b93d5511b42199031d57b8`
+- Design: `brain_bitcoin_nonce_search`
+
+This is an engineering experiment only. Initial SDC/floorplan values are not reviewed timing constraints or foundry signoff. A green workflow, synthesized netlist, or candidate GDS does not prove DRC/LVS closure, timing closure, fabricated silicon, Bitcoin mining, accepted pool shares, or revenue. Logs, reports, result files, and SHA-256 checksums are retained as evidence even when the flow fails.
+
