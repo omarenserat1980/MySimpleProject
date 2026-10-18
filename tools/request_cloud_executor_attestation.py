@@ -1,17 +1,32 @@
 #!/usr/bin/env python3
 """Fetch a fresh short-lived attestation from the Brain control plane.
 
-HTTP failures expose only the server's allowlisted machine-readable error code;
+HTTP failures expose only a fixed allowlist of machine-readable error codes;
 request headers, token values, response bodies, and URLs are never printed.
 """
 from __future__ import annotations
 import argparse, json, os, tempfile, urllib.error, urllib.request
 from pathlib import Path
 
-# Only fixed, documented server codes may cross into CI logs.
+# Only non-secret, server-defined diagnostic codes may cross into CI logs.
+# Keep this allowlist narrow: never forward arbitrary response text.
 _SAFE_ERROR_DETAILS = {
+    "CLOUD_EXECUTOR_AUTH_REQUIRED",
     "CLOUD_EXECUTOR_AUTH_REJECTED",
     "CLOUD_EXECUTOR_HOST_BINDING_REQUIRED",
+    "CLOUD_EXECUTOR_HOST_BINDING_HOSTNAME_INVALID",
+    "CLOUD_EXECUTOR_HOST_BINDING_ARCHITECTURE_INVALID",
+    "CLOUD_EXECUTOR_HOST_BINDINGS_CONFIG_INVALID",
+    "CLOUD_EXECUTOR_ENROLLMENTS_CONFIG_INVALID",
+    "CLOUD_EXECUTOR_ISSUER_NOT_CONFIGURED",
+    "CLOUD_EXECUTOR_REGISTRY_PATH_INVALID",
+    "CLOUD_EXECUTOR_REGISTRY_PARENT_MISSING",
+    "CLOUD_EXECUTOR_ISSUER_CHALLENGE_STORE_UNAVAILABLE",
+    "CLOUD_EXECUTOR_ISSUER_CHALLENGE_STORE_PARENT_MISSING",
+    "CLOUD_EXECUTOR_POSTGRES_TLS_REQUIRED",
+    "CLOUD_EXECUTOR_POSTGRES_DRIVER_UNAVAILABLE",
+    "CLOUD_EXECUTOR_ISSUER_SIGNING_KEY_REQUIRED",
+    "CLOUD_EXECUTOR_ISSUER_SIGNING_KEY_INVALID",
 }
 
 
@@ -32,17 +47,17 @@ def _safe_http_error(exc: urllib.error.HTTPError) -> RuntimeError:
 
 def post(base: str, path: str, token: str, payload: dict) -> dict:
     request = urllib.request.Request(
-        base.rstrip("/") + path,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "X-Brain-Executor-Token": token},
-        method="POST",
+       base.rstrip("/") + path,
+       data=json.dumps(payload).encode("utf-8"),
+       headers={"Content-Type": "application/json", "X-Brain-Executor-Token": token},
+       method="POST",
     )
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
             result = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         raise _safe_http_error(exc) from None
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
         raise RuntimeError("CLOUD_EXECUTOR_REGISTRY_REQUEST_FAILED") from None
     if not isinstance(result, dict):
         raise RuntimeError("CLOUD_EXECUTOR_REGISTRY_RESPONSE_INVALID")

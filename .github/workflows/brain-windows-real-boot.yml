@@ -565,10 +565,14 @@ jobs:
           PY
 
       - name: Run dedicated Windows boot proof verifier
+        env:
+          TRUSTED_ISO_SHA256_INPUT: ${{ inputs.trusted_iso_sha256 }}
         run: |
           set -euo pipefail
           python3 brain_v12/tools/windows_boot_proof.py \
             --evidence windows-combined-evidence.json \
+            --guest-evidence windows-boot-evidence.json \
+            --trusted-iso-sha256 "$TRUSTED_ISO_SHA256_INPUT" \
             --marker /tmp/windows-boot-marker \
             --phase windows-boot-phase.txt \
             --contract-gate windows-execution-contract-gate.json \
