@@ -6,7 +6,11 @@ from brain_v12.business.revenue_ledger import RevenueRecord
 
 
 def _verified_cycle(opportunity_id: str) -> dict:
-    cycle = start_cloud_mining_verification("CloudMineCrypto", opportunity_id)
+    # Test-only deterministic verifier; never evidence of a real chain transaction.
+    cycle = start_cloud_mining_verification(
+        "CloudMineCrypto", opportunity_id,
+        chain_verifier=lambda proof, payout: proof.txid == "tx-001",
+    )
     for state in (VerificationState.RISK_CHECK, VerificationState.FREE_TEST, VerificationState.MEASURE, VerificationState.WITHDRAWAL_TEST):
         cycle.advance(state, "test")
     cycle.submit_payout_evidence(PayoutEvidence(
