@@ -84,6 +84,8 @@ jobs:
             test: brain_v12.hardware.test_ramulator_adapter
           - component: hardware_reality_audit
             test: brain_v12.hardware.test_reality_audit
+          - component: qemu_host_preflight
+            test: brain_v12.hardware.test_qemu_host_preflight
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
