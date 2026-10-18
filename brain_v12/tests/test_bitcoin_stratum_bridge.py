@@ -74,5 +74,78 @@ class BitcoinStratumBridgeTests(unittest.TestCase):
                 probe_stratum_connection()
 
 
+    def test_successful_tls_probe_reports_connectivity_only(self):
+        import io
+        import json
+        from unittest.mock import MagicMock
+
+        env = {
+            "BRAIN_ENABLE_LIVE_STRATUM_BRIDGE": "1",
+            "BRAIN_STRATUM_HOST": "pool.example.test",
+            "BRAIN_STRATUM_PORT": "443",
+            "BRAIN_STRATUM_USERNAME": "account.worker",
+            "BRAIN_STRATUM_PASSWORD": "test-password-not-real",
+            "BRAIN_STRATUM_TLS": "1",
+            "BRAIN_MINING_WORKER_OWNED": "1",
+            "BRAIN_MINING_AUTHORIZED": "1",
+        }
+        raw_socket = MagicMock()
+        tls_socket = MagicMock()
+        # Keep the writer's bytes inspectable after the probe returns.
+        class CaptureWriter(io.StringIO):
+            def close(self):
+                self.flush()
+
+        writer = CaptureWriter()
+        tls_socket.makefile.side_effect = [
+            io.StringIO(json.dumps({"id": 1, "result": [[], "aabb", 4], "error": None}) + "\n"
+                        + json.dumps({"id": 2, "result": True, "error": None}) + "\n"),
+            writer,
+        ]
+        tls_context = MagicMock()
+        tls_context.wrap_socket.return_value = tls_socket
+        with (patch.dict(os.environ, env, clear=True), patch("brain_v12.brain.bitcoin_stratum_bridge.socket.create_connection", return_value=raw_socket), patch("brain_v12.brain.bitcoin_stratum_bridge.ssl.create_default_context", return_value=tls_context)):
+            result = probe_stratum_connection()
+
+        self.assertEqual(result["status"], "STRATUM_SESSION_AUTHENTICATED")
+        self.assertTrue(result["tls"])
+        self.assertFalse(result["proof_of_work_performed"])
+        self.assertEqual(result["shares_submitted"], 0)
+        self.assertEqual(result["accepted_shares"], 0)
+        self.assertFalse(result["execution_authorized"])
+        self.assertNotIn("test-password-not-real", repr(result))
+        requests = [json.loads(line) for line in writer.getvalue().splitlines()]
+        self.assertEqual([request["method"] for request in requests], ["mining.subscribe", "mining.authorize"])
+        self.assertEqual(requests[1]["params"], ["account.worker", "test-password-not-real"])
+        tls_context.wrap_socket.assert_called_once_with(raw_socket, server_hostname="pool.example.test")
+
+    def test_tls_probe_fails_closed_when_subscribe_is_rejected(self):
+        import io
+        import json
+        from unittest.mock import MagicMock
+
+        env = {
+            "BRAIN_ENABLE_LIVE_STRATUM_BRIDGE": "1",
+            "BRAIN_STRATUM_HOST": "pool.example.test",
+            "BRAIN_STRATUM_PORT": "443",
+            "BRAIN_STRATUM_USERNAME": "account.worker",
+            "BRAIN_STRATUM_PASSWORD": "test-password-not-real",
+            "BRAIN_STRATUM_TLS": "1",
+            "BRAIN_MINING_WORKER_OWNED": "1",
+            "BRAIN_MINING_AUTHORIZED": "1",
+        }
+        raw_socket = MagicMock()
+        tls_socket = MagicMock()
+        tls_socket.makefile.side_effect = [
+            io.StringIO(json.dumps({"id": 1, "result": None, "error": [20, "rejected", None]}) + "\n"),
+            io.StringIO(),
+        ]
+        tls_context = MagicMock()
+        tls_context.wrap_socket.return_value = tls_socket
+        with (patch.dict(os.environ, env, clear=True), patch("brain_v12.brain.bitcoin_stratum_bridge.socket.create_connection", return_value=raw_socket), patch("brain_v12.brain.bitcoin_stratum_bridge.ssl.create_default_context", return_value=tls_context)):
+            with self.assertRaisesRegex(StratumBridgeError, "SUBSCRIBE_REJECTED"):
+                probe_stratum_connection()
+
+
 if __name__ == "__main__":
     unittest.main()
