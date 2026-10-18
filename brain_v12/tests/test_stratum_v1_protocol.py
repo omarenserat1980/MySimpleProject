@@ -24,7 +24,8 @@ def test_subscription_authorization_and_share_acceptance_are_distinct():
     session.receive(json.dumps({"id": auth["id"], "result": True, "error": None}))
     assert session.authorized
     session.receive(json.dumps({"id": None, "method": "mining.notify",
-                                "params": ["job-1", "00" * 32, "01020304", "aabbccdd", [], "20000000", "1d00ffff", "65aa0000", True]}))
+                                "params": ["job-1", "00" * 32, "01020304", "aabbccdd", [],
+                                           "20000000", "1d00ffff", "65aa0000", True]}))
     share = json.loads(session.request_submit("job-1", "00000001", "65a1b2c3", "00000001"))
     assert share["method"] == "mining.submit"
     result = session.receive(json.dumps({"id": share["id"], "result": True, "error": None}))
@@ -41,14 +42,19 @@ def test_authorization_cannot_happen_before_subscription():
 def test_share_requires_authorization_and_current_job():
     session = StratumV1Session("worker", "secret")
     with pytest.raises(StratumProtocolError, match="POOL_AUTHORIZATION_REQUIRED"):
-        session.request_submit("job", "00", "00", "00")
+        session.request_submit("job", "00", "00000000", "00000000")
 
 
 def test_unknown_or_stale_job_is_rejected():
     session = StratumV1Session("worker", "secret", subscribed=True, authorized=True,
                                current_job_id="job-2")
     with pytest.raises(StratumProtocolError, match="UNKNOWN_OR_STALE_JOB"):
-        session.request_submit("job-1", "00", "00", "00")
+        session.request_submit("job-1", "00", "00000000", "00000000")
+
+
+def test_malformed_messages_fail_closed(line):
+    with pytest.raises(StratumProtocolError):
+        parse_message(line)
 
 
 @pytest.mark.parametrize("line", ["{", "[]", "null", "x" * 1_000_001])
@@ -65,7 +71,7 @@ def test_invalid_difficulty_is_rejected():
 
 def test_pool_rejection_is_not_counted_as_acceptance():
     session = StratumV1Session("worker", "secret", authorized=True, current_job_id="job")
-    request = json.loads(session.request_submit("job", "00", "00", "00"))
+    request = json.loads(session.request_submit("job", "00", "00000000", "00000000"))
     result = session.receive(json.dumps({"id": request["id"], "result": False, "error": [20, "bad share", None]}))
     assert result["status"] == "REJECTED_BY_POOL"
     assert session.accepted_shares == 0
@@ -74,7 +80,7 @@ def test_pool_rejection_is_not_counted_as_acceptance():
 
 def test_malformed_share_response_does_not_consume_pending_request():
     session = StratumV1Session("worker", "secret", authorized=True, current_job_id="job")
-    request = json.loads(session.request_submit("job", "00", "00", "00"))
+    request = json.loads(session.request_submit("job", "00", "00000000", "00000000"))
     with pytest.raises(StratumProtocolError, match="MALFORMED_JSON_RPC_RESPONSE"):
         session.receive(json.dumps({"id": request["id"], "result": True}))
     assert request["id"] in session.pending
@@ -114,3 +120,68 @@ def test_malformed_notify_jobs_are_rejected_without_advancing_current_job(params
     with pytest.raises(StratumProtocolError, match="INVALID_MINING_JOB"):
         session.receive(json.dumps({"id": None, "method": "mining.notify", "params": params}))
     assert session.current_job_id == "previous-job"
+
+
+@pytest.mark.parametrize(
+    ("field_index", "bad_value", "error"),
+    [
+        (1, "00" * 16 + "  " + "00" * 16, "INVALID_HEX_PREVHASH"),
+        (2, "0102  ", "INVALID_HEX_COINBASE1"),
+        (3, "aabb  ", "INVALID_HEX_COINBASE2"),
+        (4, None, "INVALID_HEX_MERKLE_BRANCH"),
+        (5, "20 000000", "INVALID_HEX_VERSION"),
+        (6, "1d00 ff ", "INVALID_HEX_NBITS"),
+        (7, "65aa 0000", "INVALID_HEX_NTIME"),
+    ],
+)
+def test_notify_rejects_embedded_or_trailing_hex_whitespace(field_index, bad_value, error):
+    params = ["job-1", "00" * 32, "01020304", "aabbccdd", ["11" * 32],
+              "20000000", "1d00ffff", "65aa0000", True]
+    if field_index == 4:
+        params[4] = ["11" * 16 + "  " + "11" * 16]
+    else:
+        params[field_index] = bad_value
+    session = StratumV1Session("worker", "secret")
+    with pytest.raises(StratumProtocolError, match="INVALID_MINING_JOB"):
+        session.receive(json.dumps({"id": None, "method": "mining.notify", "params": params}))
+    assert session.current_job_id is None
+
+
+@pytest.mark.parametrize(
+    ("extranonce1", "extranonce2", "error"),
+    [
+        ("a1b2  ", "c3d4", "INVALID_HEX_EXTRANONCE1"),
+        ("a1b2", "c3d4  ", "INVALID_HEX_EXTRANONCE2"),
+    ],
+)
+def test_coinbase_rejects_noncanonical_extranonce_hex(extranonce1, extranonce2, error):
+    from brain_v12.brain.stratum_v1_jobs import StratumJob, build_coinbase
+    job = StratumJob.from_notify(
+        ["job-1", "00" * 32, "01020304", "aabbccdd", ["11" * 32],
+         "20000000", "1d00ffff", "65aa0000", True]
+    )
+    with pytest.raises(ValueError, match=error):
+        build_coinbase(job, extranonce1, extranonce2, 2)
+
+
+def test_share_submit_requires_exact_ntime_and_nonce_widths():
+    session = StratumV1Session("worker", "secret", authorized=True, current_job_id="job")
+    for ntime, nonce, expected in [
+        ("0000000", "00000001", "INVALID_NTIME_HEX_WIDTH"),
+        ("000000000", "00000001", "INVALID_NTIME_HEX_WIDTH"),
+        ("00000000", "0000000", "INVALID_NONCE_HEX_WIDTH"),
+        ("00000000", "000000000", "INVALID_NONCE_HEX_WIDTH"),
+        ("0000000g", "00000001", "INVALID_NTIME_HEX_WIDTH"),
+        ("00000000", "0000000g", "INVALID_NONCE_HEX_WIDTH"),
+    ]:
+        with pytest.raises(StratumProtocolError, match=expected):
+            session.request_submit("job", "00000001", ntime, nonce)
+    assert not session.pending
+
+
+@pytest.mark.parametrize("extranonce2", ["", "0", "gg", "00" * 33])
+def test_share_submit_rejects_invalid_or_oversized_extranonce2(extranonce2):
+    session = StratumV1Session("worker", "secret", authorized=True, current_job_id="job")
+    with pytest.raises(StratumProtocolError, match="INVALID_EXTRANONCE2_HEX_WIDTH"):
+        session.request_submit("job", extranonce2, "00000000", "00000000")
+    assert not session.pending
