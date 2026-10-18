@@ -55,12 +55,13 @@ jobs:
       - name: Prepare Brain runtime
         run: |
           set -euo pipefail
-          python3 -m pip install --disable-pip-version-check -q httpx fastapi python3-multipart google-api-python3-client google-auth-oauthlib google-auth-httplib2
+          python3 -m pip install --disable-pip-version-check -q httpx fastapi python-multipart google-api-python-client google-auth-oauthlib google-auth-httplib2
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
           mkdir -p brain_v12/bin
           ln -sf "$(command -v ffmpeg)" brain_v12/bin/ffmpeg
           ln -sf "$(command -v ffprobe)" brain_v12/bin/ffprobe
+          export PATH="$PWD/brain_v12/bin:$PATH"
           test -x brain_v12/bin/ffmpeg
           test -x brain_v12/bin/ffprobe
           python3 - <<'PY'
