@@ -37,7 +37,7 @@ $beforeLength = $file.Length
 $beforeWriteUtc = $file.LastWriteTimeUtc.ToString('o')
 
 # DISM /Get-ImageInfo is a metadata query; it does not mount or service the image.
-if ($extension -in @('vhdx', 'ffu')) {
+if ($extension -in @('vhd', 'vhdx', 'ffu')) {
     $dismOutput = & $dism /English /Get-ImageInfo "/ImageFile:$($file.FullName)" /Index:1 2>&1
 } else {
     $dismOutput = & $dism /English /Get-ImageInfo "/ImageFile:$($file.FullName)" 2>&1
