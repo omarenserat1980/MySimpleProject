@@ -45,24 +45,39 @@ class WindowsCloudExecutor:
     def __init__(self, provider: WindowsCloudProvider | None = None):
         self.provider = provider
 
-    def readiness(self) -> dict[str, Any]:
+    def _is_simulator_provider(self) -> bool:
         if self.provider is None:
+            return False
+        try:
+            from brain_v12.azure_emulator.windows_provider import EmulatorWindowsProvider
+        except ImportError:
+            return False
+        return isinstance(self.provider, EmulatorWindowsProvider)
+
+    def readiness(self) -> dict[str, Any]:
+        if self._is_simulator_provider():
             return {
-                "status": "NOT_CONFIGURED",
-                "ready": False,
+                "status": "SIMULATOR_READY",
+                "ready": True,
                 "executor": self.capability,
-                "reason": "CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED",
+                "provider": self.provider.name,
+                "execution_mode": "SIMULATION_ONLY",
+                "real_windows_boot_verified": False,
             }
         return {
-            "status": "CONFIGURED",
-            "ready": True,
+            "status": "DISABLED_SIMULATION_ONLY",
+            "ready": False,
             "executor": self.capability,
-            "provider": self.provider.name,
+            "reason": "WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY",
+            "execution_mode": "SIMULATION_ONLY",
+            "real_windows_boot_verified": False,
         }
 
     def provision(self, **kwargs: Any) -> CloudWindowsVM:
         if self.provider is None:
             raise RuntimeError("CLOUD_WINDOWS_PROVIDER_NOT_CONFIGURED")
+        if not self._is_simulator_provider():
+            raise RuntimeError("WINDOWS_REAL_EXECUTION_DISABLED_SIMULATION_ONLY")
         vm = self.provider.provision_windows_server_2025(**kwargs)
         self._validate(vm)
         return vm
