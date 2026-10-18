@@ -17,7 +17,7 @@ No: the available repository evidence does not establish that every Brain compon
 | Component | Existing project capability/evidence | Reality status | Next gate |
 |---|---|---|---|
 | RAM / DRAM | Ramulator adapter and mocked contract tests added in PR #989 | `ADAPTER_IMPLEMENTED`; real Ramulator run not verified | Run pinned Ramulator with reviewed example and preserve logs/results |
-| Virtual server | QEMU-based runbooks and readiness gates exist | `PLANNED/BLOCKED` until a successful authorized VM and guest evidence are attached | Probe runner capacity, QEMU/KVM, disk and guest evidence |
+| Virtual server | QEMU runbooks plus a read-only QEMU/KVM host preflight adapter and mocked tests | `ADAPTER_IMPLEMENTED`; no target-host tool run or guest boot claimed | Run preflight on an authorized runner; then capture separate guest-generated boot evidence |
 | Windows Server guest | Installation planners, read-only image inspection and independent boot-proof tools exist | `BLOCKED` until valid media and guest-generated boot proof are available | Authorized media, capable host, successful installed-disk boot and independent verification |
 | CPU / full system | Hardware profiles and simulator tests exist; gem5 is a candidate | `PLANNED` for gem5 integration; no real CPU upgrade implied | Pin gem5, run known workload, validate outputs |
 | ASIC RTL | Brain SHA256d RTL and CI simulation/synthesis path exists | `SIMULATION/SYNTHESIS` only where CI artifacts prove it; no physical ASIC claim | Preserve current CI evidence; RTL vectors, netlist and design-flow checks |
@@ -33,11 +33,11 @@ No: the available repository evidence does not establish that every Brain compon
 - `brain_v12/hardware/software_integration_registry.json`: component-by-component status and gates.
 - `brain_v12/hardware/reality_audit.py`: read-only validator for the registry. It rejects missing fields, unknown evidence levels, duplicate IDs, and physical claims without the required evidence declaration.
 - `brain_v12/hardware/test_reality_audit.py`: unit tests for valid and invalid registry cases.
-- `brain_v12/hardware/ramulator_adapter.py`: bounded local-script adapter; does not install or fetch upstream code.
+- `brain_v12/hardware/ramulator_adapter.py`: bounded local-script adapter; does not install or fetch upstream code.\n- `brain_v12/hardware/qemu_host_preflight.py`: bounded, read-only QEMU/KVM host readiness probe; never starts a VM and never claims guest boot.
 
 ## What is not done
 - No RAM sticks, server, ASIC, FPGA, thermal sensor or other physical parts have been added by this code change.
-- No candidate tool is considered installed merely because a URL or adapter exists.
+- No candidate tool is considered installed merely because a URL or adapter exists. The QEMU preflight status is still unverified until it runs on the target host.
 - No Windows guest boot, accepted mining share, payout, or revenue is asserted by this audit.
 - The audit validates declarations; it does not independently authenticate external evidence or inspect hardware.
 

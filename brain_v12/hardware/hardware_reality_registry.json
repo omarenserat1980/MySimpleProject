@@ -32,14 +32,16 @@
     {
       "id": "virtual-server",
       "name": "Virtual server / QEMU",
-      "reality_status": "BLOCKED",
+      "reality_status": "ADAPTER_IMPLEMENTED",
       "evidence": [
-        "QEMU/Windows readiness and boot runbooks exist"
+        "QEMU/Windows readiness and boot runbooks exist",
+        "Read-only QEMU/KVM host preflight adapter and mocked contract tests in PR brain/qemu-host-preflight-adapter-v1"
       ],
       "not_proven": [
-        "Successful current VM guest boot"
+        "Successful current VM guest boot",
+        "QEMU/KVM tools installed or host preflight executed on an authorized target runner"
       ],
-      "next_gate": "Check authorized runner capacity and QEMU/KVM; obtain guest-generated evidence from a disposable VM."
+      "next_gate": "Run the preflight on an authorized runner, retain host evidence, then separately obtain disposable guest boot evidence."
     },
     {
       "id": "windows-guest",
@@ -158,4 +160,4 @@
       "next_gate": "Collect real accepted-share records and payout evidence; do not derive revenue from simulated hashrate."
     }
   ]
-}
+}\n
