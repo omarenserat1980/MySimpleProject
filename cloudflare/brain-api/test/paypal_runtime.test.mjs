@@ -74,3 +74,13 @@ test("PayPal webhook rejects malformed JSON before attempting provider authentic
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { ok: false, error: "INVALID_JSON" });
 });
+
+
+test("PayPal webhook rejects missing signature headers before OAuth credentials or provider calls", async () => {
+  const response = await post("/api/payments/paypal/webhook", {
+    BRAIN_DB: {},
+    PAYPAL_WEBHOOK_ID: "synthetic-webhook-id",
+  }, { event_type: "PAYMENT.CAPTURE.COMPLETED" });
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { ok: false, error: "PAYPAL_WEBHOOK_HEADERS_REQUIRED" });
+});
