@@ -1,6 +1,6 @@
 """Offline Stratum V1 share-submission payload contract.
 
-This module validates and serializes a candidate submission request only. It
+This module validates and serializes candidate submission requests only. It
 never opens sockets, reads credentials, submits shares, or asserts pool
 acceptance. A separate explicitly authorized live transport must be implemented
 and independently evidenced before this can be called a mining worker.
@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
+
+from .stratum_v1_protocol import StratumProtocolError, StratumV1Session
 
 
 _HEX = re.compile(r"^[0-9a-fA-F]+$")
@@ -57,6 +59,44 @@ def build_share_submission(
         "real_mining_verified": False,
         "revenue_verified": False,
         "evidence_class": "OFFLINE_VALIDATED_SHARE_CANDIDATE",
+    }
+
+
+def build_session_share_submission(
+    session: StratumV1Session,
+    *,
+    job_id: str,
+    extranonce2: str,
+    ntime: str,
+    nonce: str,
+) -> dict[str, Any]:
+    """Build a submit candidate through the existing authorized session gate.
+
+    The protocol state machine validates authorization, current job freshness,
+    negotiated extranonce width, and field widths. This call only creates a
+    pending request; it does not write to a socket or prove pool acceptance.
+    """
+    if not isinstance(session, StratumV1Session):
+        raise ValueError("STRATUM_V1_SESSION_REQUIRED")
+    try:
+        payload = session.request_submit(job_id, extranonce2, ntime, nonce)
+    except StratumProtocolError as exc:
+        raise ValueError(str(exc)) from exc
+    try:
+        request = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise AssertionError("SESSION_EMITTED_INVALID_JSON") from exc
+    if request.get("method") != "mining.submit" or not isinstance(request.get("id"), int):
+        raise AssertionError("SESSION_EMITTED_INVALID_SUBMISSION")
+    return {
+        "id": request["id"],
+        "method": request["method"],
+        "params": request["params"],
+        "sent": False,
+        "pool_acceptance_verified": False,
+        "real_mining_verified": False,
+        "revenue_verified": False,
+        "evidence_class": "OFFLINE_SESSION_VALIDATED_SHARE_CANDIDATE",
     }
 
 
