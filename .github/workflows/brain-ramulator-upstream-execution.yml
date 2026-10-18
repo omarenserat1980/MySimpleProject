@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: CMU-SAFARI/ramulator2
-          ref: main
+          ref: c6c7a5de0cef35935d6fad7369e6271406798865
           path: .evidence/upstream/ramulator2
 
       - name: Record toolchain and upstream revision
@@ -69,6 +69,19 @@ jobs:
           python -m pip install -e . 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/ramulator/python-install.log"
           python examples/example_config.py 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/ramulator/example-run.log"
           test -s "$GITHUB_WORKSPACE/artifacts/ramulator/example-run.log"
+          python - <<'PY'
+          import pathlib, re
+          log = pathlib.Path("artifacts/ramulator/example-run.log")
+          text = log.read_text(encoding="utf-8", errors="replace")
+          required = ("Controller cycles:", "Avg read latency:", "Read requests:")
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit("Ramulator output missing expected summary fields: " + ", ".join(missing))
+          match = re.search(r"Controller cycles:\s*(\d+)", text)
+          if not match or int(match.group(1)) <= 0:
+              raise SystemExit("Ramulator controller cycle count missing or not positive")
+          print("Ramulator known-output assertions passed")
+          PY
 
       - name: Validate execution evidence
         if: always()
@@ -111,7 +124,7 @@ jobs:
               "evidence_class": "UPSTREAM_TOOL_EXECUTION",
               "physical_ram_verified": False,
               "limitations": [
-                  "Upstream revision is recorded but currently follows upstream main rather than a fixed commit.",
+                  "Upstream source is pinned to the reviewed immutable commit recorded by the initial successful execution.",
                   "This is a DRAM simulation, not a measurement of physical RAM or host memory performance.",
                   "Successful execution is only established when the workflow job concludes successfully."
               ]
