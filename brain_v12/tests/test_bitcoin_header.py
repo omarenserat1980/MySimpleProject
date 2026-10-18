@@ -264,6 +264,13 @@ def test_stratum_difficulty_rejects_target_outside_256_bit_range():
         stratum_difficulty_to_share_target("1e-100")
 
 
+def test_stratum_difficulty_conversion_uses_exact_integer_floor():
+    # 4.25 = 17/4, so target must be floor(diff1_target * 4 / 17)
+    # exactly, without Decimal context rounding.
+    expected = (STRATUM_DIFFICULTY_ONE_TARGET * 4) // 17
+    assert stratum_difficulty_to_share_target("4.25") == expected
+
+
 def test_stratum_difficulty_conversion_does_not_claim_pool_acceptance():
     # The conversion only derives a candidate target; it is not pool evidence.
     target = stratum_difficulty_to_share_target("4.25")
