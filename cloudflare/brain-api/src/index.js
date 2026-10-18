@@ -504,8 +504,6 @@ async function handlePayPalWebhook(request, env, requestOrigin, allowedOrigin) {
   const raw = await request.text();
   let event;
   try { event = JSON.parse(raw); } catch { return json({ ok: false, error: "INVALID_JSON" }, 400, requestOrigin, allowedOrigin); }
-  const access = await getPayPalAccessToken(env);
-  if (!access.ok) return json({ ok: false, error: access.error }, access.status ? 502 : 503, requestOrigin, allowedOrigin);
   const h = request.headers;
   const verification = {
     auth_algo: h.get("PAYPAL-AUTH-ALGO"),
@@ -516,7 +514,10 @@ async function handlePayPalWebhook(request, env, requestOrigin, allowedOrigin) {
     webhook_id: webhookId,
     webhook_event: event,
   };
+  // Reject incomplete webhook envelopes before making an OAuth/provider network request.
   if (Object.values(verification).some(v => !v)) return json({ ok: false, error: "PAYPAL_WEBHOOK_HEADERS_REQUIRED" }, 401, requestOrigin, allowedOrigin);
+  const access = await getPayPalAccessToken(env);
+  if (!access.ok) return json({ ok: false, error: access.error }, access.status ? 502 : 503, requestOrigin, allowedOrigin);
   const verifyResponse = await fetch(PAYPAL_API_BASE + "/v1/notifications/verify-webhook-signature", {
     method: "POST",
     headers: { Authorization: "Bearer " + access.token, "Content-Type": "application/json" },
