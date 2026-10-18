@@ -146,13 +146,13 @@ class MiningVerificationCycle:
         }
 
 
-def start_cloud_mining_verification(
+def _start_cloud_mining_verification_with_verifier(
     provider: str,
     opportunity_id: str,
     *,
-    chain_verifier: Callable[[BlockchainProof, dict[str, Any]], bool] | None = None,
+    chain_verifier: Callable[[BlockchainProof, dict[str, Any]], bool],
 ) -> MiningVerificationCycle:
-    """Create a cycle; production verifier injection must come from trusted wiring."""
+    """Internal dependency-injection seam for trusted wiring and isolated tests."""
     if not provider.strip() or not opportunity_id.strip():
         raise ValueError("provider and opportunity_id are required")
     return MiningVerificationCycle(
@@ -160,3 +160,12 @@ def start_cloud_mining_verification(
         provider=provider,
         _chain_verifier=chain_verifier,
     )
+
+
+def start_cloud_mining_verification(
+    provider: str, opportunity_id: str
+) -> MiningVerificationCycle:
+    """Create a fail-closed cycle; no caller-provided verifier is accepted."""
+    if not provider.strip() or not opportunity_id.strip():
+        raise ValueError("provider and opportunity_id are required")
+    return MiningVerificationCycle(opportunity_id=opportunity_id, provider=provider)
