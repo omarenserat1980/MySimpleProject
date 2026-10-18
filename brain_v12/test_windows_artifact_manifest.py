@@ -162,7 +162,7 @@ class WindowsArtifactManifestTests(unittest.TestCase):
             guest_boot_evidence=guest,
         )
         self.assertEqual(state["state"], "ARTIFACT_FINGERPRINTED")
-        self.assertTrue(state["real_guest_boot_verified"])
+        self.assertFalse(state["real_guest_boot_verified"])
 
         simulated = evaluate_artifact_state(
             {**result, "evidence_type": "SYNTHETIC_SIMULATION_EVENT"},
