@@ -220,3 +220,22 @@ def test_independent_hash_verifier_matches_genesis_header_candidate():
 def test_independent_hash_verifier_rejects_invalid_target(target):
     with pytest.raises(ValueError, match="TARGET_OUT_OF_RANGE"):
         verify_candidate_against_target(b"\x00" * 80, target)
+
+
+@pytest.mark.parametrize(
+    ("compact", "expected"),
+    [
+        (0x01010000, 1),       # exponent 1, mantissa 0x010000
+        (0x02000100, 1),       # exponent 2, mantissa 0x000100
+        (0x02012300, 0x0123),  # exponent 2, right shift by one byte
+    ],
+)
+def test_compact_target_accepts_small_exponents_when_result_is_nonzero(compact, expected):
+    encoded = compact.to_bytes(4, "little").hex()
+    assert compact_nbits_to_target(encoded) == expected
+
+
+def test_compact_target_rejects_small_exponent_that_decodes_to_zero():
+    # exponent 1 with mantissa 1 shifts right by 16 bits, producing zero.
+    with pytest.raises(ValueError, match="COMPACT_TARGET_OUT_OF_RANGE"):
+        compact_nbits_to_target((0x01000001).to_bytes(4, "little").hex())
