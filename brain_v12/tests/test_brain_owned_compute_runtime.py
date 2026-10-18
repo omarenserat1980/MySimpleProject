@@ -115,6 +115,8 @@ def test_search_nonce_rejects_boolean_numeric_bounds():
 def test_execution_host_gate_blocks_ci_even_when_other_gates_pass(monkeypatch):
     import pytest
 
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("CI", raising=False)
     for marker in ("GITHUB_ACTIONS", "CI"):
         monkeypatch.setenv(marker, "true")
         monkeypatch.delenv("ANDROID_ROOT", raising=False)
