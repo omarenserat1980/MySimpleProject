@@ -120,6 +120,7 @@ class BrainSyncStore:
         event = self._event(key, "delete", record, event_id)
         self._records[key] = record
         self._seen_events.add(event_id)
+        self._events_by_id[event_id] = event
         self._events.append(event)
         return event
 
