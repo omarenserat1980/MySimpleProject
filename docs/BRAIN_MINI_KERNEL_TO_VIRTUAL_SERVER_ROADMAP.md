@@ -76,7 +76,8 @@ Windows Server 2025 is a target behavior profile and optional guest OS, not the 
 - D2: BrainVM instruction execution and a bounded execution board are implemented; checkpoint/resume is covered by focused tests.
 - D4/D5 foundation: `BrainVMTaskRunner`, `BrainVirtualServerRuntime`, and `BrainVirtualHost` provide deterministic task/service models and serialized simulated state.
 - D6 prototype: `BrainVirtualClusterManager` models ready/draining/failed nodes, round-robin placement, health summaries, and cluster checkpoint/restore.
+- D7 prototype: `BrainBladeServerFabric` models a chassis with independently identified blades, per-blade task-slot limits, blade draining/failure isolation, task placement, and fabric checkpoint/restore.
 - These are code-level milestones only. Do not mark the full D3–D7 acceptance gates complete solely because these abstractions exist.
 
 ## Immediate implementation target
-Run the focused tests for the execution board, task runner checkpoint, virtual server, host, and cluster manager on the same PR revision. Fix failures before merge. Then add evidence-backed task placement/recovery integration tests and explicit resource accounting before progressing to the blade-server model. Do not start a parallel kernel or claim later stages complete before their acceptance tests pass.
+Run the focused tests for the execution board, task runner checkpoint, virtual server, host, and cluster manager on the same PR revision. Fix failures before merge. Run `brain_v12/test_blade_server_fabric.py` with the task-runner, virtual-host, and cluster tests on the same revision. Add evidence-backed placement/recovery integration tests and explicit resource accounting. These models do not reserve or measure real blade capacity. Do not start a parallel kernel or claim later stages complete before their acceptance tests pass.
