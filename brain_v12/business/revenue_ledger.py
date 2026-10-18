@@ -64,10 +64,10 @@ class RevenueRecord:
         payout = evidence.get("payout_verification", {})
         blockchain = evidence.get("blockchain_proof", {})
         expected_txid = str(evidence.get("payout_txid", "")).strip()
-        if payout.get("status") != "VERIFIED_COMPLETED":
-            raise ValueError("verified payout evidence required")
-        if payout.get("financial_state") != "REVENUE_REALIZED":
-            raise ValueError("financial realization evidence required")
+        if payout.get("status") != "CLAIMED_PAYOUT_EVIDENCE":
+            raise ValueError("claimed payout evidence required")
+        if blockchain.get("independently_verified") is not True:
+            raise ValueError("independent blockchain verification required")
         if not expected_txid or not blockchain.get("txid") or not blockchain.get("explorer_url"):
             raise ValueError("transaction and explorer evidence required")
         if blockchain.get("txid") != expected_txid:
