@@ -18,7 +18,7 @@ Every adapter must provide:
 
 | Brain subsystem | Real upstream candidate(s) | Integration mode | Minimum acceptance evidence | Current gate |
 |---|---|---|---|---|
-| RAM / DRAM timing | [Ramulator 2](https://github.com/CMU-SAFARI/ramulator2), [DRAMsim3](https://github.com/umd-memsys/DRAMsim3) | External source build + trace/config adapter | Immutable source revision, license review, build/run logs, trace/config hash, checked latency/bandwidth output | Ramulator execution workflow proposed in PR #991; not yet verified |
+| RAM / DRAM timing | [Ramulator 2](https://github.com/CMU-SAFARI/ramulator2), [DRAMsim3](https://github.com/umd-memsys/DRAMsim3) | External source build + trace/config adapter | Immutable source revision, license review, build/run logs, trace/config hash, checked latency/bandwidth output | Pinned Ramulator 2 upstream revision built and example executed with expected-output assertions in GitHub Actions run 39149941417; simulation only. Next: connect a reviewed Brain memory trace |
 | CPU / system architecture | [gem5](https://www.gem5.org/) | Pinned simulator build + known workload | Revision, binary version, workload ID/hash, reproducible output | Candidate |
 | VM / server | [QEMU](https://www.qemu.org/) + KVM where supported | Read-only host preflight then disposable guest | Host capability record, VM config fingerprint, guest-generated boot evidence | Preflight adapter exists; target host and guest boot unverified |
 | Windows Server guest | QEMU + legally obtained Microsoft media | Isolated disposable VM | Media provenance/hash, read-only host inspection, guest-side boot evidence | Blocked until authorized media and capable runner |
@@ -44,7 +44,7 @@ Every adapter must provide:
 
 ## Execution order
 
-1. Establish actual upstream execution in CI: Ramulator 2 build and known example, then fix its upstream revision to an immutable reviewed commit and assert expected output.
+1. Ramulator 2 upstream execution is verified for pinned revision `c6c7a5de0cef35935d6fad7369e6271406798865` (GitHub Actions run 39149941417). Next, add a reviewed representative Brain memory trace and deterministic regression; outputs remain simulation-only.
 2. Make ASIC toolchain evidence reproducible: detect and pin Verilator/Icarus/Yosys; run known SHA-256d vectors and store logs/netlist hashes.
 3. Run host preflight on an authorized capable runner: QEMU/KVM tools and available memory; never assume the user's low-RAM PC is suitable.
 4. Integrate CPU/system, storage and virtual networking using disposable fixtures and resource budgets.
