@@ -42,8 +42,8 @@ const paypalVerifierStart = worker.indexOf("async function markPayPalPaymentVeri
 const paypalVerifierEnd = worker.indexOf("async function handlePayTabsReturn", paypalVerifierStart);
 const paypalVerifier = worker.slice(paypalVerifierStart, paypalVerifierEnd);
 assert.ok(paypalVerifierStart >= 0 && paypalVerifierEnd > paypalVerifierStart, "PayPal payment verifier must exist");
-assert.match(paypalVerifier, /paypal-order:\\"? \+ orderId/);
-assert.match(paypalVerifier, /await env\\.BRAIN_DB\\.batch\\(\\[/);
+assert.ok(paypalVerifier.includes('new TextEncoder().encode("paypal-order:" + orderId)'), "stable recovery key missing");
+assert.ok(paypalVerifier.includes("await env.BRAIN_DB.batch(["), "atomic D1 batch missing");
 assert.match(paypalVerifier, /INSERT OR IGNORE INTO revenue_ledger/);
 assert.match(paypalVerifier, /INSERT OR IGNORE INTO service_jobs/);
 assert.match(paypalVerifier, /PAYPAL_REVENUE_LEDGER_RECONCILIATION_FAILED/);
