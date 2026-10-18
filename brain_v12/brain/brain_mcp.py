@@ -245,7 +245,6 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
         auth_response = authorize_mcp_request(request)
         if auth_response is not None:
             return auth_response
-    async def mcp_get(request: Request):
         # Stateless MCP does not require an event stream for these read-only
         # request/response tools. A GET is kept for discovery/health clients.
         version = request.headers.get("MCP-Protocol-Version", PROTOCOL_VERSION)
