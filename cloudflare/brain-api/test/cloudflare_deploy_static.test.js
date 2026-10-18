@@ -17,7 +17,7 @@ const production = fs.readFileSync("../../.github/workflows/last-light-no-pay.ym
 
 assert.ok(worker.includes('const PAYTABS_BASE_URL = "https://secure-jordan.paytabs.com";'));
 const confirmDeliverySource = worker.slice(worker.indexOf("async function confirmDelivery("), worker.indexOf("async function completeJob("));
-assert.doesNotMatch(confirmDeliverySource, /UPDATE\\s+revenue_ledger\\s+SET\\s+state\\s*=\\s*[\'"]REVENUE_REALIZED[\'"]/i, "delivery confirmation must not realize revenue");
+assert.doesNotMatch(confirmDeliverySource, /UPDATE\s+revenue_ledger\s+SET\s+state\s*=\s*[\'"]REVENUE_REALIZED[\'"]/i, "delivery confirmation must not realize revenue");
 assert.match(worker, /async function verifySignedSettlementEvidence/);
 assert.match(worker, /BRAIN_SETTLEMENT_ATTESTATION_KEY/);
 assert.match(worker, /SETTLEMENT_SIGNATURE_INVALID/);
