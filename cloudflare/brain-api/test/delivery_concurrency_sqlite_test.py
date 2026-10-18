@@ -95,6 +95,7 @@ class DeliveryRevenueGateTests(unittest.TestCase):
 
     def test_sandbox_payment_cannot_advance_live_revenue_ledger(self):
         self.db.execute("UPDATE revenue_ledger SET environment='test'")
+        self.db.commit()
         self.assertEqual(self.confirm(), [1, 1, 0])
         self.assertEqual(
             self.db.execute("SELECT state FROM revenue_ledger").fetchone()[0],
