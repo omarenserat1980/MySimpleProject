@@ -90,32 +90,61 @@ def validate_artifact_manifest(manifest: Any) -> dict[str, Any]:
         "ok": ok,
         "status": "MANIFEST_VALID_METADATA_ONLY" if ok else "INVALID_MANIFEST",
         "errors": errors,
-        # A manifest claim is not independent proof of publisher authenticity.\n        "artifact_authenticity_verified": False,
+        # A manifest claim is not independent proof of publisher authenticity.
+        "sha256": digest.lower() if isinstance(digest, str) and HEX_SHA256.fullmatch(digest) else None,
+        "artifact_authenticity_verified": False,
         "real_guest_boot_verified": False,
         "execution_performed": False,
     }
 
 
+def _evidence_matches_artifact(evidence: Any, manifest_result: dict[str, Any]) -> bool:
+    return bool(
+        isinstance(evidence, dict)
+        and evidence.get("status") == "VERIFIED"
+        and evidence.get("artifact_sha256")
+        and evidence.get("artifact_sha256") == manifest_result.get("sha256")
+        and isinstance(evidence.get("evidence_id"), str)
+        and evidence["evidence_id"].strip()
+    )
+
+
+def _guest_boot_evidence_is_valid(evidence: Any, manifest_result: dict[str, Any]) -> bool:
+    if not _evidence_matches_artifact(evidence, manifest_result):
+        return False
+    vm_hash = evidence.get("vm_config_sha256")
+    return bool(
+        evidence.get("source") == "IN_GUEST"
+        and evidence.get("os_edition")
+        and evidence.get("os_build")
+        and evidence.get("boot_time_utc")
+        and isinstance(vm_hash, str)
+        and HEX_SHA256.fullmatch(vm_hash)
+        and evidence.get("independent_verification") is True
+    )
+
+
 def evaluate_artifact_state(
     manifest_result: dict[str, Any],
     *,
-    image_inspected: bool = False,
-    image_serviced: bool = False,
-    guest_boot_evidence_verified: bool = False,
+    publisher_signature_independently_verified: bool = False,
+    image_inspection_evidence: dict[str, Any] | None = None,
+    servicing_evidence: dict[str, Any] | None = None,
+    guest_boot_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Derive a conservative state; metadata validity alone never proves a boot."""
     if not isinstance(manifest_result, dict) or not manifest_result.get("ok"):
         state = "NOT_VERIFIED"
-    elif manifest_result.get("artifact_authenticity_verified") is True:
+    elif publisher_signature_independently_verified is True:
         state = "ARTIFACT_AUTHENTICITY_VERIFIED"
     else:
         state = "ARTIFACT_FINGERPRINTED"
 
-    if state == "ARTIFACT_AUTHENTICITY_VERIFIED" and image_inspected:
+    if state == "ARTIFACT_AUTHENTICITY_VERIFIED" and _evidence_matches_artifact(image_inspection_evidence, manifest_result):
         state = "IMAGE_INSPECTED"
-    if state == "IMAGE_INSPECTED" and image_serviced:
+    if state == "IMAGE_INSPECTED" and _evidence_matches_artifact(servicing_evidence, manifest_result):
         state = "IMAGE_SERVICED"
-    if state == "IMAGE_SERVICED" and guest_boot_evidence_verified:
+    if state == "IMAGE_SERVICED" and _guest_boot_evidence_is_valid(guest_boot_evidence, manifest_result):
         state = "GUEST_BOOT_VERIFIED"
 
     # Explicitly prevent promotion from simulated evidence.
