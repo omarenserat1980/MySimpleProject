@@ -148,27 +148,34 @@ def evaluate_artifact_state(
     servicing_evidence: dict[str, Any] | None = None,
     guest_boot_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Derive a conservative state; metadata validity alone never proves a boot."""
-    if not isinstance(manifest_result, dict) or not manifest_result.get("ok"):
+    """Fail closed: caller-supplied JSON fields are not cryptographic verification.
+
+    Evidence records may be shape-checked here, but this module has no trusted
+    verifier or attestation signature validation. Consequently it never promotes
+    a record to authentic, inspected, serviced, or boot-verified from JSON claims.
+    """
+    if isinstance(manifest_result, dict) and manifest_result.get("evidence_type") == "SYNTHETIC_SIMULATION_EVENT":
+        state = "SIMULATED"
+    elif not isinstance(manifest_result, dict) or not manifest_result.get("ok"):
         state = "NOT_VERIFIED"
-    elif _signature_evidence_is_valid(publisher_signature_evidence, manifest_result):
-        state = "ARTIFACT_AUTHENTICITY_VERIFIED"
     else:
         state = "ARTIFACT_FINGERPRINTED"
 
-    if state == "ARTIFACT_AUTHENTICITY_VERIFIED" and _evidence_matches_artifact(image_inspection_evidence, manifest_result):
-        state = "IMAGE_INSPECTED"
-    if state == "IMAGE_INSPECTED" and _evidence_matches_artifact(servicing_evidence, manifest_result):
-        state = "IMAGE_SERVICED"
-    if state == "IMAGE_SERVICED" and _guest_boot_evidence_is_valid(guest_boot_evidence, manifest_result):
-        state = "GUEST_BOOT_VERIFIED"
-
-    # Explicitly prevent promotion from simulated evidence.
-    if manifest_result.get("evidence_type") == "SYNTHETIC_SIMULATION_EVENT":
-        state = "SIMULATED"
-
     return {
         "state": state,
-        "real_guest_boot_verified": state == "GUEST_BOOT_VERIFIED",
+        "signature_evidence_shape_valid": _signature_evidence_is_valid(
+            publisher_signature_evidence, manifest_result
+        ) if isinstance(manifest_result, dict) else False,
+        "inspection_evidence_record_present": _evidence_matches_artifact(
+            image_inspection_evidence, manifest_result
+        ) if isinstance(manifest_result, dict) else False,
+        "servicing_evidence_record_present": _evidence_matches_artifact(
+            servicing_evidence, manifest_result
+        ) if isinstance(manifest_result, dict) else False,
+        "guest_boot_evidence_record_shape_valid": _guest_boot_evidence_is_valid(
+            guest_boot_evidence, manifest_result
+        ) if isinstance(manifest_result, dict) else False,
+        "real_guest_boot_verified": False,
         "physical_hardware_claimed": False,
+        "requires_trusted_external_verifier": state == "ARTIFACT_FINGERPRINTED",
     }
