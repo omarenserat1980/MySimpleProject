@@ -105,6 +105,7 @@ def run_one_bounded_attempt(
 
     session = StratumV1Session(worker_name, worker_password)
     context = ssl.create_default_context()
+    job: StratumJob | None = None
     try:
         with socket.create_connection((host.strip(), port), timeout=timeout) as raw:
             raw.settimeout(timeout)
@@ -114,20 +115,20 @@ def run_one_bounded_attempt(
                 with tls.makefile("rwb") as stream:
                     stream.write(session.request_subscribe())
                     stream.flush()
-                    _consume_until(
+                    _, job = _consume_until(
                         session, stream,
                         predicate=lambda outcome, message: outcome.get("purpose") == "subscribe",
                         max_lines=100,
+                        current_job=job,
                     )
                     stream.write(session.request_authorize())
                     stream.flush()
-                    _consume_until(
+                    _, job = _consume_until(
                         session, stream,
                         predicate=lambda outcome, message: outcome.get("purpose") == "authorize",
                         max_lines=100,
+                        current_job=job,
                     )
-
-                    job: StratumJob | None = None
                     _, job = _consume_until(
                         session, stream,
                         predicate=lambda outcome, message: (
