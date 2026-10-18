@@ -111,3 +111,25 @@ def test_search_nonce_rejects_boolean_numeric_bounds():
         search_nonce(bytes(80), 1, start_nonce=True, max_hashes=1)
     with pytest.raises(ValueError, match="MAX_HASHES_OUT_OF_RANGE"):
         search_nonce(bytes(80), 1, start_nonce=0, max_hashes=True)
+
+def test_execution_host_gate_blocks_ci_even_when_other_gates_pass(monkeypatch):
+    import pytest
+
+    for marker in ("GITHUB_ACTIONS", "CI"):
+        monkeypatch.setenv(marker, "true")
+        monkeypatch.delenv("ANDROID_ROOT", raising=False)
+        monkeypatch.delenv("ANDROID_DATA", raising=False)
+        monkeypatch.delenv("TERMUX_VERSION", raising=False)
+        monkeypatch.setenv("PREFIX", "/usr")
+        result = execution_host_gate(
+            attested_brain_compute_host=True,
+            explicit_approval=True,
+            pool_adapter_ready=True,
+            resource_budget_verified=True,
+            physical_gateway_only=True,
+        )
+        assert result["status"] == "BLOCKED"
+        assert result["execution_allowed"] is False
+        assert result["execution_started"] is False
+        assert "CI_AND_GITHUB_ACTIONS_MINING_FORBIDDEN" in result["blockers"]
+        monkeypatch.delenv(marker, raising=False)
