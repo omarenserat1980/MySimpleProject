@@ -53,29 +53,29 @@ class SoftwareNodeIdentityGate:
         self._nonce_factory = nonce_factory
         self._pending: dict[str, Challenge] = {}
         self._consumed: set[str] = set()
-        # Serializes challenge issuance/consumption inside this process only.
-        # Cross-process replay protection still requires the central durable registry.
+        # Process-local synchronization only; durable cross-process replay protection
+        # remains the responsibility of the central cloud-executor registry.
         self._lock = RLock()
 
     def issue_challenge(self, node_id: str) -> dict[str, object]:
+        if not isinstance(node_id, str) or not node_id.strip():
+            raise ValueError("NODE_ID_REQUIRED")
+        if node_id not in self._secrets or not self._secrets[node_id]:
+            raise PermissionError("NODE_IDENTITY_NOT_CONFIGURED")
+        now = int(self._clock())
+        nonce = self._nonce_factory()
         with self._lock:
-            if not isinstance(node_id, str) or not node_id.strip():
-                raise ValueError("NODE_ID_REQUIRED")
-            if node_id not in self._secrets or not self._secrets[node_id]:
-                raise PermissionError("NODE_IDENTITY_NOT_CONFIGURED")
-            now = int(self._clock())
-            nonce = self._nonce_factory()
             if not nonce or nonce in self._pending or nonce in self._consumed:
                 raise RuntimeError("CHALLENGE_NONCE_COLLISION")
             challenge = Challenge(node_id, nonce, now, now + self._ttl)
             self._pending[nonce] = challenge
-            return {"node_id": node_id, "nonce": nonce, "issued_at": now,
-                    "expires_at": challenge.expires_at, "challenge_status": "ISSUED",
-                    "claim_scope": "SOFTWARE_NODE_POSSESSION_PROOF"}
+        return {"node_id": node_id, "nonce": nonce, "issued_at": now,
+                "expires_at": challenge.expires_at, "challenge_status": "ISSUED",
+                "claim_scope": "SOFTWARE_NODE_POSSESSION_PROOF"}
 
     def verify_response(self, *, node_id: str, nonce: str, issued_at: int,
+                        task_id: str, result_sha256: str, signature: str) -> dict[str, object]:
         with self._lock:
-                            task_id: str, result_sha256: str, signature: str) -> dict[str, object]:
             challenge = self._pending.get(nonce)
             if challenge is None or nonce in self._consumed:
                 return self._blocked("CHALLENGE_UNKNOWN_OR_REPLAYED")
@@ -102,7 +102,7 @@ class SoftwareNodeIdentityGate:
                     "claim_scope": "SOFTWARE_NODE_ONLY", "physical_hardware_verified": False,
                     "independent_host_attestation_verified": False}
 
-        @staticmethod
+    @staticmethod
     def _blocked(reason: str) -> dict[str, object]:
         return {"status": "BLOCKED", "identity_verified": False,
                 "physical_hardware_verified": False, "reason": reason}
