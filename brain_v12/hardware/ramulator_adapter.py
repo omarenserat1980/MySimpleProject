@@ -1,8 +1,10 @@
-"""Fail-closed adapter for an externally installed Ramulator 2.x executable.
+"""Bounded adapter for Ramulator 2.1's Python-script interface.
 
-This module does not install software or download upstream code. It only runs a
-locally configured executable with a caller-supplied configuration file. All
-reported memory results are simulation evidence, never physical RAM telemetry.
+The upstream 2.1 guide demonstrates running a Python example/configuration
+(e.g. examples/example_config.py), not a guaranteed `ramulator2 --version`
+CLI. This adapter therefore accepts a trusted local Python script. Treat that
+script as executable code: run only reviewed scripts in an isolated runner.
+Outputs are simulation evidence, never physical RAM telemetry.
 """
 from __future__ import annotations
 
@@ -15,15 +17,21 @@ import time
 from pathlib import Path
 from typing import Any
 
-
 DEFAULT_TIMEOUT_SECONDS = 30
 MAX_TIMEOUT_SECONDS = 300
-MAX_CONFIG_BYTES = 1_048_576
+MAX_SCRIPT_BYTES = 1_048_576
 
 
-def probe(executable: str = "ramulator2") -> dict[str, Any]:
-    """Report whether Ramulator is installed and expose its version output."""
-    resolved = shutil.which(executable)
+def _timeout(value: int) -> None:
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError("timeout_seconds must be an integer")
+    if not 1 <= value <= MAX_TIMEOUT_SECONDS:
+        raise ValueError(f"timeout_seconds must be between 1 and {MAX_TIMEOUT_SECONDS}")
+
+
+def probe(python_executable: str = "python3") -> dict[str, Any]:
+    """Check whether the Python interpreter can import Ramulator and report its version."""
+    resolved = shutil.which(python_executable)
     if not resolved:
         return {
             "component": "ramulator2-memory",
@@ -32,22 +40,27 @@ def probe(executable: str = "ramulator2") -> dict[str, Any]:
             "evidence_class": "TOOL_DISCOVERY",
             "physical_hardware_verified": False,
         }
+    code = (
+        "import importlib.metadata as m, json; "
+        "print(json.dumps({'package':'ramulator','version':m.version('ramulator')}))"
+    )
     try:
         result = subprocess.run(
-            [resolved, "--version"],
+            [resolved, "-c", code],
             capture_output=True,
             text=True,
             timeout=5,
             check=False,
             shell=False,
+            env={"PATH": os.path.dirname(resolved), "LANG": "C", "LC_ALL": "C"},
         )
         return {
             "component": "ramulator2-memory",
-            "status": "TOOL_DISCOVERED",
-            "available": True,
-            "executable": resolved,
-            "version_exit_code": result.returncode,
-            "version_output": (result.stdout + result.stderr)[:2000].strip(),
+            "status": "TOOL_DISCOVERED" if result.returncode == 0 else "NOT_CONFIGURED",
+            "available": result.returncode == 0,
+            "python_executable": resolved,
+            "return_code": result.returncode,
+            "version_output": (result.stdout + result.stderr)[-2000:].strip(),
             "evidence_class": "TOOL_DISCOVERY",
             "physical_hardware_verified": False,
         }
@@ -62,25 +75,16 @@ def probe(executable: str = "ramulator2") -> dict[str, Any]:
         }
 
 
-def run_config(
-    config_path: str,
+def run_script(
+    script_path: str,
     *,
-    executable: str = "ramulator2",
+    python_executable: str = "python3",
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
-    """Run Ramulator against a local config under a strict timeout.
-
-    No shell is used, no dependency is installed, no network is requested, and
-    stdout/stderr are truncated before returning. Callers should execute this
-    adapter in a sandbox/container for stronger resource and filesystem limits.
-    """
-    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool):
-        raise ValueError("timeout_seconds must be an integer")
-    if not 1 <= timeout_seconds <= MAX_TIMEOUT_SECONDS:
-        raise ValueError(f"timeout_seconds must be between 1 and {MAX_TIMEOUT_SECONDS}")
-
-    resolved = shutil.which(executable)
-    if not resolved:
+    """Run a reviewed local Ramulator Python example with a bounded timeout."""
+    _timeout(timeout_seconds)
+    resolved_python = shutil.which(python_executable)
+    if not resolved_python:
         return {
             "component": "ramulator2-memory",
             "status": "NOT_CONFIGURED",
@@ -88,27 +92,28 @@ def run_config(
             "physical_hardware_verified": False,
         }
 
-    path = Path(config_path).expanduser().resolve(strict=True)
-    if not path.is_file() or path.stat().st_size > MAX_CONFIG_BYTES:
-        raise ValueError("config must be a regular file no larger than 1 MiB")
+    path = Path(script_path).expanduser().resolve(strict=True)
+    if not path.is_file() or path.suffix != ".py" or path.stat().st_size > MAX_SCRIPT_BYTES:
+        raise ValueError("script must be a regular .py file no larger than 1 MiB")
     raw = path.read_bytes()
     digest = hashlib.sha256(raw).hexdigest()
     started = time.monotonic()
     try:
         result = subprocess.run(
-            [resolved, "-f", str(path)],
+            [resolved_python, str(path)],
             capture_output=True,
             text=True,
             timeout=timeout_seconds,
             check=False,
             shell=False,
-            env={"PATH": os.path.dirname(resolved), "LANG": "C", "LC_ALL": "C"},
+            env={"PATH": os.path.dirname(resolved_python), "LANG": "C", "LC_ALL": "C"},
+            cwd=str(path.parent),
         )
     except subprocess.TimeoutExpired as exc:
         return {
             "component": "ramulator2-memory",
             "status": "TIMEOUT",
-            "config_sha256": digest,
+            "script_sha256": digest,
             "duration_seconds": round(time.monotonic() - started, 3),
             "stdout_tail": str(exc.stdout or "")[-2000:],
             "stderr_tail": str(exc.stderr or "")[-2000:],
@@ -119,7 +124,7 @@ def run_config(
         return {
             "component": "ramulator2-memory",
             "status": "EXECUTION_ERROR",
-            "config_sha256": digest,
+            "script_sha256": digest,
             "error_type": type(exc).__name__,
             "evidence_class": "SIMULATED",
             "physical_hardware_verified": False,
@@ -129,7 +134,7 @@ def run_config(
         "component": "ramulator2-memory",
         "status": "SIMULATION_COMPLETED" if result.returncode == 0 else "SIMULATION_FAILED",
         "return_code": result.returncode,
-        "config_sha256": digest,
+        "script_sha256": digest,
         "duration_seconds": round(time.monotonic() - started, 3),
         "stdout_tail": result.stdout[-4000:],
         "stderr_tail": result.stderr[-4000:],
@@ -140,4 +145,4 @@ def run_config(
 
 def evidence_json(result: dict[str, Any]) -> str:
     """Serialize adapter evidence deterministically for artifact storage."""
-    return json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n"
+    return json.dumps(result, sort_keys=True, separators=(",", ":")) + "\\n"
