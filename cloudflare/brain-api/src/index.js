@@ -555,7 +555,7 @@ async function handlePayPalWebhook(request, env, requestOrigin, allowedOrigin) {
 }
 
 async function markPayPalPaymentVerified(env, orderId, paypalOrderId, captureId, amount, currency, evidenceObject) {
-  const payment = await env.BRAIN_DB.prepare("SELECT tran_ref, order_id, amount, currency, state FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first();
+  const payment = await env.BRAIN_DB.prepare("SELECT tran_ref, order_id, amount, currency, state, raw_evidence FROM payments WHERE tran_ref = ? AND order_id = ? AND provider = 'paypal'").bind(paypalOrderId, orderId).first();
   if (!payment) return { ok: false, error: "PAYPAL_PAYMENT_NOT_FOUND", status: 404 };
   const order = await env.BRAIN_DB.prepare("SELECT amount, currency FROM orders WHERE order_id = ?").bind(orderId).first();
   if (!order) return { ok: false, error: "ORDER_NOT_FOUND", status: 404 };
