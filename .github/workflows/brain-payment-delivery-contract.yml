@@ -1,0 +1,40 @@
+name: Brain Payment Delivery Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/brain-payment-delivery-contract.yml"
+      - "cloudflare/brain-api/src/index.js"
+      - "cloudflare/brain-api/test/commercial_worker_static.test.js"
+      - "cloudflare/brain-api/test/payment_delivery_flow.test.mjs"
+      - "cloudflare/brain-api/migrations/**"
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/brain-payment-delivery-contract.yml"
+      - "cloudflare/brain-api/src/index.js"
+      - "cloudflare/brain-api/test/commercial_worker_static.test.js"
+      - "cloudflare/brain-api/test/payment_delivery_flow.test.mjs"
+      - "cloudflare/brain-api/migrations/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  payment-delivery-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate Worker syntax
+        run: node --check cloudflare/brain-api/src/index.js
+      - name: Run payment and delivery contract checks
+        working-directory: cloudflare/brain-api
+        run: |
+          set -euo pipefail
+          node test/commercial_worker_static.test.js
+          node test/payment_delivery_flow.test.mjs
