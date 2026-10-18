@@ -1,5 +1,3 @@
-# Brain representative memory-access trace; Ramulator SimpleO3 format: op address [instruction-address]
-# Generated deterministically from a bounded synthetic Brain memory workload.
 3 4096
 1 4096
 3 4160
