@@ -134,3 +134,18 @@ def test_enum_values_are_exact_and_case_sensitive():
     }
     assert report["observations"]["accepted_shares"] == "UNKNOWN"
     assert report["observations"]["process_inventory"] == "UNKNOWN"
+
+
+
+def test_transport_failures_precede_account_mismatch_claim():
+    cases = [
+        ({"dns": "FAIL", "account_match": "MISMATCH"}, "DNS_RESOLUTION_FAILURE"),
+        ({"dns": "PASS", "tcp": "FAIL", "account_match": "MISMATCH"}, "POOL_TCP_CONNECTION_FAILURE"),
+        ({"dns": "PASS", "tcp": "PASS", "tls": "FAIL", "account_match": "MISMATCH"}, "TLS_HANDSHAKE_FAILURE"),
+        ({"dns": "PASS", "tcp": "PASS", "tls": "PASS", "stratum": "FAIL", "account_match": "MISMATCH"}, "STRATUM_HANDSHAKE_FAILURE"),
+    ]
+    for evidence, expected in cases:
+        report = classify_mining_runtime_diagnosis(evidence)
+        assert report["diagnosis"] == expected
+        assert report["real_mining_verified"] is False
+        assert report["revenue_verified"] is False
