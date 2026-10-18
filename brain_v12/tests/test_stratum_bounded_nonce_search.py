@@ -93,21 +93,35 @@ def test_requires_explicit_prevhash_dialect_confirmation():
 
 def test_reused_header_prefix_matches_reference_builder_for_each_nonce():
     session, job = authorized_session_and_job()
-    result = search(session, job, max_attempts=3, share_target=1)
-    assert result["status"] == "NO_LOCAL_TARGET_MATCH_IN_RANGE"
-    assert result["attempts"] == 3
 
-    reference = build_session_header_candidate(
-        session,
-        job,
-        extranonce2="c3d4",
-        ntime_hex="65aa0000",
-        nonce_hex="0000002c",
-        share_target=1,
-        prevhash_dialect_confirmed=True,
-    )
-    optimized = result["last_candidate"]
-    assert optimized["header_hex"] == reference["header_hex"]
-    assert optimized["sha256d_display_hex"] == reference["sha256d_display_hex"]
-    assert optimized["hash_integer"] == reference["hash_integer"]
-    assert optimized["meets_supplied_share_target"] == reference["meets_supplied_share_target"]
+    for nonce in (42, 43, 44):
+        result = search(
+            session,
+            job,
+            nonce_start=nonce,
+            max_attempts=1,
+            share_target=1,
+        )
+        assert result["status"] == "NO_LOCAL_TARGET_MATCH_IN_RANGE"
+        assert result["attempts"] == 1
+
+        reference = build_session_header_candidate(
+            session,
+            job,
+            extranonce2="c3d4",
+            ntime_hex="65aa0000",
+            nonce_hex=f"{nonce:08x}",
+            share_target=1,
+            prevhash_dialect_confirmed=True,
+        )
+        optimized = result["last_candidate"]
+        assert optimized["header_hex"] == reference["header_hex"]
+        assert optimized["sha256d_display_hex"] == reference["sha256d_display_hex"]
+        assert optimized["hash_integer"] == reference["hash_integer"]
+        assert optimized["meets_supplied_share_target"] == reference["meets_supplied_share_target"]
+
+
+def test_optimized_search_preserves_reference_builder_target_validation():
+    session, job = authorized_session_and_job()
+    with pytest.raises(ValueError, match="SHARE_TARGET_OUT_OF_RANGE"):
+        search(session, job, share_target=0)
