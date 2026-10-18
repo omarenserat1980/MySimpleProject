@@ -13,7 +13,9 @@ The `Bitcoin SHA-256 compression RTL` GitHub Actions workflow installs Icarus Ve
 
 Latest recorded successful integrated run for the genesis-nonce search:
 - Run: [38568698782](https://github.com/omarenserat1980/MySimpleProject/actions/runs/38568698782)
-- Tested commit: `4d4c74d687abe00edd3ca55d456318e6cf6f314c`
+- Checked-out source: merge commit `82661f4` (Actions log: `HEAD is now at 82661f4 Merge 4d4c74d687abe00edd3ca55d456318e6cf6f314c into 2ad98ff9a060d738215c5334f99502148121ea8f`).
+- Tested change: `4d4c74d687abe00edd3ca55d456318e6cf6f314c`, validated in PR merge context against base `2ad98ff9a060d738215c5334f99502148121ea8f`.
+- The runner-image metadata line `Commit: c3d12f3313a95f25162a1503be624f3b0617f8c0` is not the repository checkout SHA.
 - Job conclusion: `success`
 - The suite includes the SHA-256 empty-message known-answer test, Bitcoin Genesis SHA-256d header vector, target comparator checks, bounded nonce-sweep exhaustion/easy-target tests, and a Genesis nonce search starting one nonce before the known nonce with a two-attempt budget.
 
