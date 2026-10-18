@@ -50,15 +50,15 @@ jobs:
       - name: Synthesize SHA-256 compression datapath
         run: |
           set -o pipefail
-          yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_compress.sv; hierarchy -top brain_sha256_compress; proc; opt; check; synth -top brain_sha256_compress; stat; write_json hardware/brain_asic_v1/build/brain_sha256_compress.json" | tee hardware/brain_asic_v1/build/yosys-compress.log
+          timeout --signal=TERM --kill-after=30s 15m yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_compress.sv; hierarchy -top brain_sha256_compress; proc; opt; check; synth -top brain_sha256_compress; stat; write_json hardware/brain_asic_v1/build/brain_sha256_compress.json" | tee hardware/brain_asic_v1/build/yosys-compress.log
       - name: Synthesize SHA256d header datapath
         run: |
           set -o pipefail
-          yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/rtl/brain_sha256d_header.sv; hierarchy -top brain_sha256d_header; proc; opt; check; synth -top brain_sha256d_header; stat; write_json hardware/brain_asic_v1/build/brain_sha256d_header.json" | tee hardware/brain_asic_v1/build/yosys-sha256d.log
+          timeout --signal=TERM --kill-after=30s 15m yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_compress.sv hardware/brain_asic_v1/rtl/brain_sha256d_header.sv; hierarchy -top brain_sha256d_header; proc; opt; check; synth -top brain_sha256d_header; stat; write_json hardware/brain_asic_v1/build/brain_sha256d_header.json" | tee hardware/brain_asic_v1/build/yosys-sha256d.log
       - name: Synthesize control shell (not a miner)
         run: |
           set -o pipefail
-          yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_core.sv; hierarchy -top brain_sha256_core; proc; opt; check; synth -top brain_sha256_core; stat; write_json hardware/brain_asic_v1/build/brain_sha256_core.json" | tee hardware/brain_asic_v1/build/yosys-core.log
+          timeout --signal=TERM --kill-after=30s 15m yosys -p "read_verilog -sv hardware/brain_asic_v1/rtl/brain_sha256_core.sv; hierarchy -top brain_sha256_core; proc; opt; check; synth -top brain_sha256_core; stat; write_json hardware/brain_asic_v1/build/brain_sha256_core.json" | tee hardware/brain_asic_v1/build/yosys-core.log
       - name: Diagnose rejection causes and require complete evidence
         if: always()
         run: |

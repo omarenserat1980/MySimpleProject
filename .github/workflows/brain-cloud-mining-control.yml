@@ -16,7 +16,8 @@ on:
     - cron: "31 */6 * * *"
 
 concurrency:
-  group: brain-cloud-mining-control-${{ github.ref }}
+  # Isolate pull-request validation from main-branch and scheduled runs.
+  group: brain-cloud-mining-control-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
