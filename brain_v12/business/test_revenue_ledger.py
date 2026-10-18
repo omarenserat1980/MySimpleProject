@@ -1,13 +1,16 @@
 import pytest
 
 from brain_v12.business.crypto_mining_intelligence import PayoutEvidence
-from brain_v12.business.crypto_mining_verification import BlockchainProof, VerificationState, start_cloud_mining_verification
+from brain_v12.business.crypto_mining_verification import (
+    BlockchainProof, VerificationState, start_cloud_mining_verification,
+    _start_cloud_mining_verification_with_verifier,
+)
 from brain_v12.business.revenue_ledger import RevenueRecord
 
 
 def _verified_cycle(opportunity_id: str) -> dict:
     # Test-only deterministic verifier; never evidence of a real chain transaction.
-    cycle = start_cloud_mining_verification(
+    cycle = _start_cloud_mining_verification_with_verifier(
         "CloudMineCrypto", opportunity_id,
         chain_verifier=lambda proof, payout: proof.txid == "tx-001",
     )
