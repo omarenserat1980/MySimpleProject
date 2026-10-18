@@ -1,0 +1,9 @@
+export DESIGN_NAME = brain_bitcoin_nonce_search
+export DESIGN_NICKNAME = brain_bitcoin_nonce_search
+export PLATFORM = sky130hd
+export VERILOG_FILES = $(sort $(wildcard $(DESIGN_HOME)/$(PLATFORM)/$(DESIGN_NICKNAME)/src/*.sv))
+export SDC_FILE = $(DESIGN_HOME)/$(PLATFORM)/$(DESIGN_NICKNAME)/constraint.sdc
+export CLOCK_PERIOD = 100.0
+export CORE_UTILIZATION = 30
+export PLACE_DENSITY = 0.30
+export SYNTH_HIERARCHICAL = 0
