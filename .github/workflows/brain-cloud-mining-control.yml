@@ -16,7 +16,7 @@ on:
     - cron: "31 */6 * * *"
 
 concurrency:
-  group: brain-brain-cloud-mining-control-main
+  group: brain-cloud-mining-control-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -128,6 +128,12 @@ jobs:
       - name: Validate mining-to-revenue fail-closed boundary
         run: |
           python -m pytest -q brain_v12/business/test_crypto_mining_end_to_end.py
+      - name: Validate independent Bitcoin payout reconciliation
+        run: |
+          python -m pytest -q brain_v12/business/test_bitcoin_payout_reconciliation.py
+      - name: Validate read-only live Bitcoin chain evidence collector
+        run: |
+          python -m pytest -q brain_v12/business/test_bitcoin_chain_readonly_collector.py
       - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
