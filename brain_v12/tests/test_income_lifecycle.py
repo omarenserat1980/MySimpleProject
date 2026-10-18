@@ -136,6 +136,29 @@ class IncomeLifecycleTests(unittest.TestCase):
         self.assertEqual(skipped["status"],"INVALID_SKIPPED_TRANSITION")
 
 
+
+    def test_reconciliation_requires_exact_order_and_amount(self):
+        self.life.qualify("LIVE-test")
+        self.life.prepare("LIVE-test")
+        for status, evidence in [("SUBMITTED","receipt-1"),("CLIENT_RESPONDED","client-1"),("ACCEPTED","accepted-1"),("DELIVERING","delivery-start-1"),("COMPLETED","delivery-final-1")]:
+            self.life.record_external("LIVE-test", status, evidence)
+        self.life.request_payment("LIVE-test", 25, currency="JOD", order_id="ORDER-1")
+        authority={"evidence_ref":"proof","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-order"}
+        authority["authority_proof"] = payment_authority_proof(self.secret, "ORDER-1", "TX-ORDER", "test", "evt-order")
+        self.assertEqual(self.life.reconcile_payment("LIVE-test", 25, "JOD", "TX-ORDER", authority)["status"], "ORDER_ID_REQUIRED")
+        self.assertEqual(self.life.reconcile_payment("LIVE-test", 25, "JOD", "TX-WRONG", authority, order_id="ORDER-2")["status"], "ORDER_MISMATCH")
+        over={"evidence_ref":"proof","independent_verification":"SIGNED_PROVIDER_WEBHOOK","provider":"test","event_id":"evt-over"}
+        over["authority_proof"] = payment_authority_proof(self.secret, "ORDER-1", "TX-OVER", "test", "evt-over")
+        self.assertEqual(self.life.reconcile_payment("LIVE-test", 25.01, "JOD", "TX-OVER", over, order_id="ORDER-1")["status"], "AMOUNT_MISMATCH")
+
+    def test_reconciliation_rejects_non_finite_amounts(self):
+        self.life.qualify("LIVE-test")
+        self.life.prepare("LIVE-test")
+        for status, evidence in [("SUBMITTED","receipt-1"),("CLIENT_RESPONDED","client-1"),("ACCEPTED","accepted-1"),("DELIVERING","delivery-start-1"),("COMPLETED","delivery-final-1")]:
+            self.life.record_external("LIVE-test", status, evidence)
+        self.life.request_payment("LIVE-test", 25, currency="JOD", order_id="ORDER-1")
+        self.assertEqual(self.life.reconcile_payment("LIVE-test", float("nan"), "JOD", "TX-NAN", {}, order_id="ORDER-1")["status"], "INVALID_AMOUNT")
+
 if __name__=="__main__":
     unittest.main()
 
