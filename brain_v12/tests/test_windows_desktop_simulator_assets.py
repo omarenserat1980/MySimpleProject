@@ -7,8 +7,8 @@ from pathlib import Path
 import unittest
 
 
-ROOT = Path(__file__).resolve().parents[2]
-WEB = ROOT / "web"
+BRAIN_V12 = Path(__file__).resolve().parents[1]
+WEB = BRAIN_V12 / "web"
 
 
 class WindowsDesktopSimulatorAssetTests(unittest.TestCase):
