@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hmac
 import json
+import os
 from typing import Any, Callable
 
 from fastapi import APIRouter, Request
@@ -219,8 +221,30 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
             }
         )
 
+    def authorize_mcp_request(request: Request) -> JSONResponse | None:
+        expected = os.getenv("BRAIN_MCP_TOKEN", "").strip()
+        if not expected:
+            return JSONResponse(
+                {"ok": False, "status": "MCP_NOT_CONFIGURED"},
+                status_code=503,
+            )
+        authorization = request.headers.get("authorization", "")
+        scheme, _, supplied = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not supplied or not hmac.compare_digest(
+            supplied, expected
+        ):
+            return JSONResponse(
+                {"ok": False, "status": "MCP_AUTH_REQUIRED"},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return None
+
     @router.get("/mcp")
     async def mcp_get(request: Request):
+        auth_response = authorize_mcp_request(request)
+        if auth_response is not None:
+            return auth_response
         # Stateless MCP does not require an event stream for these read-only
         # request/response tools. A GET is kept for discovery/health clients.
         version = request.headers.get("MCP-Protocol-Version", PROTOCOL_VERSION)
@@ -239,6 +263,9 @@ def build_mcp_router(brain_ai, device_bridge, store) -> APIRouter:
 
     @router.post("/mcp")
     async def mcp_post(request: Request):
+        auth_response = authorize_mcp_request(request)
+        if auth_response is not None:
+            return auth_response
         version = request.headers.get("MCP-Protocol-Version")
         if version not in SUPPORTED_PROTOCOL_VERSIONS:
             return JSONResponse(

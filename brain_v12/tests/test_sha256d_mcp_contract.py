@@ -12,13 +12,25 @@ from brain_v12.brain.sha256d_execution_contract import make_layer_result
 
 class Sha256dMcpContractTests(unittest.TestCase):
     def setUp(self):
+        self._original_mcp_token = __import__("os").environ.get("BRAIN_MCP_TOKEN")
+        __import__("os").environ["BRAIN_MCP_TOKEN"] = "unit-test-mcp-token"
         brain_ai = SimpleNamespace(status=lambda: {"status": "READY"})
         device_bridge = SimpleNamespace(agent_status=lambda: {"online": False})
         store = SimpleNamespace()
         app = FastAPI()
         app.include_router(build_mcp_router(brain_ai, device_bridge, store))
         self.client = TestClient(app)
-        self.headers = {"MCP-Protocol-Version": PROTOCOL_VERSION}
+        self.headers = {
+            "MCP-Protocol-Version": PROTOCOL_VERSION,
+            "Authorization": "Bearer unit-test-mcp-token",
+        }
+
+    def tearDown(self):
+        import os
+        if self._original_mcp_token is None:
+            os.environ.pop("BRAIN_MCP_TOKEN", None)
+        else:
+            os.environ["BRAIN_MCP_TOKEN"] = self._original_mcp_token
 
     def test_sha256d_tool_is_discoverable(self):
         response = self.client.post("/mcp", headers=self.headers, json={
