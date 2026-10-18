@@ -45,9 +45,8 @@ jobs:
         working-directory: .evidence/upstream/ramulator2
         run: |
           python3 -m venv .venv
-          . .venv/bin/activate
-          python -m pip install --upgrade pip
-          python -m pip install -e .
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -e .
 
       - name: Run Brain representative trace
         working-directory: .evidence/upstream/ramulator2
@@ -57,7 +56,7 @@ jobs:
           set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/artifacts/brain-ramulator"
           sha256sum "$BRAIN_RAMULATOR_TRACE" | tee "$GITHUB_WORKSPACE/artifacts/brain-ramulator/trace.sha256"
-          python "$GITHUB_WORKSPACE/brain_v12/hardware/ramulator_brain_trace.py" 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/brain-ramulator/run.log"
+          .venv/bin/python "$GITHUB_WORKSPACE/brain_v12/hardware/ramulator_brain_trace.py" 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/brain-ramulator/run.log"
           grep -q "Evidence class: UPSTREAM_TOOL_EXECUTION_SIMULATION_ONLY" "$GITHUB_WORKSPACE/artifacts/brain-ramulator/run.log"
           grep -q "Physical RAM verified: false" "$GITHUB_WORKSPACE/artifacts/brain-ramulator/run.log"
           grep -Eq "Read requests: [1-9][0-9]*" "$GITHUB_WORKSPACE/artifacts/brain-ramulator/run.log"
@@ -68,12 +67,20 @@ jobs:
           UPSTREAM_REVISION: c6c7a5de0cef35935d6fad7369e6271406798865
         run: |
           python3 - <<'PY'
-          import hashlib, json, os, pathlib, subprocess
+          import hashlib, json, os, pathlib
           root = pathlib.Path("artifacts/brain-ramulator")
           trace = pathlib.Path("brain_v12/hardware/traces/brain_memory_smoke.trace")
           script = pathlib.Path("brain_v12/hardware/ramulator_brain_trace.py")
+          log = root / "run.log"
           def sha(path):
               return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+          log_text = log.read_text(errors="replace") if log.is_file() else ""
+          run_ok = (
+              "Evidence class: UPSTREAM_TOOL_EXECUTION_SIMULATION_ONLY" in log_text
+              and "Physical RAM verified: false" in log_text
+              and any(line.startswith("Read requests: ") and line.split(": ", 1)[1].isdigit()
+                      and int(line.split(": ", 1)[1]) > 0 for line in log_text.splitlines())
+          )
           evidence = {
               "schema_version": "1.0",
               "component": "ram-memory",
@@ -83,8 +90,9 @@ jobs:
               "brain_commit": os.environ.get("GITHUB_SHA"),
               "trace_sha256": sha(trace),
               "runner_sha256": sha(script),
-              "run_log_sha256": sha(root / "run.log"),
-              "trace_record_count": sum(1 for line in trace.read_text().splitlines() if line.strip() and not line.lstrip().startswith("#")),
+              "run_log_sha256": sha(log),
+              "trace_record_count": sum(1 for line in trace.read_text().splitlines() if line.strip() and not line.lstrip().startswith("#")) if trace.is_file() else 0,
+              "simulation_run_succeeded": run_ok,
               "evidence_class": "UPSTREAM_TOOL_EXECUTION_SIMULATION_ONLY",
               "physical_ram_verified": False,
               "accepted_as_physical_measurement": False,
