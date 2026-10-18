@@ -1,0 +1,56 @@
+name: Brain Huda Cloud Preflight
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/tools/opennebula_cloud_preflight.py"
+      - "brain_v12/tests/test_opennebula_cloud_preflight.py"
+      - "docs/BRAIN_OPENNEBULA_CLOUD_DEPLOYMENT.md"
+      - ".github/workflows/brain-huda-cloud-preflight.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  huda-cloud-preflight-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Test Huda identity and safety boundaries
+        run: python -m pytest -q brain_v12/tests/test_opennebula_cloud_preflight.py
+      - name: Confirm this runner is not a provisioned cloud
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          import sys
+          p = subprocess.run(
+              [sys.executable, "brain_v12/tools/opennebula_cloud_preflight.py"],
+              text=True, capture_output=True, check=False, timeout=15,
+          )
+          if p.returncode not in (0, 2):
+              print(p.stderr)
+              raise SystemExit(p.returncode)
+          data = json.loads(p.stdout)
+          assert data["cloud_name"] == "هدى", data
+          assert data["cloud_slug"] == "huda", data
+          assert data["mode"] == "read_only", data
+          assert data["provisioned"] is False, data
+          assert data["vm_created"] is False, data
+          print(json.dumps({
+              "cloud_name": data["cloud_name"],
+              "cloud_slug": data["cloud_slug"],
+              "status": data["status"],
+              "provisioned": data["provisioned"],
+              "vm_created": data["vm_created"],
+          }, ensure_ascii=False))
+          PY
