@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import json
 import math
+from decimal import Decimal, InvalidOperation
 from dataclasses import dataclass, field
 from typing import Any
 
 from brain_v12.brain.stratum_v1_jobs import StratumJob
+from brain_v12.brain.bitcoin_header import stratum_difficulty_to_share_target
 
 
 class StratumProtocolError(ValueError):
@@ -36,7 +38,7 @@ def parse_message(line: str | bytes) -> dict[str, Any]:
     if not isinstance(line, str) or len(line) > 1_000_000:
         raise StratumProtocolError("MESSAGE_INVALID_OR_TOO_LARGE")
     try:
-        message = json.loads(line)
+        message = json.loads(line, parse_float=Decimal)
     except (json.JSONDecodeError, TypeError) as exc:
         raise StratumProtocolError("INVALID_JSON") from exc
     if not isinstance(message, dict):
@@ -56,6 +58,7 @@ class StratumV1Session:
     subscribed: bool = False
     authorized: bool = False
     difficulty: float | None = None
+    difficulty_text: str | None = None
     extranonce1_hex: str | None = None
     extranonce2_size: int | None = None
     current_job_id: str | None = None
@@ -115,13 +118,19 @@ class StratumV1Session:
             if method == "mining.set_difficulty":
                 if len(params) != 1 or isinstance(params[0], bool):
                     raise StratumProtocolError("INVALID_DIFFICULTY")
-                try:
-                    difficulty = float(params[0])
-                except (TypeError, ValueError) as exc:
-                    raise StratumProtocolError("INVALID_DIFFICULTY") from exc
-                if not math.isfinite(difficulty) or difficulty <= 0:
+                if not isinstance(params[0], (int, float, str, Decimal)):
                     raise StratumProtocolError("INVALID_DIFFICULTY")
+                try:
+                    exact_difficulty = Decimal(str(params[0]))
+                    difficulty = float(exact_difficulty)
+                except (InvalidOperation, TypeError, ValueError, OverflowError) as exc:
+                    raise StratumProtocolError("INVALID_DIFFICULTY") from exc
+                if (not exact_difficulty.is_finite() or exact_difficulty <= 0
+                        or not math.isfinite(difficulty) or difficulty <= 0):
+                    raise StratumProtocolError("INVALID_DIFFICULTY")
+                # Keep exact decimal text for target derivation; retain float for compatibility.
                 self.difficulty = difficulty
+                self.difficulty_text = str(exact_difficulty)
             elif method == "mining.notify":
                 try:
                     job = StratumJob.from_notify(params)
@@ -210,6 +219,19 @@ class StratumV1Session:
             raise StratumProtocolError("MALFORMED_SHARE_RESPONSE")
         return {"event": "RESPONSE", "purpose": purpose, "success": True}
 
+    def current_share_target(self) -> int:
+        """Return the conventional target from the exact received difficulty.
+
+        The pool's difficulty convention must be confirmed independently.
+        This method performs no network I/O and submits no shares.
+        """
+        if self.difficulty_text is None:
+            raise StratumProtocolError("STRATUM_DIFFICULTY_NOT_SET")
+        try:
+            return stratum_difficulty_to_share_target(self.difficulty_text)
+        except ValueError as exc:
+            raise StratumProtocolError("INVALID_DIFFICULTY_TARGET") from exc
+
     def snapshot(self) -> dict[str, Any]:
         return {
             "protocol": "STRATUM_V1",
@@ -217,6 +239,10 @@ class StratumV1Session:
             "subscribed": self.subscribed,
             "authorized": self.authorized,
             "difficulty": self.difficulty,
+            "difficulty_text": self.difficulty_text,
+            "share_target_hex": (
+                f"{self.current_share_target():064x}" if self.difficulty_text is not None else None
+            ),
             "extranonce1_configured": self.extranonce1_hex is not None,
             "extranonce2_size": self.extranonce2_size,
             "current_job_id": self.current_job_id,
