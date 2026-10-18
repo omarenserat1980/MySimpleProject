@@ -21,7 +21,7 @@ class RealityAuditTests(unittest.TestCase):
         result = audit_registry(valid_registry())
         self.assertTrue(result["passed"])
         self.assertEqual(result["component_count"], 1)
-        self.assertIn("not authenticated", result["claim_boundary"])
+        self.assertIn("no external evidence", result["claim_boundary"])
 
     def test_duplicate_component_ids_fail(self):
         data = valid_registry()
