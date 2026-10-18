@@ -61,9 +61,11 @@ def test_payout_with_chain_evidence_is_realized():
         fee_btc=0.00000005,
     )
     result = verify_payout(evidence)
-    assert result["status"] == "VERIFIED_COMPLETED"
-    assert result["financial_state"] == "REVENUE_REALIZED"
-    assert result["checks"]["on_chain_proof"] is True
+    # A caller-supplied txid/URL is a claim, not independent chain verification.
+    assert result["status"] == "CLAIMED_PAYOUT_EVIDENCE"
+    assert result["financial_state"] == "UNVERIFIED"
+    assert result["checks"]["on_chain_reference_present"] is True
+    assert result["checks"]["independent_chain_verification"] is False
 
 
 def test_tampered_evidence_is_rejected():

@@ -74,3 +74,60 @@ def test_verified_payment_still_requires_delivery_reconciliation():
     })
     with pytest.raises(ValueError, match="delivery_evidence_ref and reconciliation_ref"):
         ledger.realize({"delivery_evidence_ref": "evidence://delivery/guard-003"})
+
+
+def _verified_payment_evidence(transaction_id="tx-idempotent-001"):
+    return {
+        "transaction_id": transaction_id,
+        "evidence_ref": f"evidence://payment/{transaction_id}",
+        "source": "independent-bank-record",
+        "verification_status": "INDEPENDENTLY_VERIFIED",
+        "amount": "100",
+        "currency": "USD",
+    }
+
+
+def test_repeated_verified_payment_is_idempotent():
+    ledger = RevenueRecord("commercial-idempotent-001", "100", "USD")
+    evidence = _verified_payment_evidence()
+    first = ledger.verify(evidence)
+    second = ledger.verify(evidence)
+    assert first == second
+    assert len(ledger.evidence) == 1
+    assert ledger.status == "PAYMENT_VERIFIED"
+
+
+def test_conflicting_payment_evidence_is_rejected_after_verification():
+    ledger = RevenueRecord("commercial-conflict-001", "100", "USD")
+    ledger.verify(_verified_payment_evidence())
+    with pytest.raises(ValueError, match="conflicting payment evidence"):
+        ledger.verify(_verified_payment_evidence("tx-other"))
+
+
+def test_repeated_realization_is_idempotent_and_snapshot_is_detached():
+    ledger = RevenueRecord("commercial-realization-001", "100", "USD")
+    ledger.verify(_verified_payment_evidence("tx-realization-001"))
+    evidence = {
+        "delivery_evidence_ref": "evidence://delivery/realization-001",
+        "reconciliation_ref": "evidence://reconciliation/realization-001",
+    }
+    first = ledger.realize(evidence)
+    second = ledger.realize(evidence)
+    assert first == second
+    assert len(ledger.evidence) == 2
+    first["evidence"].append("caller-mutation")
+    assert "caller-mutation" not in ledger.snapshot()["evidence"]
+
+
+def test_conflicting_realization_evidence_is_rejected_after_realization():
+    ledger = RevenueRecord("commercial-realization-conflict-001", "100", "USD")
+    ledger.verify(_verified_payment_evidence("tx-realization-conflict-001"))
+    ledger.realize({
+        "delivery_evidence_ref": "evidence://delivery/original",
+        "reconciliation_ref": "evidence://reconciliation/original",
+    })
+    with pytest.raises(ValueError, match="conflicting realization evidence"):
+        ledger.realize({
+            "delivery_evidence_ref": "evidence://delivery/other",
+            "reconciliation_ref": "evidence://reconciliation/other",
+        })
