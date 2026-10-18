@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "audit_policy": {
+    "simulation_first": true,
+    "default_reality_status": "PLANNED",
+    "allowed_reality_statuses": [
+      "PLANNED",
+      "ADAPTER_IMPLEMENTED",
+      "TOOL_EXECUTION_VERIFIED",
+      "SIMULATION_VERIFIED",
+      "HOST_EVIDENCE_RECORDED",
+      "PHYSICAL_HARDWARE_VERIFIED",
+      "BLOCKED"
+    ],
+    "never_infer_physical_hardware_from_simulation": true,
+    "independent_evidence_required_for_physical_claims": true
+  },
+  "components": [
+    {
+      "id": "ram-dram",
+      "name": "RAM / DRAM controller",
+      "reality_status": "ADAPTER_IMPLEMENTED",
+      "evidence": [
+        "Ramulator adapter code and mocked contract tests in PR #989"
+      ],
+      "not_proven": [
+        "Ramulator upstream execution",
+        "physical RAM inventory"
+      ],
+      "next_gate": "Run pinned Ramulator release and reviewed example in isolated CI; preserve version, input hash, logs and expected output."
+    },
+    {
+      "id": "virtual-server",
+      "name": "Virtual server / QEMU",
+      "reality_status": "BLOCKED",
+      "evidence": [
+        "QEMU/Windows readiness and boot runbooks exist"
+      ],
+      "not_proven": [
+        "Successful current VM guest boot"
+      ],
+      "next_gate": "Check authorized runner capacity and QEMU/KVM; obtain guest-generated evidence from a disposable VM."
+    },
+    {
+      "id": "windows-guest",
+      "name": "Windows Server guest OS",
+      "reality_status": "BLOCKED",
+      "evidence": [
+        "Artifact manifest validation and boot-proof tooling exist"
+      ],
+      "not_proven": [
+        "Authentic Windows image inspected and installed-disk guest boot verified"
+      ],
+      "next_gate": "Use legally obtained media, host inspection and independent guest-side boot evidence."
+    },
+    {
+      "id": "cpu-system",
+      "name": "CPU / full-system simulation",
+      "reality_status": "PLANNED",
+      "evidence": [
+        "Brain hardware profiles and simulator tests exist"
+      ],
+      "not_proven": [
+        "gem5 upstream integrated and executed"
+      ],
+      "next_gate": "Pin gem5, build in CI, run known workload and compare reproducible results."
+    },
+    {
+      "id": "asic-rtl",
+      "name": "Brain ASIC RTL",
+      "reality_status": "SIMULATION_VERIFIED",
+      "evidence": [
+        "Existing CI has reported RTL vector tests and synthesis for its recorded run"
+      ],
+      "not_proven": [
+        "Fabricated ASIC or board-level measurements"
+      ],
+      "next_gate": "Keep RTL and synthesis artifacts; physical status requires fabrication/device identity and lab evidence."
+    },
+    {
+      "id": "asic-physical-design",
+      "name": "ASIC physical design / FPGA",
+      "reality_status": "BLOCKED",
+      "evidence": [
+        "OpenROAD/LiteX candidate plan and preliminary BOM documentation"
+      ],
+      "not_proven": [
+        "Completed validated layout, board, fabrication or bring-up"
+      ],
+      "next_gate": "Pin compatible toolchain and PDK, inspect DRC/LVS, then collect board/fabrication and lab evidence."
+    },
+    {
+      "id": "storage",
+      "name": "Storage / virtual disk",
+      "reality_status": "PLANNED",
+      "evidence": [
+        "Virtual disk concepts in VM workflows"
+      ],
+      "not_proven": [
+        "Dedicated upstream adapter regression"
+      ],
+      "next_gate": "Implement isolated temporary-image integrity and read/write adapter tests."
+    },
+    {
+      "id": "networking",
+      "name": "Network / virtual NIC",
+      "reality_status": "PLANNED",
+      "evidence": [
+        "Existing device bridge and virtual networking abstractions"
+      ],
+      "not_proven": [
+        "Public network connectivity inferred from simulator"
+      ],
+      "next_gate": "Add isolated virtual-peer tests and keep host network evidence separate."
+    },
+    {
+      "id": "thermal-sensor",
+      "name": "Thermal sensor",
+      "reality_status": "BLOCKED",
+      "evidence": [
+        "Thermal safety policy documented"
+      ],
+      "not_proven": [
+        "Physical sensor identity, live bus reads and calibration"
+      ],
+      "next_gate": "Identify exact sensor/interface and verify live readings/calibration when real hardware is present."
+    },
+    {
+      "id": "gpu-accelerator",
+      "name": "GPU / accelerator",
+      "reality_status": "PLANNED",
+      "evidence": [],
+      "not_proven": [
+        "GPU/driver availability or upstream adapter execution"
+      ],
+      "next_gate": "Inventory authorized runner GPU and driver; only integrate if available."
+    },
+    {
+      "id": "power-cooling",
+      "name": "Power and cooling telemetry",
+      "reality_status": "BLOCKED",
+      "evidence": [],
+      "not_proven": [
+        "Calibrated device-specific power/thermal readings"
+      ],
+      "next_gate": "Use identified instrumented device and retain calibration/measurement evidence."
+    },
+    {
+      "id": "mining-execution",
+      "name": "Mining execution and pool acceptance",
+      "reality_status": "BLOCKED",
+      "evidence": [
+        "Existing RTL tests/synthesis and read-only telemetry are lower-level evidence only"
+      ],
+      "not_proven": [
+        "Current accepted shares, physical ASIC, payout or realized revenue"
+      ],
+      "next_gate": "Collect real accepted-share records and payout evidence; do not derive revenue from simulated hashrate."
+    }
+  ]
+}
