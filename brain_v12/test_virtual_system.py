@@ -35,6 +35,25 @@ class VirtualSystemTests(unittest.TestCase):
         self.assertTrue(k.syscall(p.pid,"status")["ok"])
         self.assertTrue(k.terminate(p.pid))
 
+    def test_kernel_rejects_invalid_ticks_and_unknown_processes(self):
+        k = VirtualKernel()
+        with self.assertRaises(ValueError):
+            k.tick(-1)
+        with self.assertRaises(KeyError):
+            k.syscall("missing-process", "status")
+        self.assertEqual(k.status()["ticks"], 0)
+
+    def test_kernel_status_is_a_stable_simulation_snapshot(self):
+        k = VirtualKernel()
+        p = k.create_process("snapshot-test")
+        k.tick(2)
+        status = k.status()
+        self.assertEqual(status["ticks"], 2)
+        self.assertEqual(status["process_count"], 1)
+        self.assertEqual(status["processes"][0]["pid"], p.pid)
+        self.assertEqual(status["processes"][0]["state"], "READY")
+        self.assertEqual(status["interrupts"], 2)
+
     def test_virtual_network(self):
         a=VirtualComputer("a"); b=VirtualComputer("b")
         router=VirtualRouter()
