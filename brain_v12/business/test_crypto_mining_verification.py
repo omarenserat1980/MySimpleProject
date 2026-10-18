@@ -1,12 +1,17 @@
 from brain_v12.business.crypto_mining_intelligence import PayoutEvidence
 from brain_v12.business.crypto_mining_verification import (
     BlockchainProof, VerificationState, start_cloud_mining_verification,
+    _start_cloud_mining_verification_with_verifier,
 )
 
 
 def _ready_cycle(opportunity_id: str, chain_verifier=None):
-    cycle = start_cloud_mining_verification(
-        "CloudMineCrypto", opportunity_id, chain_verifier=chain_verifier
+    cycle = (
+        _start_cloud_mining_verification_with_verifier(
+            "CloudMineCrypto", opportunity_id, chain_verifier=chain_verifier
+        )
+        if chain_verifier is not None
+        else start_cloud_mining_verification("CloudMineCrypto", opportunity_id)
     )
     for state in (
         VerificationState.RISK_CHECK,
