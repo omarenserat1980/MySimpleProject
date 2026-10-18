@@ -139,7 +139,7 @@ class BitcoinStratumBridgeTests(unittest.TestCase):
         raw_socket = MagicMock()
         tls_socket = MagicMock()
         tls_socket.makefile.side_effect = [
-            io.StringIO(json.dumps({"id": 1, "result": None, "error": [20, "rejected", None]}) + "\\n"),
+            io.StringIO(json.dumps({"id": 1, "result": None, "error": [20, "rejected", None]}) + "\n"),
             io.StringIO(),
         ]
         tls_context = MagicMock()
