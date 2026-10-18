@@ -202,3 +202,107 @@ test("verified PayPal capture retry repairs ledger and service job without anoth
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("verified PayPal retry rebuilds both missing ledger and service-job rows", async () => {
+  const payment = {
+    tran_ref: "PP-ORDER-REPAIR",
+    order_id: "ORDER-REPAIR",
+    amount: 7.25,
+    currency: "JOD",
+    state: "PAYMENT_VERIFIED",
+    raw_evidence: JSON.stringify({
+      provider: "paypal",
+      capture_id: "PP-CAPTURE-REPAIR",
+      amount: 7.25,
+      currency: "JOD",
+      status: "COMPLETED",
+    }),
+  };
+  const order = {
+    order_id: "ORDER-REPAIR",
+    amount: 7.25,
+    currency: "JOD",
+    state: "PAYMENT_VERIFIED",
+    client_email: "repair@example.test",
+  };
+  let ledger = null;
+  let job = null;
+  const batchSql = [];
+  const db = {
+    prepare(sql) {
+      return {
+        sql,
+        values: [],
+        bind(...values) { this.values = values; return this; },
+        async first() {
+          if (this.sql.includes("FROM orders WHERE order_id = ?")) return order;
+          if (this.sql.includes("FROM payments WHERE tran_ref = ?")) return payment;
+          if (this.sql.includes("FROM revenue_ledger WHERE order_id = ?")) return ledger;
+          if (this.sql.includes("FROM service_jobs WHERE job_id = ?")) return job;
+          return null;
+        },
+        async run() {
+          batchSql.push(this.sql);
+          if (this.sql.includes("INSERT OR IGNORE INTO revenue_ledger")) {
+            ledger = {
+              revenue_id: this.values[0],
+              order_id: this.values[1],
+              tran_ref: this.values[2],
+              amount: this.values[3],
+              currency: this.values[4],
+              state: "PAYMENT_VERIFIED_PENDING_DELIVERY",
+            };
+          }
+          if (this.sql.includes("INSERT OR IGNORE INTO service_jobs")) {
+            job = {
+              job_id: this.values[0],
+              order_id: this.values[1],
+              state: "PENDING",
+            };
+          }
+          return { success: true, meta: { changes: 1 } };
+        },
+      };
+    },
+    async batch(statements) {
+      for (const statement of statements) await statement.run();
+      return [];
+    },
+  };
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    if (String(url) === "https://auth.test/auth/me") {
+      return new Response(JSON.stringify({ account: { email: "repair@example.test" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    throw new Error("unexpected provider call for verified retry");
+  };
+
+  try {
+    const response = await worker.fetch(new Request("https://brain.test/api/payments/paypal/capture", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer synthetic-session" },
+      body: JSON.stringify({ order_id: "ORDER-REPAIR", paypal_order_id: "PP-ORDER-REPAIR" }),
+    }), {
+      BRAIN_DB: db,
+      BRAIN_ORIGIN: "https://auth.test",
+      BRAIN_ALLOWED_ORIGIN: "https://brain.test",
+    });
+
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.idempotent, true);
+    assert.equal(result.capture_id, "PP-CAPTURE-REPAIR");
+    assert.equal(ledger?.tran_ref, "PP-ORDER-REPAIR", "missing ledger row must be recreated");
+    assert.equal(ledger?.amount, 7.25);
+    assert.equal(job?.order_id, "ORDER-REPAIR", "missing service job must be recreated");
+    assert.ok(batchSql.some(sql => sql.includes("INSERT OR IGNORE INTO revenue_ledger")));
+    assert.ok(batchSql.some(sql => sql.includes("INSERT OR IGNORE INTO service_jobs")));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
