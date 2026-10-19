@@ -83,11 +83,11 @@ def test_session_subscribe_authorize_and_process_correlated_responses():
     session.connect(explicit_approval=True, approved_host="pool.example.test")
     assert session.subscribe() == {"status": "SUBSCRIBE_SENT", "request_id": 1}
     assert b"mining.subscribe" in endpoint.sent[0]
+    assert session.process_one()["result"]["status"] == "SUBSCRIBED"
     auth = session.authorize("placeholder-secret")
     assert auth == {"status": "AUTHORIZE_SENT", "request_id": 2}
     assert b"placeholder-secret" in endpoint.sent[1]
 
-    assert session.process_one()["result"]["status"] == "SUBSCRIBED"
     assert session.process_one()["result"]["status"] == "AUTHORIZED"
     assert session.process_one()["result"]["status"] == "DIFFICULTY_UPDATED"
     job = session.process_one()["result"]
@@ -98,8 +98,10 @@ def test_session_subscribe_authorize_and_process_correlated_responses():
 
 
 def test_session_never_submits_shares_and_does_not_echo_password():
-    session, endpoint, _ = _session()
+    session, endpoint, _ = _session(b'{"id":1,"result":[[], "abcd", 4],"error":null}\\n')
     session.connect(explicit_approval=True, approved_host="pool.example.test")
+    session.subscribe()
+    assert session.process_one()["result"]["status"] == "SUBSCRIBED"
     result = session.authorize("sensitive-placeholder")
     assert "sensitive-placeholder" not in repr(result)
     assert "sensitive-placeholder" not in repr(session.status())
