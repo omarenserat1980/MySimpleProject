@@ -120,7 +120,7 @@ class EvidenceEnginePrototype:
                evidence_class: str = "simulated") -> dict[str, Any]:
         if not isinstance(kind, str) or not kind.strip() or not isinstance(source, str) or not source.strip() or not isinstance(payload, dict):
             raise ValueError("INVALID_EVIDENCE_RECORD")
-        if evidence_class not in {"simulated", "local_test", "device_observed", "external"}:
+        if not isinstance(evidence_class, str) or evidence_class not in {"simulated", "local_test", "device_observed", "external"}:
             raise ValueError("INVALID_EVIDENCE_CLASS")
         # Isolate stored evidence from caller-owned nested objects.
         safe_payload = deepcopy(payload)
@@ -254,3 +254,80 @@ class MiningSupervisorPrototype:
                 "can certify live mining or revenue."
             ),
         }
+
+@dataclass
+class DurableEvidenceAdapter:
+    """Persist evidence and verify its stored hash; persistence is not independent proof."""
+    store: Any
+
+    def record(
+        self,
+        *,
+        task_id: str,
+        kind: str,
+        source: str,
+        payload: dict[str, Any],
+        evidence_class: str = "simulated",
+    ) -> dict[str, Any]:
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError("TASK_ID_REQUIRED")
+        if not isinstance(kind, str) or not kind.strip():
+            raise ValueError("EVIDENCE_KIND_REQUIRED")
+        if not isinstance(source, str) or not source.strip():
+            raise ValueError("EVIDENCE_SOURCE_REQUIRED")
+        if not isinstance(payload, dict):
+            raise ValueError("EVIDENCE_PAYLOAD_MUST_BE_OBJECT")
+        if not isinstance(evidence_class, str) or evidence_class not in {"simulated", "local_test", "device_observed", "external"}:
+            raise ValueError("INVALID_EVIDENCE_CLASS")
+
+        stored_payload = {
+            "schema": "brain-capability-evidence/v1",
+            "source": source,
+            "evidence_class": evidence_class,
+            "payload": deepcopy(payload),
+        }
+        try:
+            record = self.store.append(
+                task_id=task_id,
+                kind=kind,
+                payload=stored_payload,
+                producer=source,
+                phase=evidence_class,
+            )
+        except Exception:
+            return {"status": "PERSISTENCE_FAILED", "independent_evidence": False}
+
+        if (
+            not isinstance(record, dict)
+            or not isinstance(record.get("evidence_id"), str)
+            or not record["evidence_id"].strip()
+            or not isinstance(record.get("sha256"), str)
+            or not record["sha256"].strip()
+        ):
+            return {"status": "PERSISTENCE_RESULT_INVALID", "independent_evidence": False}
+
+        try:
+            check = self.store.verify_hash(record["evidence_id"])
+        except Exception:
+            return {
+                "status": "HASH_VERIFICATION_FAILED",
+                "evidence_id": record["evidence_id"],
+                "sha256": record["sha256"],
+                "independent_evidence": False,
+            }
+
+        verified = (
+            isinstance(check, dict)
+            and check.get("ok") is True
+            and check.get("status") == "VERIFIED"
+            and check.get("evidence_id") == record["evidence_id"]
+            and check.get("sha256") == record["sha256"]
+        )
+        return {
+            "status": "PERSISTED_AND_HASH_VERIFIED" if verified else "INTEGRITY_CHECK_FAILED",
+            "evidence_id": record["evidence_id"],
+            "sha256": record["sha256"],
+            "independent_evidence": False,
+            "verification_status": check.get("status") if isinstance(check, dict) else "INVALID_VERIFIER_RESULT",
+        }
+
