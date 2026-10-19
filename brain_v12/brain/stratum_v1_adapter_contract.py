@@ -153,6 +153,8 @@ class StratumV1AdapterContract:
     def handle_response(self, message: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(message, dict) or isinstance(message.get("id"), bool) or not isinstance(message.get("id"), int):
             raise ValueError("INVALID_STRATUM_RESPONSE")
+        if "result" not in message or "error" not in message:
+            raise ValueError("INCOMPLETE_STRATUM_RESPONSE")
         request_id = message["id"]
         if request_id not in self._pending:
             raise ValueError("UNMATCHED_STRATUM_RESPONSE")
