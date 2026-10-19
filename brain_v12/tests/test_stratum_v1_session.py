@@ -155,3 +155,25 @@ def test_failed_subscribe_response_never_allows_authorization():
     assert b"mining.authorize" not in endpoint.sent[0]
     assert session.status()["protocol"]["authorized"] is False
     session.close()
+
+
+def test_denied_authorization_never_marks_session_authorized():
+    incoming = (
+        b'{"id":1,"result":[[], "abcd", 4],"error":null}\\n'
+        b'{"id":2,"result":false,"error":null}\\n'
+    )
+    session, endpoint, _ = _session(incoming)
+    session.connect(explicit_approval=True, approved_host="pool.example.test")
+    session.subscribe()
+
+    assert session.process_one()["result"]["status"] == "SUBSCRIBED"
+    assert session.authorize("placeholder-secret")["status"] == "AUTHORIZE_SENT"
+    denied = session.process_one()
+
+    assert denied["result"]["status"] == "AUTHORIZATION_DENIED"
+    assert session.status()["protocol"]["authorized"] is False
+    assert session.status()["share_submission_enabled"] is False
+    assert session.status()["live_mining_verified"] is False
+    assert len(endpoint.sent) == 2
+    assert b"mining.submit" not in b"".join(endpoint.sent)
+    session.close()
