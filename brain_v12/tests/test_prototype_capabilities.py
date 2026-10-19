@@ -133,14 +133,30 @@ def test_mining_supervisor_requires_independent_pool_evidence():
     assert "independent_pool_confirmation" in result["missing_evidence"]
 
 
-def test_mining_supervisor_only_accepts_complete_non_simulated_evidence():
+def test_mining_supervisor_never_trusts_caller_supplied_success_flags():
     result = MiningSupervisorPrototype.assess(MiningTelemetry(
         simulated=False, transport_connected=True, tls_authenticated=True,
         worker_active=True, accepted_shares_reported=1,
-        independent_pool_confirmation=True, revenue_confirmed=False,
+        independent_pool_confirmation=True, revenue_confirmed=True,
     ))
-    assert result["real_mining_verified"] is True
+    assert result["real_mining_verified"] is False
     assert result["revenue_verified"] is False
+    assert result["status"] == "NOT_VERIFIED"
+    assert "trusted_server_side_evidence_verifier_not_bound" in result["missing_evidence"]
+    assert "Caller-supplied telemetry is not proof" in result["verification_boundary"]
+
+
+@pytest.mark.parametrize("counter", [-1, True, False, 1.5, "1", None])
+def test_mining_supervisor_rejects_invalid_share_counters(counter):
+    with pytest.raises(ValueError, match="INVALID_SHARE_COUNTER"):
+        MiningSupervisorPrototype.assess(MiningTelemetry(
+            accepted_shares_reported=counter,
+        ))
+
+
+def test_mining_supervisor_rejects_wrong_telemetry_type():
+    with pytest.raises(ValueError, match="INVALID_MINING_TELEMETRY"):
+        MiningSupervisorPrototype.assess({"accepted_shares_reported": 1})
 
 
 def test_mining_supervisor_fails_closed_when_transport_is_unavailable():

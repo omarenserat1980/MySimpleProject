@@ -222,27 +222,35 @@ class MiningSupervisorPrototype:
     """Evidence gate for mining claims; telemetry is input, never fabricated."""
     @staticmethod
     def assess(t: MiningTelemetry) -> dict[str, Any]:
-        if t.accepted_shares_reported < 0:
+        if not isinstance(t, MiningTelemetry):
+            raise ValueError("INVALID_MINING_TELEMETRY")
+        if (
+            isinstance(t.accepted_shares_reported, bool)
+            or not isinstance(t.accepted_shares_reported, int)
+            or t.accepted_shares_reported < 0
+        ):
             raise ValueError("INVALID_SHARE_COUNTER")
-        real_path = (
-            not t.simulated and t.transport_connected and t.tls_authenticated
-            and t.worker_active and t.accepted_shares_reported > 0
-            and t.independent_pool_confirmation
+        # Caller-supplied fields are not independently verified pool evidence.
+        observed_conditions = (
+            ("non_simulated_runtime", not t.simulated),
+            ("transport_connected", t.transport_connected),
+            ("tls_authenticated", t.tls_authenticated),
+            ("worker_active", t.worker_active),
+            ("pool_reported_accepted_share", t.accepted_shares_reported > 0),
+            ("independent_pool_confirmation", t.independent_pool_confirmation),
         )
+        missing = [name for name, ok in observed_conditions if not ok]
+        missing.append("trusted_server_side_evidence_verifier_not_bound")
         return {
-            "status": "REAL_SHARE_EVIDENCE_COMPLETE" if real_path else "NOT_VERIFIED",
+            "status": "NOT_VERIFIED",
             "stop_required": not (t.transport_connected and t.tls_authenticated),
             "simulated": t.simulated,
-            "real_mining_verified": bool(real_path),
-            "revenue_verified": bool(real_path and t.revenue_confirmed),
-            "missing_evidence": [
-                name for name, ok in (
-                    ("non_simulated_runtime", not t.simulated),
-                    ("transport_connected", t.transport_connected),
-                    ("tls_authenticated", t.tls_authenticated),
-                    ("worker_active", t.worker_active),
-                    ("pool_reported_accepted_share", t.accepted_shares_reported > 0),
-                    ("independent_pool_confirmation", t.independent_pool_confirmation),
-                ) if not ok
-            ],
+            "real_mining_verified": False,
+            "revenue_verified": False,
+            "missing_evidence": missing,
+            "verification_boundary": (
+                "Caller-supplied telemetry is not proof; a trusted server-side "
+                "collector and verifier must be integrated before this prototype "
+                "can certify live mining or revenue."
+            ),
         }
