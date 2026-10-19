@@ -69,6 +69,29 @@ class CommerceApiTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 s.transition(oid, "REVENUE_REALIZED", "free-form-reconciliation")
 
+    def test_corrupt_commerce_store_fails_closed_without_erasing_bytes(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "commerce.json"
+            path.write_text('{"partial":', encoding="utf-8")
+            store = CommerceStore(str(path))
+            with self.assertRaisesRegex(RuntimeError, "COMMERCE_STORE_UNREADABLE"):
+                store.list()
+            self.assertEqual(path.read_text(encoding="utf-8"), '{"partial":')
+
+    def test_non_object_commerce_store_schema_fails_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "commerce.json"
+            path.write_text("[]", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "COMMERCE_STORE_SCHEMA_INVALID"):
+                CommerceStore(str(path)).list()
+
+    def test_mismatched_commerce_order_identity_fails_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "commerce.json"
+            path.write_text('{"ORDER-A": {"order_id": "ORDER-B"}}', encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "COMMERCE_STORE_RECORD_INVALID"):
+                CommerceStore(str(path)).list()
+
 
 if __name__ == "__main__":
     unittest.main()
