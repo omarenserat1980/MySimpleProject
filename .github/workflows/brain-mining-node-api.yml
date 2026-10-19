@@ -15,6 +15,8 @@ on:
       - "brain_v12/brain/stratum_v1_jobs.py"
       - "brain_v12/brain/stratum_candidate_pipeline.py"
       - "brain_v12/brain/stratum_v1_protocol.py"
+      - "brain_v12/brain/stratum_v1_adapter_contract.py"
+      - "brain_v12/brain/stratum_v1_tls_transport.py"
       - "brain_v12/self_healing/completion_audit.py"
       - "brain_v12/tests/test_mining_node_api_software_only.py"
       - "brain_v12/tests/test_mining_node_stratum_status.py"
@@ -24,6 +26,8 @@ on:
       - "brain_v12/tests/test_stratum_v1_jobs.py"
       - "brain_v12/tests/test_stratum_candidate_pipeline.py"
       - "brain_v12/tests/test_stratum_v1_protocol.py"
+      - "brain_v12/tests/test_stratum_v1_adapter_contract.py"
+      - "brain_v12/tests/test_stratum_v1_tls_transport.py"
       - "brain_v12/tests/test_completion_audit.py"
       - "brain_v12/app.py"
       - "tests/test_brain_mining_node_api.py"
@@ -43,6 +47,7 @@ on:
       - "brain_v12/brain/stratum_v1_jobs.py"
       - "brain_v12/brain/stratum_candidate_pipeline.py"
       - "brain_v12/brain/stratum_v1_protocol.py"
+      - "brain_v12/brain/stratum_v1_adapter_contract.py"
       - "brain_v12/self_healing/completion_audit.py"
       - "brain_v12/tests/test_mining_node_api_software_only.py"
       - "brain_v12/tests/test_brain_owned_compute_runtime.py"
@@ -51,6 +56,7 @@ on:
       - "brain_v12/tests/test_stratum_v1_jobs.py"
       - "brain_v12/tests/test_stratum_candidate_pipeline.py"
       - "brain_v12/tests/test_stratum_v1_protocol.py"
+      - "brain_v12/tests/test_stratum_v1_adapter_contract.py"
       - "brain_v12/tests/test_completion_audit.py"
       - "brain_v12/app.py"
       - "tests/test_brain_mining_node_api.py"
@@ -83,9 +89,11 @@ jobs:
       - name: Run mining node contract tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
-        run: python -m pytest -q tests/test_brain_mining_node_api.py brain_v12/tests/test_mining_node_api_software_only.py brain_v12/tests/test_mining_node_stratum_status.py
+        run: python -m pytest -q tests/test_brain_mining_node_api.py brain_v12/tests/test_mining_node_api_software_only.py brain_v12/tests/test_mining_node_stratum_status.py brain_v12/tests/test_stratum_v1_adapter_contract.py brain_v12/tests/test_stratum_v1_tls_transport.py
       - name: Validate fail-closed Stratum V1 response correlation
         run: python -m pytest -q brain_v12/tests/test_stratum_v1_protocol.py
+      - name: Validate Stratum V1 adapter contract and response correlation
+        run: python -m pytest -q brain_v12/tests/test_stratum_v1_adapter_contract.py
       - name: Validate offline Stratum-to-header candidate pipeline
         run: python -m pytest -q brain_v12/tests/test_stratum_candidate_pipeline.py
       - name: Validate offline Stratum V1 job and share lifecycle primitives
