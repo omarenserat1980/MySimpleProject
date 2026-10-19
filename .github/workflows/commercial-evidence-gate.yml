@@ -24,6 +24,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install test dependency
+        run: python -m pip install "pytest>=8,<9"
+
       - name: Commercial evidence gate
         run: python -m brain_v12.business.commercial_gate
 
