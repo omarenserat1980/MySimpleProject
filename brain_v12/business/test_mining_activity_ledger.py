@@ -102,3 +102,31 @@ def test_invalid_mode_and_payload_fail_clearly():
     with pytest.raises(ValueError, match="payload must"):
         ledger.record(**{**base, "mode": "SIMULATION", "payload": "not-object"})
     ledger.close()
+
+
+
+def test_generated_timestamp_retry_is_idempotent():
+    ledger = MiningActivityLedger(":memory:")
+    args = dict(
+        activity_id="activity-generated-time", run_id="run-time",
+        mode="SIMULATION", activity_type="SIMULATOR_RUN", payload={"cycles": 7},
+    )
+    first = ledger.record(**args)
+    second = ledger.record(**args)
+    assert second == first
+    ledger.close()
+
+
+def test_activity_survives_database_reopen(tmp_path):
+    path = tmp_path / "mining-activity.db"
+    ledger = MiningActivityLedger(path)
+    saved = ledger.record(
+        activity_id="activity-durable", run_id="run-durable",
+        mode="SIMULATION", activity_type="SHA256D_RESULT",
+        payload={"vectors_checked": 42},
+    )
+    ledger.close()
+
+    reopened = MiningActivityLedger(path)
+    assert reopened.get("activity-durable") == saved
+    reopened.close()
