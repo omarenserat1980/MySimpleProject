@@ -178,7 +178,13 @@ class MiningSupervisorPrototype:
     """Evidence gate for mining claims; telemetry is input, never fabricated."""
     @staticmethod
     def assess(t: MiningTelemetry) -> dict[str, Any]:
-        if t.accepted_shares_reported < 0:
+        if not isinstance(t, MiningTelemetry):
+            raise ValueError("INVALID_MINING_TELEMETRY")
+        if (
+            isinstance(t.accepted_shares_reported, bool)
+            or not isinstance(t.accepted_shares_reported, int)
+            or t.accepted_shares_reported < 0
+        ):
             raise ValueError("INVALID_SHARE_COUNTER")
         # This prototype receives caller-supplied booleans, not signed evidence
         # from a trusted server-side pool collector. Therefore it must never
