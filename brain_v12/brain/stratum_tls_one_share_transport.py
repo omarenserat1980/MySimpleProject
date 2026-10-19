@@ -61,6 +61,11 @@ def send_one_share(
         raise StratumTLSTransportError("TLS_PEER_VALIDATION_FAILED") from exc
     if not certificate or not cipher:
         raise StratumTLSTransportError("TLS_PEER_CERTIFICATE_REQUIRED")
+    context = tls_socket.context
+    if (not isinstance(context, ssl.SSLContext)
+            or context.verify_mode != ssl.CERT_REQUIRED
+            or context.check_hostname is not True):
+        raise StratumTLSTransportError("TLS_CERTIFICATE_AND_HOSTNAME_VERIFICATION_REQUIRED")
 
     if not isinstance(submit_request, dict):
         raise StratumTLSTransportError("INVALID_SUBMIT_REQUEST")
