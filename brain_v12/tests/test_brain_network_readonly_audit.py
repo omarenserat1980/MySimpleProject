@@ -10,9 +10,10 @@ assert spec.loader is not None
 spec.loader.exec_module(audit)
 
 
-def test_audit_uses_only_explicit_read_endpoints():
+def test_default_audit_uses_only_explicit_local_status_endpoints():
     assert all(path.startswith('/api/') for path in audit.ENDPOINTS.values())
-    assert len(audit.ENDPOINTS) == 7
+    assert len(audit.ENDPOINTS) == 6
+    assert audit.OPTIONAL_NETWORK_DIAGNOSTICS_ENDPOINT == '/api/network-diagnostics/report'
 
 
 def test_report_does_not_infer_asic_from_empty_inventory():
@@ -20,16 +21,20 @@ def test_report_does_not_infer_asic_from_empty_inventory():
         'directory_status': {'ok': True, 'network_scan_performed': False},
         'directory_devices': {'items': []},
         'directory_overview': {'devices': [], 'asic_contacted': False},
-        'network_diagnostics': {'ok': True},
         'asic_bridge': {'device_contacted': False, 'mining_started': False},
         'mining_readiness': {'real_mining_ready': False},
         'follow_up': {'total_tasks': 8},
     }
+    calls = []
     def fake_fetch(base_url, path, timeout):
+        calls.append(path)
         name = next(key for key, endpoint in audit.ENDPOINTS.items() if endpoint == path)
         return {'http_status': 200, 'data': fixtures[name]}
     with patch.object(audit, 'fetch_json', side_effect=fake_fetch):
         report = audit.build_report('http://127.0.0.1:8012')
+    assert audit.OPTIONAL_NETWORK_DIAGNOSTICS_ENDPOINT not in calls
+    assert report['network_diagnostics_included'] is False
+    assert report['results']['network_diagnostics']['skipped'] is True
     result = report['conclusion']
     assert result['brain_local_api_reachable'] is True
     assert result['known_device_count'] == 0
@@ -45,3 +50,15 @@ def test_failed_endpoint_is_not_reported_as_fully_reachable():
     with patch.object(audit, 'fetch_json', return_value={'http_status': None, 'error': 'TimeoutError'}):
         report = audit.build_report('http://127.0.0.1:8012')
     assert report['conclusion']['brain_local_api_reachable'] is False
+
+
+def test_network_diagnostics_requires_explicit_opt_in():
+    paths = []
+    def fake_fetch(base_url, path, timeout):
+        paths.append(path)
+        return {'http_status': 200, 'data': {}}
+    with patch.object(audit, 'fetch_json', side_effect=fake_fetch):
+        report = audit.build_report('http://127.0.0.1:8012', include_network_diagnostics=True)
+    assert audit.OPTIONAL_NETWORK_DIAGNOSTICS_ENDPOINT in paths
+    assert report['network_diagnostics_included'] is True
+    assert report['results']['network_diagnostics']['http_status'] == 200
