@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import tools.windows_brain_bridge_agent as bridge
 from tools.windows_brain_bridge_agent import (
-    ALLOWED_TASKS, execute, validate_config,
+    ALLOWED_TASKS, _NoRedirectHandler, execute, validate_config,
 )
 
 
@@ -14,6 +14,12 @@ class WindowsBridgeAgentTests(unittest.TestCase):
             execute("powershell")
         with self.assertRaisesRegex(ValueError, "TASK_NOT_ALLOWED"):
             execute("brain_runtime_launch")
+
+    def test_redirect_handler_refuses_redirects(self):
+        handler = _NoRedirectHandler()
+        self.assertIsNone(handler.redirect_request(
+            None, None, 302, "Found", {}, "https://unexpected.example.invalid/steal"
+        ))
 
     def test_status_labels_observed_host_and_no_reservation(self):
         result = execute("status")
