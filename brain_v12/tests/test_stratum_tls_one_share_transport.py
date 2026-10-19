@@ -28,6 +28,10 @@ def _authorized_session():
 
 def _tls_socket(response):
     sock = MagicMock(spec=ssl.SSLSocket)
+    context = MagicMock(spec=ssl.SSLContext)
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.check_hostname = True
+    sock.context = context
     sock.getpeercert.return_value = b"test-certificate"
     sock.cipher.return_value = ("TLS_AES_128_GCM_SHA256", "TLSv1.3", 128)
     reader = MagicMock()
@@ -99,6 +103,14 @@ class StratumTLSOneShareTransportTests(unittest.TestCase):
         self.assertEqual(result["status"], "POOL_REPORTED_SHARE_REJECTED")
         self.assertFalse(result["pool_acceptance_response_observed"])
         self.assertFalse(result["revenue_verified"])
+
+    def test_unverified_tls_context_fails_before_send(self):
+        session, request = _authorized_session()
+        sock, _ = _tls_socket(b'{"id":1,"result":true,"error":null}\\n')
+        sock.context.verify_mode = ssl.CERT_NONE
+        with self.assertRaisesRegex(StratumTLSTransportError, "CERTIFICATE_AND_HOSTNAME_VERIFICATION_REQUIRED"):
+            send_one_share(session, sock, request)
+        sock.sendall.assert_not_called()
 
     def test_unverified_peer_certificate_fails_before_send(self):
         session, request = _authorized_session()
