@@ -56,6 +56,26 @@ class DeviceHeartbeatHttpTests(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "INVALID_DEVICE_AGENT_ID")
         self.assertEqual(self.bridge.heartbeats, [])
 
+    def test_empty_list_metadata_is_rejected(self):
+        response = self.client.post(
+            "/api/device/heartbeat",
+            headers={"X-V12-Agent-Id": "realme-01", "X-V12-Agent-Key": "realme-test-key"},
+            json={"metadata": []},
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"], "INVALID_DEVICE_METADATA")
+        self.assertEqual(self.bridge.heartbeats, [])
+
+    def test_null_metadata_is_rejected(self):
+        response = self.client.post(
+            "/api/device/heartbeat",
+            headers={"X-V12-Agent-Id": "realme-01", "X-V12-Agent-Key": "realme-test-key"},
+            json={"metadata": None},
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"], "INVALID_DEVICE_METADATA")
+        self.assertEqual(self.bridge.heartbeats, [])
+
     def test_non_object_metadata_is_rejected(self):
         response = self.client.post(
             "/api/device/heartbeat",
