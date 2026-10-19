@@ -71,7 +71,7 @@ def compile_graph(spec: dict[str, Any]) -> str:
                 raise NodeCompileError(f"CONST_OUT_OF_RANGE:{name}")
             expr = f"{width}'d{value}"
         else:
-            if op not in OPS:
+            if not isinstance(op, str) or op not in OPS:
                 raise NodeCompileError(f"UNSUPPORTED_OPERATOR:{name}")
             if set(node) != {"id", "op", "inputs"}:
                 raise NodeCompileError(f"INVALID_NODE_FIELDS:{name}")
