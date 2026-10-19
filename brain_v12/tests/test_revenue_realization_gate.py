@@ -82,3 +82,76 @@ def test_costs_are_separate_and_idempotent(tmp_path):
     summary = gate.summary()
     assert summary["realized_revenue_gross"] == []
     assert summary["operating_costs_separate"][0]["amount"] == 2.0
+
+
+def test_activity_records_without_payment_proof_and_never_counts_as_revenue(tmp_path):
+    gate = RevenueRealizationGate(tmp_path / "ledger.sqlite")
+    result = gate.record_activity(
+        idempotency_key="mining-session-1",
+        activity={
+            "activity_kind": "MINING_SESSION",
+            "mode": "live",
+            "activity_status": "OBSERVED",
+            "worker_id": "worker-test-1",
+            "hashrate": {"value": 125.5, "unit": "H/s"},
+            "sha256d_result": {"attempts": 1000, "source": "test-fixture"},
+            "accepted_shares": 0,
+            "rejected_shares": 1,
+            "estimated_amount": "0.02",
+            "estimated_currency": "BTC",
+            "evidence_ref": "telemetry-test-1",
+        },
+    )
+    assert result["status"] == "ACTIVITY_RECORDED"
+    assert result["revenue_status"] == "NOT_REALIZED"
+    assert result["payment_status"] == "PAYMENT_UNVERIFIED"
+    assert result["estimated_earnings_status"] == "ESTIMATED_UNVERIFIED"
+    summary = gate.summary()
+    assert summary["realized_revenue_gross"] == []
+    assert summary["estimated_earnings_unverified"] == [
+        {"currency": "BTC", "amount": 0.02, "entries": 1}
+    ]
+    assert summary["mining_activity_separate"][0]["entries"] == 1
+
+
+def test_simulation_activity_is_recordable_but_labeled_simulated(tmp_path):
+    gate = RevenueRealizationGate(tmp_path / "ledger.sqlite")
+    result = gate.record_activity(
+        idempotency_key="sim-1",
+        activity={
+            "activity_kind": "SIMULATION",
+            "mode": "simulation",
+            "activity_status": "SIMULATED",
+            "hashrate": {"value": 9999, "unit": "H/s"},
+        },
+    )
+    assert result["status"] == "ACTIVITY_RECORDED"
+    assert result["mode"] == "simulation"
+    assert result["revenue_status"] == "NOT_REALIZED"
+    assert gate.summary()["realized_revenue_gross"] == []
+
+
+def test_activity_idempotency_and_conflict(tmp_path):
+    gate = RevenueRealizationGate(tmp_path / "ledger.sqlite")
+    activity = {"activity_kind": "SHARE", "mode": "live", "activity_status": "SUBMITTED",
+                "accepted_shares": 0, "rejected_shares": 1}
+    first = gate.record_activity(activity=activity, idempotency_key="share-1")
+    retry = gate.record_activity(activity=activity, idempotency_key="share-1")
+    assert first["duplicate"] is False
+    assert retry["duplicate"] is True
+    with pytest.raises(RevenueGateError, match="DUPLICATE_ACTIVITY_KEY_CONFLICT"):
+        gate.record_activity(
+            activity={**activity, "rejected_shares": 2},
+            idempotency_key="share-1",
+        )
+
+
+def test_invalid_activity_measurement_is_rejected_without_revenue(tmp_path):
+    gate = RevenueRealizationGate(tmp_path / "ledger.sqlite")
+    with pytest.raises(RevenueGateError, match="INVALID_HASHRATE_VALUE"):
+        gate.record_activity(
+            idempotency_key="bad-hashrate",
+            activity={"activity_kind": "HASHRATE", "mode": "live",
+                      "hashrate": {"value": float("nan"), "unit": "H/s"}},
+        )
+    assert gate.summary()["realized_revenue_gross"] == []
