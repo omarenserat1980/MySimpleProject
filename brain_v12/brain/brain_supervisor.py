@@ -93,7 +93,7 @@ class BrainSupervisor:
 
     def _event(self,job_id,event,data=None):
         row={"ts":time.time(),"job_id":job_id,"event":event,"data":data or {}}
-        with self.events_path.open("a",encoding="utf-8") as f:f.write(json.dumps(row,ensure_ascii=False,default=_event_json_default)+"\\n")
+        with self.events_path.open("a",encoding="utf-8") as f:f.write(json.dumps(row,ensure_ascii=False,default=_event_json_default)+"\n")
 
     @staticmethod
     def _task_subject(task):
