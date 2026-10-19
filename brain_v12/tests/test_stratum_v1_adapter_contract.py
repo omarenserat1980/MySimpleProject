@@ -122,3 +122,12 @@ def test_clean_job_keeps_old_pending_share_response_correlated():
     assert adapter.status()["share_counts"]["REJECTED"] == 1
     with pytest.raises(ValueError, match="UNKNOWN_OR_STALE_JOB"):
         adapter.prepare_share("job-1", "00000000", "65aa0000", "00000000")
+
+
+
+def test_incomplete_response_cannot_be_counted_as_accepted():
+    adapter = StratumV1AdapterContract("sim.worker")
+    request = adapter.request("mining.subscribe", [])
+    with pytest.raises(ValueError, match="INCOMPLETE_STRATUM_RESPONSE"):
+        adapter.handle_response({"id": request["id"], "result": [[], "00", 4]})
+    assert adapter.status()["subscribed"] is False
