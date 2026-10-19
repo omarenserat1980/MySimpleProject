@@ -106,14 +106,14 @@ class ExperimentMemory:
         return self.get(event_id)
 
     def get(self, event_id: str) -> dict[str, Any] | None:
-        with self.connect() as conn:
+        with self.connection() as conn:
             row = conn.execute("SELECT * FROM experiment_events WHERE event_id=?",
                                (event_id,)).fetchone()
         return self._decode(row) if row else None
 
     def list_events(self, subject: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
         limit = max(1, min(int(limit), 1000))
-        with self.connect() as conn:
+        with self.connection() as conn:
             if subject:
                 rows = conn.execute(
                     "SELECT * FROM experiment_events WHERE subject=? "
@@ -125,7 +125,7 @@ class ExperimentMemory:
         return [self._decode(row) for row in rows]
 
     def health(self) -> dict[str, Any]:
-        with self.connect() as conn:
+        with self.connection() as conn:
             count = conn.execute("SELECT COUNT(*) FROM experiment_events").fetchone()[0]
             version = conn.execute("SELECT sqlite_version()").fetchone()[0]
         return {"status": "SQLITE_READY", "record_count": count,
