@@ -7,6 +7,7 @@ runs shell commands, installs software, or provisions resources.
 from __future__ import annotations
 
 import json
+import math
 import os
 import platform
 import shutil
@@ -19,7 +20,7 @@ from urllib.request import Request, urlopen
 AGENT_ID = os.getenv("V12_AGENT_ID", "windows-bridge-01").strip()
 BRAIN_URL = os.getenv("V12_BRAIN_URL", "").strip().rstrip("/")
 KEY_FILE = Path(os.getenv("V12_AGENT_KEY_FILE", str(Path.home() / ".brain" / "agent.key")))
-POLL_SECONDS = max(5.0, min(60.0, float(os.getenv("V12_POLL_SECONDS", "10"))))
+POLL_SECONDS = 10.0
 ALLOWED_TASKS = frozenset({"status", "platform", "python_version"})
 
 
@@ -62,15 +63,19 @@ def validate_config() -> None:
     if parsed.hostname.lower() not in allowed_hosts:
         raise RuntimeError("BRAIN_HOST_NOT_ALLOWLISTED")
 
-    # Apply the validated runtime configuration to every subsequent request.
-    # Import-time globals alone would otherwise validate one endpoint but use another.
+    try:
+        poll_seconds = float(os.getenv("V12_POLL_SECONDS", "10"))
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("INVALID_V12_POLL_SECONDS") from exc
+    if not math.isfinite(poll_seconds):
+        raise RuntimeError("INVALID_V12_POLL_SECONDS")
+
+    # Apply configuration only after every field has passed validation.
+    # This prevents a partially updated runtime if one setting is malformed.
     AGENT_ID = agent_id
     BRAIN_URL = brain_url.rstrip("/")
     KEY_FILE = Path(os.getenv("V12_AGENT_KEY_FILE", str(Path.home() / ".brain" / "agent.key")))
-    try:
-        POLL_SECONDS = max(5.0, min(60.0, float(os.getenv("V12_POLL_SECONDS", "10"))))
-    except ValueError as exc:
-        raise RuntimeError("INVALID_V12_POLL_SECONDS") from exc
+    POLL_SECONDS = max(5.0, min(60.0, poll_seconds))
 
 def load_key() -> str:
     key = KEY_FILE.read_text(encoding="utf-8").strip()
