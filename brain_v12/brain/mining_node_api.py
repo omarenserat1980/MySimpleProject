@@ -15,6 +15,7 @@ from .brain_owned_compute_runtime import double_sha256, execution_host_gate
 from .compute_resource_manager import build_compute_resource_report
 from .braiins_pool_evidence_collector import BRAIINS_WORKERS_URL
 from .stratum_v1_adapter_contract import StratumV1AdapterContract
+from .stratum_v1_tls_transport import StratumV1TLSTransport
 
 router = APIRouter(prefix="/api/mining-node", tags=["Brain Mining Node"])
 
@@ -289,7 +290,9 @@ def stratum_adapter_contract_status() -> dict[str, Any]:
         "status": "CONTRACT_ONLY",
         "transport_mode": StratumV1AdapterContract.transport_mode,
         "protocol_state_machine_available": True,
-        "live_transport_implemented": False,
+        "tls_transport_module_available": True,
+        "transport_class": StratumV1TLSTransport.__name__,
+        "live_transport_integrated": False,
         "live_transport_enabled": False,
         "network_access_performed": False,
         "pool_contacted": False,
@@ -298,7 +301,7 @@ def stratum_adapter_contract_status() -> dict[str, Any]:
         "real_mining_verified": False,
         "payout_verified": False,
         "revenue_verified": False,
-        "note": "Protocol validation and response-correlation contract only; no socket transport or live mining is implemented.",
+        "note": "TLS transport module is available but is not connected to the API or mining execution path; this endpoint opens no sockets and performs no live mining.",
     }
 
 
