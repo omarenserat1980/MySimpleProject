@@ -57,22 +57,22 @@ class VirtualServerFabricTests(unittest.TestCase):
     def test_host_memory_observation_reports_tighter_cgroup_source(self):
         from brain_v12.virtual_hardware import server_fabric
 
-        with patch.object(server_fabric, "_proc_available_memory_mib", return_value=2048), \\
-             patch.object(server_fabric, "_cgroup_memory_available_observation",
-                          return_value=(512, "CGROUP_V2_MEMORY_HEADROOM")):
-            value, source = server_fabric._available_memory_observation()
+        with patch.object(server_fabric, "_proc_available_memory_mib", return_value=2048):
+            with patch.object(server_fabric, "_cgroup_memory_available_observation",
+                              return_value=(512, "CGROUP_V2_MEMORY_HEADROOM")):
+                value, source = server_fabric._available_memory_observation()
         self.assertEqual(value, 512)
         self.assertEqual(source, "CGROUP_V2_MEMORY_HEADROOM")
 
     def test_host_memory_observation_reports_windows_api_source(self):
         from brain_v12.virtual_hardware import server_fabric
 
-        with patch.object(server_fabric.os, "name", "nt"), \\
-             patch.object(server_fabric, "_proc_available_memory_mib", return_value=None), \\
-             patch.object(server_fabric, "_windows_available_memory_mib", return_value=768), \\
-             patch.object(server_fabric, "_cgroup_memory_available_observation",
-                          return_value=(None, "UNAVAILABLE")):
-            value, source = server_fabric._available_memory_observation()
+        with patch.object(server_fabric.os, "name", "nt"):
+            with patch.object(server_fabric, "_proc_available_memory_mib", return_value=None):
+                with patch.object(server_fabric, "_windows_available_memory_mib", return_value=768):
+                    with patch.object(server_fabric, "_cgroup_memory_available_observation",
+                                      return_value=(None, "UNAVAILABLE")):
+                        value, source = server_fabric._available_memory_observation()
         self.assertEqual(value, 768)
         self.assertEqual(source, "WINDOWS_GLOBAL_MEMORY_STATUS_EX")
 
