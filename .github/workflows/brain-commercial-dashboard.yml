@@ -1,0 +1,56 @@
+name: Brain Commercial Dashboard
+
+on:
+  pull_request:
+    paths:
+      - "brain_v12/brain/commercial_dashboard_api.py"
+      - "brain_v12/business/commercial_case.py"
+      - "brain_v12/business/commercial_case_store.py"
+      - "brain_v12/business/commercial_operations_dashboard.py"
+      - "brain_v12/business/initial_monetization_catalog.py"
+      - "brain_v12/business/test_commercial_dashboard_api.py"
+      - "brain_v12/business/test_commercial_case_store.py"
+      - ".github/workflows/brain-commercial-dashboard.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/brain/commercial_dashboard_api.py"
+      - "brain_v12/business/commercial_case.py"
+      - "brain_v12/business/commercial_case_store.py"
+      - "brain_v12/business/commercial_operations_dashboard.py"
+      - "brain_v12/business/initial_monetization_catalog.py"
+      - "brain_v12/business/test_commercial_dashboard_api.py"
+      - "brain_v12/business/test_commercial_case_store.py"
+      - ".github/workflows/brain-commercial-dashboard.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-commercial-dashboard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commercial-dashboard-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+      - name: Run commercial persistence and API tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          BRAIN_LIVE_INCOME_SEARCH_ENABLED: "false"
+          BRAIN_WORKFORCE_ENABLED: "false"
+        run: |
+          python -m pytest -q \
+            brain_v12/business/test_commercial_case_store.py \
+            brain_v12/business/test_commercial_dashboard_api.py
