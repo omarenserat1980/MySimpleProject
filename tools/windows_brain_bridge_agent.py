@@ -13,7 +13,7 @@ import shutil
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 
 AGENT_ID = os.getenv("V12_AGENT_ID", "windows-bridge-01").strip()
@@ -32,13 +32,23 @@ def validate_config() -> None:
         raise RuntimeError("V12_AGENT_ID_MUST_START_WITH_windows-bridge-")
     if not brain_url:
         raise RuntimeError("V12_BRAIN_URL_REQUIRED")
-    if not (brain_url.startswith("https://") or (
-        os.getenv("BRAIN_ALLOW_INSECURE_HTTP", "").strip() == "1"
-        and brain_url.startswith("http://")
-    )):
-        raise RuntimeError("HTTPS_REQUIRED_SET_BRAIN_ALLOW_INSECURE_HTTP=1_ONLY_FOR_TRUSTED_TEST_NETWORK")
     if any(c in brain_url for c in "\\r\\n"):
         raise RuntimeError("INVALID_BRAIN_URL")
+    parsed = urlsplit(brain_url)
+    if parsed.scheme != "https" and not (
+        parsed.scheme == "http"
+        and os.getenv("BRAIN_ALLOW_INSECURE_HTTP", "").strip() == "1"
+    ):
+        raise RuntimeError("HTTPS_REQUIRED_SET_BRAIN_ALLOW_INSECURE_HTTP=1_ONLY_FOR_TRUSTED_TEST_NETWORK")
+    if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise RuntimeError("INVALID_BRAIN_URL")
+    allowed_hosts = {
+        item.strip().lower()
+        for item in os.getenv("V12_BRAIN_ALLOWED_HOSTS", "").split(",")
+        if item.strip()
+    }
+    if allowed_hosts and parsed.hostname.lower() not in allowed_hosts:
+        raise RuntimeError("BRAIN_HOST_NOT_ALLOWLISTED")
 
 def load_key() -> str:
     key = KEY_FILE.read_text(encoding="utf-8").strip()
