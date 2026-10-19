@@ -83,6 +83,41 @@ class CommerceRevenueBridgeTests(unittest.TestCase):
             self.bridge.enqueue(self.order_id, self.tx, "different-delivery", "reconciliation-proof")
 
 
+    def test_outbox_recovers_if_ledger_commits_before_outbox_completion(self):
+        """A retry must finish safely if ledger commit succeeds but outbox update fails."""
+        import sqlite3
+        from contextlib import contextmanager
+
+        self._realized_order()
+        self.bridge.enqueue(self.order_id, self.tx, "delivery-proof", "reconciliation-proof")
+
+        original_db = self.bridge._db
+        calls = {"count": 0}
+
+        @contextmanager
+        def fail_once_on_completion():
+            calls["count"] += 1
+            if calls["count"] == 2:
+                raise sqlite3.OperationalError("injected outbox completion write failure")
+            with original_db() as db:
+                yield db
+
+        self.bridge._db = fail_once_on_completion
+        with self.assertRaisesRegex(sqlite3.OperationalError, "injected outbox completion"):
+            self.bridge.reconcile(self.order_id, self.tx)
+
+        # Ledger commit is durable, while the outbox remains retryable.
+        self.assertEqual(self.ledger.get(self.order_id)["status"], "REVENUE_REALIZED")
+        self.assertEqual(self.bridge.get(self.order_id, self.tx)["status"], "PENDING")
+
+        self.bridge._db = original_db
+        recovered = self.bridge.reconcile(self.order_id, self.tx)
+        self.assertEqual(recovered["status"], "COMPLETED")
+        self.assertEqual(recovered["ledger"]["status"], "REVENUE_REALIZED")
+        self.assertEqual(len(recovered["ledger"]["evidence"]), 2)
+        self.assertEqual(self.bridge.get(self.order_id, self.tx)["status"], "COMPLETED")
+
+
 if __name__ == "__main__":
     unittest.main()
 
