@@ -160,6 +160,43 @@ class WindowsBridgeAgentTests(unittest.TestCase):
                     bridge.run_once("unit-test-key")
                 self.assertEqual(request.call_count, 2)
 
+    def test_run_once_rejects_unconfirmed_report(self):
+        fake_snapshot = {
+            "memory": {"available_bytes": None, "total_bytes": None},
+            "home_disk": {"free_bytes": 100, "total_bytes": 200},
+            "reality": "OBSERVED_HOST",
+            "resource_reservation": "NONE",
+        }
+        with patch.object(bridge, "AGENT_ID", "windows-bridge-test"), patch.object(
+            bridge, "resource_snapshot", return_value=fake_snapshot
+        ), patch.object(bridge, "request_json", side_effect=[
+            {"ok": True, "status": "HEARTBEAT", "agent_id": "windows-bridge-test"},
+            {"ok": True, "status": "TASK_AVAILABLE", "task": {
+                "task_id": "test-task-002", "task": "python_version"
+            }},
+            {"ok": False, "status": "AGENT_MISMATCH", "task": {
+                "task_id": "test-task-002"
+            }},
+        ]):
+            with self.assertRaisesRegex(RuntimeError, "REPORT_NOT_CONFIRMED"):
+                bridge.run_once("unit-test-key")
+
+    def test_run_once_rejects_unconfirmed_heartbeat(self):
+        fake_snapshot = {
+            "memory": {"available_bytes": None, "total_bytes": None},
+            "home_disk": {"free_bytes": 100, "total_bytes": 200},
+            "reality": "OBSERVED_HOST",
+            "resource_reservation": "NONE",
+        }
+        with patch.object(bridge, "AGENT_ID", "windows-bridge-test"), patch.object(
+            bridge, "resource_snapshot", return_value=fake_snapshot
+        ), patch.object(bridge, "request_json", return_value={
+            "ok": False, "status": "UNAUTHORIZED_AGENT"
+        }) as request:
+            with self.assertRaisesRegex(RuntimeError, "HEARTBEAT_NOT_CONFIRMED"):
+                bridge.run_once("unit-test-key")
+            self.assertEqual(request.call_count, 1)
+
     def test_run_once_completes_mocked_heartbeat_poll_report_cycle(self):
         fake_snapshot = {
             "memory": {"available_bytes": 1024 * 1024 * 512, "total_bytes": 1024 * 1024 * 1024},
