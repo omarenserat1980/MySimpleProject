@@ -52,19 +52,25 @@ class StratumV1Session:
         """Process one received protocol message; never submits a share."""
         self._require_connected()
         message = self.transport.receive_message()
-        if message.get("id") is None:
-            result = self.adapter.handle_notification(message)
+        try:
+            if message.get("id") is None:
+                result = self.adapter.handle_notification(message)
+                return {
+                    "message_type": "notification",
+                    "result": result,
+                    "share_submission_enabled": False,
+                }
+            result = self.adapter.handle_response(message)
             return {
-                "message_type": "notification",
+                "message_type": "response",
                 "result": result,
                 "share_submission_enabled": False,
             }
-        result = self.adapter.handle_response(message)
-        return {
-            "message_type": "response",
-            "result": result,
-            "share_submission_enabled": False,
-        }
+        except ValueError:
+            # An invalid or unmatched protocol message makes the session untrustworthy.
+            # Close the transport instead of allowing further requests on a desynchronized stream.
+            self.close()
+            raise
 
     def submit_share(self, *_args: Any, **_kwargs: Any) -> None:
         """Fail closed: candidate validation is not live share-submission authority."""
