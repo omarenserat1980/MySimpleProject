@@ -112,6 +112,7 @@ class HostCapacity:
     operating_system: str
     architecture: str
     provenance: str = "UNVERIFIED"
+    available_memory_source: str = "UNAVAILABLE"
 
     def describe(self) -> dict[str, Any]:
         return asdict(self)
@@ -127,55 +128,71 @@ def _read_int(path: str) -> int | None:
     return None
 
 
-def _cgroup_memory_available_mib() -> int | None:
-    """Return effective cgroup headroom when the host exposes a memory limit."""
-    # cgroup v2
+def _cgroup_memory_available_observation() -> tuple[int | None, str]:
+    """Return effective cgroup headroom and the limit source when exposed."""
     limit = _read_int("/sys/fs/cgroup/memory.max")
     current = _read_int("/sys/fs/cgroup/memory.current")
     if limit is not None and current is not None and limit > 0:
-        return max(0, limit - current) // (1024 * 1024)
-    # cgroup v1
+        return max(0, limit - current) // (1024 * 1024), "CGROUP_V2_MEMORY_HEADROOM"
     limit = _read_int("/sys/fs/cgroup/memory/memory.limit_in_bytes")
     current = _read_int("/sys/fs/cgroup/memory/memory.usage_in_bytes")
     if limit is not None and current is not None and 0 < limit < (1 << 60):
-        return max(0, limit - current) // (1024 * 1024)
-    return None
+        return max(0, limit - current) // (1024 * 1024), "CGROUP_V1_MEMORY_HEADROOM"
+    return None, "UNAVAILABLE"
 
 
-def _available_memory_mib() -> int | None:
-    """Observe memory headroom, respecting tighter cgroup limits where visible."""
-    observed: int | None = None
-    # Linux/Android (including Termux) path; no third-party dependency.
+def _proc_available_memory_mib() -> int | None:
+    """Read Linux/Android MemAvailable without a third-party dependency."""
     try:
         for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
             if line.startswith("MemAvailable:"):
-                observed = max(0, int(line.split()[1]) // 1024)
-                break
+                return max(0, int(line.split()[1]) // 1024)
     except (OSError, ValueError, IndexError):
         pass
-    # Windows fallback using the native memory-status API.
-    if observed is None and os.name == "nt":
-        try:
-            import ctypes
+    return None
 
-            class MEMORYSTATUSEX(ctypes.Structure):
-                _fields_ = [
-                    ("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
-                    ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
-                    ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
-                    ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
-                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
-                ]
-            status = MEMORYSTATUSEX()
-            status.dwLength = ctypes.sizeof(status)
-            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
-                observed = int(status.ullAvailPhys // (1024 * 1024))
-        except (AttributeError, OSError, TypeError):
-            pass
-    cgroup_available = _cgroup_memory_available_mib()
+
+def _windows_available_memory_mib() -> int | None:
+    """Read Windows available physical memory through GlobalMemoryStatusEx."""
+    try:
+        import ctypes
+
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+        status = MEMORYSTATUSEX()
+        status.dwLength = ctypes.sizeof(status)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return int(status.ullAvailPhys // (1024 * 1024))
+    except (AttributeError, OSError, TypeError):
+        pass
+    return None
+
+
+def _available_memory_observation() -> tuple[int | None, str]:
+    """Return visible memory headroom with the source that constrains it."""
+    observed = _proc_available_memory_mib()
+    source = "PROC_MEMINFO_MEMAVAILABLE" if observed is not None else "UNAVAILABLE"
+    if observed is None and os.name == "nt":
+        observed = _windows_available_memory_mib()
+        if observed is not None:
+            source = "WINDOWS_GLOBAL_MEMORY_STATUS_EX"
+    cgroup_available, cgroup_source = _cgroup_memory_available_observation()
     if observed is None:
-        return cgroup_available
-    return min(observed, cgroup_available) if cgroup_available is not None else observed
+        return cgroup_available, cgroup_source
+    if cgroup_available is not None and cgroup_available < observed:
+        return cgroup_available, cgroup_source
+    return observed, source
+
+
+def _available_memory_mib() -> int | None:
+    """Backward-compatible memory headroom value; see observation for provenance."""
+    return _available_memory_observation()[0]
 
 
 def _effective_logical_cpus() -> int:
@@ -209,7 +226,7 @@ def _effective_logical_cpus() -> int:
 def observe_host_capacity(path: str | os.PathLike[str] = ".") -> HostCapacity:
     """Observe basic host capacity without reserving resources or starting a VM."""
     logical_cpus = _effective_logical_cpus()
-    available_memory_mib = _available_memory_mib()
+    available_memory_mib, available_memory_source = _available_memory_observation()
     try:
         available_disk_bytes = shutil.disk_usage(path).free
     except OSError:
@@ -221,6 +238,7 @@ def observe_host_capacity(path: str | os.PathLike[str] = ".") -> HostCapacity:
         operating_system=platform.system() or "unknown",
         architecture=platform.machine() or "unknown",
         provenance=HOST_OBSERVED,
+        available_memory_source=available_memory_source,
     )
 
 
