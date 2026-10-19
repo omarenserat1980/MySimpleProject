@@ -15,12 +15,12 @@ def _authorize(adapter):
     assert adapter.handle_response({"id": authorize["id"], "result": True, "error": None})["status"] == "AUTHORIZED"
 
 
-def _notify(adapter, clean_jobs=False):
+def _notify(adapter, clean_jobs=False, job_id="job-1"):
     return adapter.handle_notification({
         "id": None,
         "method": "mining.notify",
         "params": [
-            "job-1", "00" * 32, "0102", "0304", ["11" * 32],
+            job_id, "00" * 32, "0102", "0304", ["11" * 32],
             "20000000", "1d00ffff", "65aa0000", clean_jobs,
         ],
     })
@@ -114,7 +114,7 @@ def test_clean_job_keeps_old_pending_share_response_correlated():
     _authorize(adapter)
     _notify(adapter, clean_jobs=False)
     share = adapter.prepare_share("job-1", "00000000", "65aa0000", "00000000")
-    _notify(adapter, clean_jobs=True)
+    _notify(adapter, clean_jobs=True, job_id="job-2")
     # A late response remains associated with its original request even after
     # the old job is no longer valid for preparing new shares.
     response = adapter.handle_response({"id": share["id"], "result": False, "error": None})
