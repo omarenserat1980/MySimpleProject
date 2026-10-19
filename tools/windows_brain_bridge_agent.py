@@ -194,12 +194,20 @@ def run_once(key: str) -> str:
     request_json("POST", "/api/device/heartbeat", key, {"agent_id": AGENT_ID, "metadata": metadata})
     response = request_json("GET", "/api/device/poll?agent_id=" + quote(AGENT_ID, safe=""), key)
     task = response.get("task")
-    if not task:
+    if task is None:
         return "IDLE"
-    task_id = str(task.get("task_id", ""))
-    task_name = str(task.get("task", ""))
-    if not task_id:
-        raise RuntimeError("TASK_ID_MISSING")
+    if not isinstance(task, dict):
+        raise RuntimeError("TASK_PAYLOAD_INVALID")
+    task_id_value = task.get("task_id")
+    task_name_value = task.get("task")
+    if not isinstance(task_id_value, (str, int)) or isinstance(task_id_value, bool):
+        raise RuntimeError("TASK_ID_INVALID")
+    task_id = str(task_id_value).strip()
+    if not task_id or len(task_id) > 200:
+        raise RuntimeError("TASK_ID_INVALID")
+    if not isinstance(task_name_value, str) or not task_name_value:
+        raise RuntimeError("TASK_NAME_INVALID")
+    task_name = task_name_value
     try:
         result = execute(task_name)
         report = {"task_id": task_id, "agent_id": AGENT_ID, "ok": True, "result": result, "error": ""}
