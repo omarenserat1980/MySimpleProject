@@ -58,6 +58,32 @@ def classify_real_mining_evidence(evidence: Any) -> dict[str, Any]:
     }
 
 
+def diagnostic_continuation_status(evidence: Any = None) -> dict[str, Any]:
+    """Allow offline diagnostics/simulation to continue without live proof.
+
+    This is deliberately not an execution override: missing or caller-supplied
+    evidence never authorizes live mining, pool submissions, payout, or revenue.
+    """
+    classification = classify_real_mining_evidence(evidence)
+    missing = classification["missing_evidence"]
+    return {
+        "status": "DIAGNOSTICS_CONTINUE",
+        "diagnostic_continuation_allowed": True,
+        "simulation_allowed": True,
+        "evidence_state": "NOT_VERIFIED" if missing else "REQUIRES_INDEPENDENT_SERVER_VERIFICATION",
+        "missing_evidence": missing,
+        "live_mining_authorized": False,
+        "live_execution_started": False,
+        "pool_share_submission_enabled": False,
+        "accepted_shares_verified": False,
+        "payout_verified": False,
+        "revenue_verified": False,
+        "financial_execution_enabled": False,
+        "real_mining_verified": False,
+        "note": "Missing independent evidence does not block offline diagnostics or simulation; it never authorizes live mining or financial claims.",
+    }
+
+
 def node_status() -> dict[str, Any]:
     return {
         "ok": True,
@@ -256,6 +282,12 @@ def stratum_candidate_pipeline_status() -> dict[str, Any]:
 @router.get("/stratum-pipeline/status")
 def get_stratum_candidate_pipeline_status() -> dict[str, Any]:
     return stratum_candidate_pipeline_status()
+
+
+@router.get("/diagnostic-continuation")
+def get_diagnostic_continuation_status() -> dict[str, Any]:
+    """Let diagnostics continue while reporting live mining as unverified."""
+    return diagnostic_continuation_status()
 
 
 @router.get("/status")

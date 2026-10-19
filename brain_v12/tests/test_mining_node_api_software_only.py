@@ -1,5 +1,6 @@
 from brain_v12.brain.mining_node_api import (
     classify_real_mining_evidence,
+    diagnostic_continuation_status,
     compute_backend_preflight,
     compute_resource_status,
     pool_evidence_status,
@@ -99,3 +100,43 @@ def test_compute_resource_status_is_read_only_and_keeps_mining_gates_closed():
     assert result["execution_gates"]["share_submission_enabled"] is False
     assert result["execution_gates"]["pool_acceptance_verified"] is False
     assert result["execution_gates"]["revenue_verified"] is False
+
+
+
+def test_missing_live_proof_does_not_block_diagnostics_but_keeps_live_gates_closed():
+    result = diagnostic_continuation_status()
+
+    assert result["status"] == "DIAGNOSTICS_CONTINUE"
+    assert result["diagnostic_continuation_allowed"] is True
+    assert result["simulation_allowed"] is True
+    assert result["evidence_state"] == "NOT_VERIFIED"
+    assert result["live_mining_authorized"] is False
+    assert result["live_execution_started"] is False
+    assert result["pool_share_submission_enabled"] is False
+    assert result["accepted_shares_verified"] is False
+    assert result["payout_verified"] is False
+    assert result["revenue_verified"] is False
+    assert result["financial_execution_enabled"] is False
+    assert result["real_mining_verified"] is False
+
+
+def test_caller_claims_do_not_unlock_live_execution_or_financial_state():
+    claimed = {
+        key: {"verified": True, "source": "caller", "digest": "untrusted"}
+        for key in (
+            "authenticated_host_attestation",
+            "authenticated_brain_connection",
+            "pool_session_attestation",
+            "accepted_share_attestation",
+        )
+    }
+
+    result = diagnostic_continuation_status(claimed)
+
+    assert result["status"] == "DIAGNOSTICS_CONTINUE"
+    assert result["diagnostic_continuation_allowed"] is True
+    assert result["evidence_state"] == "REQUIRES_INDEPENDENT_SERVER_VERIFICATION"
+    assert result["live_mining_authorized"] is False
+    assert result["pool_share_submission_enabled"] is False
+    assert result["accepted_shares_verified"] is False
+    assert result["revenue_verified"] is False
