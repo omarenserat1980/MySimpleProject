@@ -85,6 +85,7 @@ from .brain.freelance_agent import FreelanceAgent
 from .brain.virtual_datacenter import BrainVirtualDatacenter
 from .brain.evidence_store import EvidenceStore
 from .brain.verification_engine import VerificationEngine
+from .brain.follow_up_api import router as follow_up_router
 from .virtual_hardware.windows_server_backend import QemuWindowsBackend
 from .virtual_hardware.api import router as virtual_hardware_router, read_arkan_runtime_status
 from .brain.arkan_software_executor_api import router as arkan_software_executor_router, close_executor_for_shutdown
@@ -225,6 +226,7 @@ suggestions_engine = BrainSuggestionsEngine(openai_provider, error_log_store)
 suggestion_worker_candidates = SuggestionWorkerCandidateStore(os.getenv("BRAIN_DB", os.path.join(ROOT, "brain_v12.db")))
 app.include_router(build_mcp_router(brain_ai, device_bridge, store))
 app.include_router(error_recovery_router)
+app.include_router(follow_up_router)
 app.include_router(universal_simulator_router)
 app.include_router(windows_server_2025_simulation_router)
 app.include_router(virtual_hardware_router)
