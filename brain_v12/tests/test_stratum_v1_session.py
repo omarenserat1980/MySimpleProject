@@ -177,3 +177,18 @@ def test_denied_authorization_never_marks_session_authorized():
     assert len(endpoint.sent) == 2
     assert b"mining.submit" not in b"".join(endpoint.sent)
     session.close()
+
+def test_unmatched_response_closes_session_fail_closed():
+    incoming = b'{"id":999,"result":true,"error":null}\n'
+    session, endpoint, _ = _session(incoming)
+    session.connect(explicit_approval=True, approved_host="pool.example.test")
+    session.subscribe()
+
+    with pytest.raises(ValueError, match="UNMATCHED_STRATUM_RESPONSE"):
+        session.process_one()
+
+    assert endpoint.closed is True
+    assert session.status()["connected"] is False
+    assert session.status()["share_submission_enabled"] is False
+    assert session.status()["live_mining_verified"] is False
+
