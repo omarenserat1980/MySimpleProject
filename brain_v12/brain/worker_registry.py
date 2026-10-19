@@ -123,7 +123,7 @@ class WorkerRegistry:
                     "worker_id": w.worker_id,
                     "kind": w.kind,
                     "capabilities": sorted(w.capabilities),
-                    "online": w.online,
+                    "online": w.online and w.lease_until >= timestamp,
                     "last_seen": w.last_seen,
                     "lease_until": w.lease_until,
                 }
