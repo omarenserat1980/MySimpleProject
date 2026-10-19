@@ -71,7 +71,7 @@ jobs:
           print('published artifact verified')
           PY
           cp docs/assets/last_light_city.mp4 /tmp/brain-last-light-master.mp4
-          ffmpeg -y -loglevel error -i docs/assets/last_light_city.mp4 -t 20 -vf "scale=854:-2" -an -c:v libx264 -pix_fmt yuv420p -movflags +faststart docs/assets/last_light_city_preview.mp4
+          ffmpeg -y -loglevel error -i docs/assets/last_light_city.mp4 -t 20 -vf "scale=854:-2" -c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart docs/assets/last_light_city_preview.mp4
           test -s docs/assets/last_light_city_preview.mp4
           rm -f docs/assets/last_light_city.mp4 docs/assets/ffprobe.json docs/assets/film_manifest.json docs/assets/VERIFIED_COMPLETED
 
