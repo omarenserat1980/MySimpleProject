@@ -17,7 +17,7 @@ jobs:
       - name: Verify production artifact
         shell: bash
         run: |
-          if [ "\${{ github.event_name }}" = "workflow_run" ]; then echo "Artifact will be downloaded from the verified production run."; else test -s docs/assets/last_light_city.mp4; fi
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then echo "Artifact will be downloaded from the verified production run."; else test -s docs/assets/last_light_city.mp4; fi
       - name: Prepare cinema metadata
         shell: bash
         run: |
