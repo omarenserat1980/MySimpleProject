@@ -28,27 +28,25 @@ jobs:
       - name: Install minimal HTTP dependency
         run: python -m pip install --disable-pip-version-check "httpx<0.28"
 
-      - name: Report missing read-only configuration without failing CI
-        if: ${{ secrets.BRAIINS_POOL_API_TOKEN == '' || vars.BRAIINS_POOL_WORKER_ID == '' }}
-        shell: bash
-        run: |
-          {
-            echo "## Braiins Pool evidence probe"
-            echo
-            echo "- Probe result: `LIVE_EVIDENCE_UNAVAILABLE`"
-            echo "- Reason: required read-only token secret or worker-ID variable is not configured."
-            echo "- No pool request was made."
-            echo "- This diagnostic workflow is independent of CI and does not affect CI status."
-            echo "- No miner was started; no shares were submitted; no payout or revenue was verified."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Collect read-only pool telemetry
-        if: ${{ secrets.BRAIINS_POOL_API_TOKEN != '' && vars.BRAIINS_POOL_WORKER_ID != '' }}
+      - name: Probe pool only when read-only configuration exists
         env:
           BRAIINS_POOL_API_TOKEN: ${{ secrets.BRAIINS_POOL_API_TOKEN }}
           BRAIINS_POOL_WORKER_ID: ${{ vars.BRAIINS_POOL_WORKER_ID }}
         shell: bash
         run: |
+          if [[ -z "${BRAIINS_POOL_API_TOKEN:-}" || -z "${BRAIINS_POOL_WORKER_ID:-}" ]]; then
+            {
+              echo "## Braiins Pool evidence probe"
+              echo
+              echo "- Probe result: LIVE_EVIDENCE_UNAVAILABLE"
+              echo "- Reason: required read-only token secret or worker-ID variable is not configured."
+              echo "- No pool request was made."
+              echo "- This diagnostic workflow is independent of CI and does not affect CI status."
+              echo "- No miner was started; no shares were submitted; no payout or revenue was verified."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           set +e
           python brain_v12/tools/brain_braiins_pool_evidence_doctor.py > pool-evidence.json
           doctor_exit=$?
@@ -87,6 +85,4 @@ jobs:
               f.write("\n".join(summary) + "\n")
           PY
 
-      - name: Clean up local evidence file
-        if: always()
-        run: rm -f pool-evidence.json
+          rm -f pool-evidence.json
