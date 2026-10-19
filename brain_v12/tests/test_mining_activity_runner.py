@@ -38,3 +38,49 @@ def test_cancelled_pow_task_is_also_recorded(tmp_path):
         assert activity["income_status"] == "NO_REVENUE_CLAIM"
     finally:
         ledger.close()
+
+
+def test_cpu_sha256d_benchmark_records_rate_as_unverified_activity(tmp_path):
+    from brain_v12.brain.mining_activity_runner import benchmark_and_record_cpu_sha256d
+
+    ledger = MiningActivityLedger(tmp_path / "activity.sqlite")
+    try:
+        measurement, activity = benchmark_and_record_cpu_sha256d(
+            activity_id="cpu-bench-activity",
+            run_id="cpu-bench-run",
+            ledger=ledger,
+            header_prefix=bytes(76),
+            hashes_per_sample=8,
+            repeats=2,
+        )
+        assert measurement["execution"] == "host_cpu_software"
+        assert measurement["hashes_per_sample"] == 8
+        assert measurement["median_hashes_per_second"] > 0
+        assert measurement["is_live_mining"] is False
+        assert measurement["is_rtl_or_asic_measurement"] is False
+        assert activity["activity_type"] == "HASHRATE_MEASUREMENT"
+        assert activity["income_status"] == "NO_REVENUE_CLAIM"
+        assert activity["counts_as_verified_revenue"] is False
+        assert ledger.get("cpu-bench-activity") is not None
+    finally:
+        ledger.close()
+
+
+def test_cpu_sha256d_benchmark_rejects_unbounded_inputs(tmp_path):
+    from brain_v12.brain.mining_activity_runner import benchmark_and_record_cpu_sha256d
+
+    ledger = MiningActivityLedger(tmp_path / "activity.sqlite")
+    try:
+        try:
+            benchmark_and_record_cpu_sha256d(
+                activity_id="bad-bench", run_id="bad-bench-run",
+                ledger=ledger, header_prefix=bytes(76),
+                hashes_per_sample=1_000_001,
+            )
+        except ValueError as exc:
+            assert "HASHES_PER_SAMPLE_OUT_OF_RANGE" in str(exc)
+        else:
+            raise AssertionError("oversized benchmark should be rejected")
+        assert ledger.get("bad-bench") is None
+    finally:
+        ledger.close()
