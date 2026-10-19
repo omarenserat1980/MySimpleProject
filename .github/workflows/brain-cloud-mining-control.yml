@@ -174,6 +174,10 @@ jobs:
         run: |
           python -m pytest -q brain_v12/self_healing/test_braiins_probe_workflow_contract.py
 
+      - name: Validate offline Stratum job-to-SHA256d integration contract
+        run: |
+          python -m pytest -q brain_v12/tests/test_offline_stratum_pow_protocol_integration.py
+
       - name: Emit cloud control snapshot
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
