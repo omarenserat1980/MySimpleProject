@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
 import json
+import math
 from typing import Any, Callable
 
 
@@ -52,23 +53,54 @@ class TaskOrchestratorPrototype:
 
 @dataclass
 class ResourceBudgetPrototype:
-    """Logical resource budget only; units are caller-defined, not device telemetry."""
+    """Logical budget only; units are caller-defined, not physical telemetry."""
     capacity: dict[str, float]
     reserved: dict[str, float] = field(default_factory=dict)
+
+    @staticmethod
+    def _finite_number(value: Any) -> bool:
+        return (
+            not isinstance(value, bool)
+            and isinstance(value, (int, float))
+            and math.isfinite(value)
+        )
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.capacity, dict) or not isinstance(self.reserved, dict):
+            raise ValueError("INVALID_RESOURCE_BUDGET")
+        for resource, capacity in self.capacity.items():
+            if not isinstance(resource, str) or not resource.strip():
+                raise ValueError("INVALID_RESOURCE_NAME")
+            if not self._finite_number(capacity) or capacity < 0:
+                raise ValueError("INVALID_RESOURCE_CAPACITY")
+        for resource, amount in self.reserved.items():
+            if resource not in self.capacity:
+                raise ValueError("UNKNOWN_RESOURCE")
+            if not self._finite_number(amount) or amount < 0:
+                raise ValueError("INVALID_RESERVED_RESOURCE_AMOUNT")
+            if amount > self.capacity[resource]:
+                raise ValueError("RESOURCE_BUDGET_EXCEEDED")
 
     def reserve(self, resource: str, amount: float) -> None:
         if resource not in self.capacity:
             raise ValueError("UNKNOWN_RESOURCE")
-        if isinstance(amount, bool) or not isinstance(amount, (int, float)) or amount <= 0:
+        if not self._finite_number(amount) or amount <= 0:
             raise ValueError("INVALID_RESOURCE_AMOUNT")
         current = self.reserved.get(resource, 0.0)
-        if current + amount > self.capacity[resource]:
+        total = current + float(amount)
+        if not math.isfinite(total):
+            raise ValueError("INVALID_RESOURCE_AMOUNT")
+        if total > self.capacity[resource]:
             raise ValueError("RESOURCE_BUDGET_EXCEEDED")
-        self.reserved[resource] = current + float(amount)
+        self.reserved[resource] = total
 
     def release(self, resource: str, amount: float) -> None:
         current = self.reserved.get(resource, 0.0)
-        if isinstance(amount, bool) or not isinstance(amount, (int, float)) or amount <= 0 or amount > current:
+        if (
+            not self._finite_number(amount)
+            or amount <= 0
+            or amount > current
+        ):
             raise ValueError("INVALID_RESOURCE_RELEASE")
         remaining = current - float(amount)
         if remaining:
