@@ -98,7 +98,7 @@ def test_session_subscribe_authorize_and_process_correlated_responses():
 
 
 def test_session_never_submits_shares_and_does_not_echo_password():
-    session, endpoint, _ = _session(b'{"id":1,"result":[[], "abcd", 4],"error":null}\\n')
+    session, endpoint, _ = _session(b'{"id":1,"result":[[], "abcd", 4],"error":null}\n')
     session.connect(explicit_approval=True, approved_host="pool.example.test")
     session.subscribe()
     assert session.process_one()["result"]["status"] == "SUBSCRIBED"
