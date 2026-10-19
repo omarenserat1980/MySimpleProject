@@ -1,5 +1,6 @@
 import pytest
 
+from brain_v12.brain.mining_node_api import stratum_adapter_contract_status
 from brain_v12.brain.stratum_v1_adapter_contract import (
     StratumV1AdapterContract,
     validate_endpoint,
@@ -93,3 +94,15 @@ def test_notify_validates_protocol_fields_and_difficulty_is_positive():
     with pytest.raises(ValueError, match="INVALID_DIFFICULTY"):
         adapter.handle_notification({"id": None, "method": "mining.set_difficulty", "params": [0]})
     assert adapter.handle_notification({"id": None, "method": "mining.set_difficulty", "params": [1.5]})["difficulty"] == 1.5
+
+
+
+def test_api_status_exposes_contract_without_claiming_live_transport():
+    status = stratum_adapter_contract_status()
+    assert status["status"] == "CONTRACT_ONLY"
+    assert status["live_transport_implemented"] is False
+    assert status["live_transport_enabled"] is False
+    assert status["network_access_performed"] is False
+    assert status["share_submission_enabled"] is False
+    assert status["real_mining_verified"] is False
+    assert status["revenue_verified"] is False
