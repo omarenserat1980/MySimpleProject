@@ -59,13 +59,13 @@ def _transport(fake_socket, *, max_line_bytes=4096):
     return transport, fake_socket, context, calls
 
 
-def test_connect_requires_explicit_approval_and_endpoint_verification():
+def test_connect_requires_explicit_approval_and_exact_endpoint_confirmation():
     fake = FakeSocket()
     transport, _, _, calls = _transport(fake)
     with pytest.raises(StratumTransportError, match="EXPLICIT_USER_APPROVAL_REQUIRED"):
-        transport.connect(explicit_approval=False, endpoint_verified=True)
-    with pytest.raises(StratumTransportError, match="POOL_ENDPOINT_VERIFICATION_REQUIRED"):
-        transport.connect(explicit_approval=True, endpoint_verified=False)
+        transport.connect(explicit_approval=False, approved_host="pool.example.test")
+    with pytest.raises(StratumTransportError, match="POOL_ENDPOINT_CONFIRMATION_MISMATCH"):
+        transport.connect(explicit_approval=True, approved_host="attacker.example.test")
     assert calls == []
     assert transport.connected is False
 
@@ -73,7 +73,7 @@ def test_connect_requires_explicit_approval_and_endpoint_verification():
 def test_tls_transport_connects_only_after_both_gates_and_sends_json_line():
     fake = FakeSocket()
     transport, _, context, calls = _transport(fake)
-    transport.connect(explicit_approval=True, endpoint_verified=True)
+    transport.connect(explicit_approval=True, approved_host="pool.example.test")
     assert calls == [(("pool.example.test", 3333), 2.0)]
     assert context.server_names == ["pool.example.test"]
     transport.send_message({"id": 1, "method": "mining.subscribe", "params": []})
@@ -113,7 +113,7 @@ def test_transport_rejects_non_object_json_and_closes_on_eof():
     transport.connect(explicit_approval=True, endpoint_verified=True)
     with pytest.raises(StratumTransportError, match="STRATUM_MESSAGE_MUST_BE_OBJECT"):
         transport.receive_message()
-    transport.close()
+    assert transport.connected is False
 
     eof = FakeSocket()
     second, _, _, _ = _transport(eof)
