@@ -316,7 +316,13 @@ class DurableEvidenceAdapter:
                 "independent_evidence": False,
             }
 
-        verified = isinstance(check, dict) and check.get("ok") is True and check.get("status") == "VERIFIED"
+        verified = (
+            isinstance(check, dict)
+            and check.get("ok") is True
+            and check.get("status") == "VERIFIED"
+            and check.get("evidence_id") == record["evidence_id"]
+            and check.get("sha256") == record["sha256"]
+        )
         return {
             "status": "PERSISTED_AND_HASH_VERIFIED" if verified else "INTEGRITY_CHECK_FAILED",
             "evidence_id": record["evidence_id"],
