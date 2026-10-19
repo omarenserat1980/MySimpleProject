@@ -182,3 +182,24 @@ def test_cost_idempotency_rejects_changed_linkage_or_evidence(tmp_path, change):
     summary = gate.summary()
     assert summary["operating_costs_separate"][0]["entries"] == 1
 
+
+
+def test_accepted_activity_status_is_only_an_unverified_claim(tmp_path):
+    gate = RevenueRealizationGate(tmp_path / "ledger.sqlite")
+    result = gate.record_activity(
+        idempotency_key="claimed-accepted-share",
+        activity={
+            "activity_kind": "SHARE",
+            "mode": "live",
+            "activity_status": "ACCEPTED",
+            "accepted_shares": 1,
+            "evidence_ref": "caller-supplied-reference",
+        },
+    )
+    assert result["activity_status"] == "ACCEPTED"
+    assert result["activity_evidence_status"] == "UNVERIFIED"
+    assert result["revenue_status"] == "NOT_REALIZED"
+    summary = gate.summary()
+    assert summary["policy"]["activity_status_is_caller_reported_claim"] is True
+    assert summary["policy"]["activity_evidence_is_independently_verified"] is False
+    assert summary["realized_revenue_gross"] == []
