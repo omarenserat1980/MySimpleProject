@@ -202,3 +202,56 @@ class MiningSupervisorPrototype:
                 ) if not ok
             ],
         }
+
+
+@dataclass
+class DurableEvidenceAdapter:
+    """Persist capability observations through Brain's canonical SQLite EvidenceStore.
+
+    This adapter makes records durable and hash-checkable; it does not turn
+    caller-provided claims into independent device, pool, or revenue evidence.
+    """
+    store: Any
+
+    def record(
+        self,
+        *,
+        task_id: str,
+        kind: str,
+        source: str,
+        payload: dict[str, Any],
+        evidence_class: str = "simulated",
+    ) -> dict[str, Any]:
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError("TASK_ID_REQUIRED")
+        if not isinstance(kind, str) or not kind.strip():
+            raise ValueError("EVIDENCE_KIND_REQUIRED")
+        if not isinstance(source, str) or not source.strip():
+            raise ValueError("EVIDENCE_SOURCE_REQUIRED")
+        if not isinstance(payload, dict):
+            raise ValueError("EVIDENCE_PAYLOAD_MUST_BE_OBJECT")
+        if evidence_class not in {"simulated", "local_test", "device_observed", "external"}:
+            raise ValueError("INVALID_EVIDENCE_CLASS")
+
+        stored_payload = {
+            "schema": "brain-capability-evidence/v1",
+            "source": source,
+            "evidence_class": evidence_class,
+            "payload": payload,
+        }
+        record = self.store.append(
+            task_id=task_id,
+            kind=kind,
+            payload=stored_payload,
+            producer=source,
+            phase=evidence_class,
+        )
+        check = self.store.verify_hash(record["evidence_id"])
+        return {
+            "status": "PERSISTED_AND_HASH_VERIFIED" if check.get("ok") else "INTEGRITY_CHECK_FAILED",
+            "evidence_id": record["evidence_id"],
+            "sha256": record["sha256"],
+            "evidence_class": evidence_class,
+            "independent_evidence": False,
+            "hash_verification": check.get("status", "UNKNOWN"),
+        }
