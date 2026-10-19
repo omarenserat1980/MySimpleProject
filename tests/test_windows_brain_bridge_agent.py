@@ -33,6 +33,7 @@ class WindowsBridgeAgentTests(unittest.TestCase):
         with patch.dict("os.environ", {
             "V12_AGENT_ID": "windows-bridge-test",
             "V12_BRAIN_URL": "http://192.168.1.10:8012",
+            "V12_BRAIN_ALLOWED_HOSTS": "192.168.1.10",
             "BRAIN_ALLOW_INSECURE_HTTP": "1",
         }, clear=True):
             validate_config()
@@ -50,6 +51,14 @@ class WindowsBridgeAgentTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "INVALID_BRAIN_URL"):
                     validate_config()
 
+    def test_host_allowlist_is_required(self):
+        with patch.dict("os.environ", {
+            "V12_AGENT_ID": "windows-bridge-test",
+            "V12_BRAIN_URL": "https://brain.example.invalid",
+        }, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "V12_BRAIN_ALLOWED_HOSTS_REQUIRED"):
+                validate_config()
+
     def test_optional_host_allowlist_blocks_unapproved_host(self):
         with patch.dict("os.environ", {
             "V12_AGENT_ID": "windows-bridge-test",
@@ -63,6 +72,7 @@ class WindowsBridgeAgentTests(unittest.TestCase):
         with patch.dict("os.environ", {
             "V12_AGENT_ID": "redmi3-01",
             "V12_BRAIN_URL": "https://brain.example.invalid",
+            "V12_BRAIN_ALLOWED_HOSTS": "brain.example.invalid",
         }, clear=True):
             with self.assertRaisesRegex(RuntimeError, "V12_AGENT_ID_MUST_START"):
                 validate_config()
