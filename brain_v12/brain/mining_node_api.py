@@ -14,6 +14,7 @@ from .brain_owned_mining_contract import build_plan, execution_gate
 from .brain_owned_compute_runtime import double_sha256, execution_host_gate
 from .compute_resource_manager import build_compute_resource_report
 from .braiins_pool_evidence_collector import BRAIINS_WORKERS_URL
+from .stratum_v1_adapter_contract import StratumV1AdapterContract
 
 router = APIRouter(prefix="/api/mining-node", tags=["Brain Mining Node"])
 
@@ -277,6 +278,33 @@ def stratum_candidate_pipeline_status() -> dict[str, Any]:
         "evidence_class": "OFFLINE_BOUNDED_POW_CANDIDATE_ONLY",
         "note": "Capability discovery only; this endpoint does not execute nonce search or infer live pool activity.",
     }
+
+
+def stratum_adapter_contract_status() -> dict[str, Any]:
+    """Report protocol-contract capability without opening a socket or reading credentials."""
+    return {
+        "ok": True,
+        "component": "stratum_v1_adapter_contract",
+        "protocol": "Stratum V1",
+        "status": "CONTRACT_ONLY",
+        "transport_mode": StratumV1AdapterContract.transport_mode,
+        "protocol_state_machine_available": True,
+        "live_transport_implemented": False,
+        "live_transport_enabled": False,
+        "network_access_performed": False,
+        "pool_contacted": False,
+        "share_submission_enabled": False,
+        "accepted_shares_verified": False,
+        "real_mining_verified": False,
+        "payout_verified": False,
+        "revenue_verified": False,
+        "note": "Protocol validation and response-correlation contract only; no socket transport or live mining is implemented.",
+    }
+
+
+@router.get("/stratum-adapter/status")
+def get_stratum_adapter_contract_status() -> dict[str, Any]:
+    return stratum_adapter_contract_status()
 
 
 @router.get("/stratum-pipeline/status")
