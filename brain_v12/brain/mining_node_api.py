@@ -8,12 +8,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 
 from .brain_owned_mining_contract import build_plan, execution_gate
 from .brain_owned_compute_runtime import double_sha256, execution_host_gate
 from .compute_resource_manager import build_compute_resource_report
 from .braiins_pool_evidence_collector import BRAIINS_WORKERS_URL
+from .control_auth import require_control_key
+from ..business.mining_activity_ledger import MiningActivityLedger
 
 router = APIRouter(prefix="/api/mining-node", tags=["Brain Mining Node"])
 
@@ -256,6 +258,31 @@ def stratum_candidate_pipeline_status() -> dict[str, Any]:
 @router.get("/stratum-pipeline/status")
 def get_stratum_candidate_pipeline_status() -> dict[str, Any]:
     return stratum_candidate_pipeline_status()
+
+
+@router.post("/activity")
+def record_mining_activity(request: Request, payload: dict[str, Any]) -> dict[str, Any]:
+    """Persist mining activity without requiring payout proof; control-key protected."""
+    require_control_key(request)
+    ledger = MiningActivityLedger()
+    try:
+        return ledger.record(**payload)
+    finally:
+        ledger.close()
+
+
+@router.get("/activity/{activity_id}")
+def get_mining_activity(request: Request, activity_id: str) -> dict[str, Any]:
+    """Retrieve a persisted activity record; never promotes estimates to revenue."""
+    require_control_key(request)
+    ledger = MiningActivityLedger()
+    try:
+        record = ledger.get(activity_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="mining activity not found")
+        return record
+    finally:
+        ledger.close()
 
 
 @router.get("/status")
