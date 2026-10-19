@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -31,8 +32,18 @@ class ExperimentMemory:
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
 
+    @contextmanager
+    def connection(self):
+        """Commit/rollback transactions and always close the SQLite handle."""
+        conn = self.connect()
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
+
     def init(self) -> None:
-        with self.connect() as conn:
+        with self.connection() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS experiment_events (
                     event_id TEXT PRIMARY KEY,
@@ -79,7 +90,7 @@ class ExperimentMemory:
                      "api_key", "secret", "authorization")
         if any(term in serialized for term in forbidden):
             raise ValueError("event contains a secret-like field or value; refusing persistence")
-        with self.connect() as conn:
+        with self.connection() as conn:
             conn.execute("""
                 INSERT INTO experiment_events (
                     event_id, occurred_at_utc, project, subject, event_type, status,
