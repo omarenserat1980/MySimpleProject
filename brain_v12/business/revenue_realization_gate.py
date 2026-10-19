@@ -269,6 +269,7 @@ class RevenueRealizationGate:
                 if prior["payload_json"] == payload_json:
                     return {"status": "ACTIVITY_RECORDED", "duplicate": True,
                             "activity_id": prior["id"], "activity_status": prior["activity_status"],
+                            "activity_evidence_status": "UNVERIFIED",
                             "revenue_status": "NOT_REALIZED"}
                 raise RevenueGateError("DUPLICATE_ACTIVITY_KEY_CONFLICT")
             cur = db.execute("""
@@ -281,6 +282,7 @@ class RevenueRealizationGate:
                   accepted, rejected, estimate_text, estimate_currency, evidence_ref, payload_json))
             return {"status": "ACTIVITY_RECORDED", "duplicate": False,
                     "activity_id": cur.lastrowid, "activity_status": status,
+                    "activity_evidence_status": "UNVERIFIED",
                     "mode": mode, "revenue_status": "NOT_REALIZED",
                     "estimated_earnings_status": "ESTIMATED_UNVERIFIED" if estimate_text is not None else "NOT_PROVIDED",
                     "payment_status": "PAYMENT_UNVERIFIED"}
@@ -340,6 +342,8 @@ class RevenueRealizationGate:
             "estimated_earnings_unverified": estimates,
             "policy": {
                 "activity_recording_requires_payment_proof": False,
+                "activity_status_is_caller_reported_claim": True,
+                "activity_evidence_is_independently_verified": False,
                 "estimated_earnings_are_revenue": False,
                 "only_independently_verified_settled_payment_is_realized_revenue": True,
             },

@@ -42,3 +42,8 @@ remain separate from the `realized_revenue` table.
 
 Thus the gate rejects unsupported *revenue promotion*, not the recording of
 useful work, telemetry, simulation output, or unverified estimates.
+
+
+## Activity status and evidence trust boundary
+
+The `activity_status` field is caller-reported telemetry, not an independently verified fact. Even when a caller submits `activity_status="ACCEPTED"`, the ledger exposes `activity_evidence_status="UNVERIFIED"`. This does not prove that a pool accepted a share. Evidence must be independently verified before any separate workflow may treat it as a real accepted share. Mining activity, hashrate, SHA-256d results, and estimated earnings never become realized revenue through activity recording; only the separately gated revenue path can record revenue after independent payment verification and settlement.
