@@ -52,3 +52,67 @@ def run_and_record_pow_task(
         },
     )
     return result, activity
+
+
+def benchmark_and_record_cpu_sha256d(
+    *,
+    activity_id: str,
+    run_id: str,
+    ledger: MiningActivityLedger,
+    header_prefix: bytes,
+    hashes_per_sample: int = 10_000,
+    repeats: int = 3,
+) -> tuple[dict, dict]:
+    """Measure bounded host-CPU SHA256d throughput and persist it as unverified activity.
+
+    header_prefix must be the first 76 bytes of an 80-byte Bitcoin header.
+    This measures Python hashlib on the current CPU only; it is not an ASIC,
+    pool hashrate, or profitability measurement.
+    """
+    import hashlib
+    import statistics
+    import time
+
+    if not isinstance(header_prefix, bytes) or len(header_prefix) != 76:
+        raise ValueError("HEADER_PREFIX_MUST_BE_76_BYTES")
+    if isinstance(hashes_per_sample, bool) or not isinstance(hashes_per_sample, int) or not 1 <= hashes_per_sample <= 1_000_000:
+        raise ValueError("HASHES_PER_SAMPLE_OUT_OF_RANGE")
+    if isinstance(repeats, bool) or not isinstance(repeats, int) or not 1 <= repeats <= 5:
+        raise ValueError("REPEATS_OUT_OF_RANGE")
+
+    samples = []
+    last_digest = ""
+    for _ in range(repeats):
+        start = time.perf_counter()
+        for nonce in range(hashes_per_sample):
+            first = hashlib.sha256(header_prefix + nonce.to_bytes(4, "little")).digest()
+            last_digest = hashlib.sha256(first).hexdigest()
+        elapsed = time.perf_counter() - start
+        samples.append({
+            "elapsed_seconds": elapsed,
+            "hashes_per_second": hashes_per_sample / elapsed if elapsed > 0 else None,
+        })
+    rates = [sample["hashes_per_second"] for sample in samples if sample["hashes_per_second"] is not None]
+    measurement = {
+        "measurement": "python_hashlib_sha256d_header",
+        "execution": "host_cpu_software",
+        "hashes_per_sample": hashes_per_sample,
+        "repeats": repeats,
+        "samples": samples,
+        "median_hashes_per_second": statistics.median(rates) if rates else None,
+        "last_digest_hex": last_digest,
+        "is_live_mining": False,
+        "is_rtl_or_asic_measurement": False,
+        "pool_contacted": False,
+        "share_submitted": False,
+    }
+    activity = ledger.record(
+        activity_id=activity_id,
+        run_id=run_id,
+        mode="SIMULATION",
+        activity_type="HASHRATE_MEASUREMENT",
+        source="brain_v12.brain.mining_activity_runner.host_cpu_software",
+        evidence_ref=f"cpu-sha256d-benchmark:{run_id}",
+        payload=measurement,
+    )
+    return measurement, activity
