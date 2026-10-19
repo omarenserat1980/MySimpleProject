@@ -63,6 +63,7 @@ from .brain.error_recovery_api import router as error_recovery_router
 from .brain.universal_simulator_api import router as universal_simulator_router
 from .brain.windows_server_2025_simulation_api import router as windows_server_2025_simulation_router
 from .brain.device_bridge import DeviceBridge
+from .brain.thin_membrane import router as thin_membrane_router
 from .brain.brain_mcp import build_mcp_router
 from .brain.device_cloud_federation import build_fleet_status
 from .brain.canonical_indicators import aggregate_indicator_payloads, indicators_for_fleet
@@ -220,6 +221,7 @@ DEPLOY_REPOSITORY=os.getenv("GITHUB_REPOSITORY") or os.getenv("RENDER_GIT_REPO_S
 DEPLOY_SERVICE_ID=os.getenv("GITHUB_RUN_ID") or os.getenv("RENDER_SERVICE_ID") or "unknown"
 RUNTIME_INSTANCE=os.getenv("RENDER_INSTANCE_ID") or os.getenv("HOSTNAME") or "unknown"
 app=FastAPI(title="Electronic Brain V14",version=APP_VERSION)
+app.include_router(thin_membrane_router)
 error_log_store = BrainErrorLogStore()
 app.add_middleware(BrainErrorLoggingMiddleware, store=error_log_store)
 suggestions_engine = BrainSuggestionsEngine(openai_provider, error_log_store)
@@ -232,7 +234,7 @@ app.include_router(windows_server_2025_simulation_router)
 app.include_router(virtual_hardware_router)
 app.include_router(arkan_software_executor_router)
 _allowed_origins=[x.strip().rstrip("/") for x in os.getenv("BRAIN_CORS_ORIGINS","https://omarenserat1980.github.io").split(",") if x.strip()]
-app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature","X-BRAIN-CONTROL-KEY","X-Brain-Control-Key","X-Brain-Client-Key"])
+app.add_middleware(CORSMiddleware, allow_origins=_allowed_origins, allow_credentials=False, allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"], allow_headers=["Content-Type","Authorization","Stripe-Signature","X-BRAIN-CONTROL-KEY","X-Brain-Control-Key","X-Brain-Client-Key","X-Brain-Membrane-Probe"])
 from .brain_git.api import router as brain_git_router
 from .brain.commerce_api import router as commerce_router
 from .brain.games_store_api import router as games_store_router

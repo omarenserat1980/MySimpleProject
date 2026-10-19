@@ -22,6 +22,15 @@ class FollowUpStoreTests(unittest.TestCase):
             self.assertEqual(second.get_task("TRACK-005")["status"], "IN_PROGRESS")
             self.assertEqual(second.summary()["active_tasks"], 1)
 
+    def test_thin_membrane_cloud_handoff_starts_blocked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = FollowUpStore(Path(directory) / "follow-up.sqlite3")
+            task = store.get_task("TRACK-008")
+            self.assertIsNotNone(task)
+            self.assertEqual(task["status"], "BLOCKED")
+            self.assertIn("cloud endpoint", task["detail"])
+            self.assertTrue(task["evidence"])
+
     def test_pass_requires_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
             store = FollowUpStore(Path(directory) / "follow-up.sqlite3")
