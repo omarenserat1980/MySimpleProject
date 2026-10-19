@@ -8,12 +8,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 
 from .brain_owned_mining_contract import build_plan, execution_gate
 from .brain_owned_compute_runtime import double_sha256, execution_host_gate
 from .compute_resource_manager import build_compute_resource_report
 from .braiins_pool_evidence_collector import BRAIINS_WORKERS_URL
+from .control_auth import require_control_key
+from ..business.mining_activity_ledger import MiningActivityLedger
+from .mining_activity_runner import benchmark_and_record_cpu_sha256d
 
 router = APIRouter(prefix="/api/mining-node", tags=["Brain Mining Node"])
 
@@ -256,6 +259,68 @@ def stratum_candidate_pipeline_status() -> dict[str, Any]:
 @router.get("/stratum-pipeline/status")
 def get_stratum_candidate_pipeline_status() -> dict[str, Any]:
     return stratum_candidate_pipeline_status()
+
+
+@router.post("/activity")
+def record_mining_activity(request: Request, payload: dict[str, Any]) -> dict[str, Any]:
+    """Persist mining activity without requiring payout proof; control-key protected."""
+    require_control_key(request)
+    ledger = MiningActivityLedger()
+    try:
+        return ledger.record(**payload)
+    finally:
+        ledger.close()
+
+
+@router.post("/cpu-sha256d-benchmark")
+def run_cpu_sha256d_benchmark(request: Request, payload: dict[str, Any]) -> dict[str, Any]:
+    """Run a bounded host-CPU benchmark on demand; never mines or contacts a pool."""
+    require_control_key(request)
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="payload must be an object")
+    header_hex = payload.get("header_prefix_hex")
+    if not isinstance(header_hex, str) or len(header_hex) != 152:
+        raise HTTPException(status_code=400, detail="header_prefix_hex must encode exactly 76 bytes")
+    try:
+        header_prefix = bytes.fromhex(header_hex)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="header_prefix_hex must be valid hex") from exc
+    hashes_per_sample = payload.get("hashes_per_sample", 10_000)
+    repeats = payload.get("repeats", 3)
+    if isinstance(hashes_per_sample, bool) or not isinstance(hashes_per_sample, int) or not 1 <= hashes_per_sample <= 100_000:
+        raise HTTPException(status_code=400, detail="hashes_per_sample must be between 1 and 100000")
+    if isinstance(repeats, bool) or not isinstance(repeats, int) or not 1 <= repeats <= 3:
+        raise HTTPException(status_code=400, detail="repeats must be between 1 and 3")
+    activity_id = payload.get("activity_id")
+    run_id = payload.get("run_id")
+    if not isinstance(activity_id, str) or not activity_id.strip() or not isinstance(run_id, str) or not run_id.strip():
+        raise HTTPException(status_code=400, detail="non-empty activity_id and run_id are required")
+    ledger = MiningActivityLedger()
+    try:
+        measurement, activity = benchmark_and_record_cpu_sha256d(
+            activity_id=activity_id, run_id=run_id, ledger=ledger,
+            header_prefix=header_prefix, hashes_per_sample=hashes_per_sample,
+            repeats=repeats,
+        )
+        return {"measurement": measurement, "activity": activity}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        ledger.close()
+
+
+@router.get("/activity/{activity_id}")
+def get_mining_activity(request: Request, activity_id: str) -> dict[str, Any]:
+    """Retrieve a persisted activity record; never promotes estimates to revenue."""
+    require_control_key(request)
+    ledger = MiningActivityLedger()
+    try:
+        record = ledger.get(activity_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail="mining activity not found")
+        return record
+    finally:
+        ledger.close()
 
 
 @router.get("/status")
