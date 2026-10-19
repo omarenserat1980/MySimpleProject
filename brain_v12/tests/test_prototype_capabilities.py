@@ -105,6 +105,19 @@ def test_mining_supervisor_never_trusts_caller_supplied_success_flags():
     assert "Caller-supplied telemetry is not proof" in result["verification_boundary"]
 
 
+
+@pytest.mark.parametrize("counter", [-1, True, False, 1.5, "1", None])
+def test_mining_supervisor_rejects_invalid_share_counters(counter):
+    with pytest.raises(ValueError, match="INVALID_SHARE_COUNTER"):
+        MiningSupervisorPrototype.assess(MiningTelemetry(
+            accepted_shares_reported=counter,
+        ))
+
+
+def test_mining_supervisor_rejects_wrong_telemetry_type():
+    with pytest.raises(ValueError, match="INVALID_MINING_TELEMETRY"):
+        MiningSupervisorPrototype.assess({"accepted_shares_reported": 1})
+
 def test_mining_supervisor_fails_closed_when_transport_is_unavailable():
     result = MiningSupervisorPrototype.assess(MiningTelemetry())
     assert result["stop_required"] is True
