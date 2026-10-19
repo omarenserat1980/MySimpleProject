@@ -244,16 +244,29 @@ class RevenueRealizationGate:
         estimate_currency = None
         if estimate is not None:
             from decimal import Decimal, InvalidOperation
+            raw_estimate = str(estimate)
+            # Bound parsing and rendering work: Decimal accepts huge exponents
+            # such as "1e100000000", and fixed-point formatting could allocate
+            # an enormous string even though the input is short.
+            if len(raw_estimate) > 128:
+                raise RevenueGateError("INVALID_ESTIMATED_AMOUNT")
             try:
-                estimate_decimal = Decimal(str(estimate))
+                estimate_decimal = Decimal(raw_estimate)
             except (InvalidOperation, ValueError):
                 raise RevenueGateError("INVALID_ESTIMATED_AMOUNT") from None
             if not estimate_decimal.is_finite() or estimate_decimal < 0:
+                raise RevenueGateError("INVALID_ESTIMATED_AMOUNT")
+            exponent = estimate_decimal.as_tuple().exponent
+            if exponent < -100 or exponent > 100:
+                raise RevenueGateError("INVALID_ESTIMATED_AMOUNT")
+            if estimate_decimal != 0 and estimate_decimal.adjusted() > 100:
                 raise RevenueGateError("INVALID_ESTIMATED_AMOUNT")
             # Estimates may be denominated in BTC or other high-precision units.
             # Preserve the exact decimal input; unlike fiat settlement, do not
             # force a universal two-decimal scale.
             estimate_text = format(estimate_decimal, "f")
+            if len(estimate_text) > 128:
+                raise RevenueGateError("INVALID_ESTIMATED_AMOUNT")
             estimate_currency = str(activity.get("estimated_currency", "")).strip().upper()
             if not estimate_currency:
                 raise RevenueGateError("ESTIMATED_CURRENCY_REQUIRED")
