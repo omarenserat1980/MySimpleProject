@@ -192,11 +192,31 @@ def run_once(key: str) -> str:
         "resource_reality": "OBSERVED_HOST",
         "resource_reservation": "NONE",
     }
-    request_json("POST", "/api/device/heartbeat", key, {"agent_id": AGENT_ID, "metadata": metadata})
-    response = request_json("GET", "/api/device/poll?agent_id=" + quote(AGENT_ID, safe=""), key)
+    heartbeat = request_json(
+        "POST", "/api/device/heartbeat", key,
+        {"agent_id": AGENT_ID, "metadata": metadata},
+    )
+    if (
+        heartbeat.get("ok") is not True
+        or heartbeat.get("status") != "HEARTBEAT"
+        or heartbeat.get("agent_id") != AGENT_ID
+    ):
+        raise RuntimeError("HEARTBEAT_NOT_CONFIRMED")
+
+    response = request_json(
+        "GET", "/api/device/poll?agent_id=" + quote(AGENT_ID, safe=""), key
+    )
+    if response.get("ok") is not True or response.get("status") not in {
+        "IDLE", "TASK_AVAILABLE"
+    }:
+        raise RuntimeError("POLL_NOT_CONFIRMED")
     task = response.get("task")
     if task is None:
+        if response.get("status") != "IDLE":
+            raise RuntimeError("POLL_TASK_STATE_MISMATCH")
         return "IDLE"
+    if response.get("status") != "TASK_AVAILABLE":
+        raise RuntimeError("POLL_TASK_STATE_MISMATCH")
     if not isinstance(task, dict):
         raise RuntimeError("TASK_PAYLOAD_INVALID")
     task_id_value = task.get("task_id")
@@ -214,7 +234,13 @@ def run_once(key: str) -> str:
         report = {"task_id": task_id, "agent_id": AGENT_ID, "ok": True, "result": result, "error": ""}
     except (ValueError, OSError, RuntimeError) as exc:
         report = {"task_id": task_id, "agent_id": AGENT_ID, "ok": False, "result": {}, "error": str(exc)[:200]}
-    request_json("POST", "/api/device/report", key, report)
+    report_response = request_json("POST", "/api/device/report", key, report)
+    if (
+        report_response.get("ok") is not True
+        or report_response.get("status") not in {"COMPLETED", "FAILED"}
+        or (report_response.get("task") or {}).get("task_id") != task_id
+    ):
+        raise RuntimeError("REPORT_NOT_CONFIRMED")
     return "REPORTED:" + task_name
 
 
