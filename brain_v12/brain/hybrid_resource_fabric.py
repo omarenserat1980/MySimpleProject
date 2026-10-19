@@ -37,6 +37,9 @@ class ResourceLease:
     resource_id: str
     task_id: str
     capacity: Mapping[str, float]
+    required_capabilities: frozenset[str]
+    permission: str
+    physical_execution: bool
     created_at: float
     expires_at: float
 
@@ -163,16 +166,6 @@ class HybridResourceFabric:
             if record is None:
                 return {"ok": False, "status": "RESOURCE_NOT_FOUND", "resource_id": resource_id}
             self._expire_leases(record, now)
-            prior_resource = self._task_leases.get(task_id)
-            if prior_resource:
-                prior = self._resources.get(prior_resource)
-                if prior and task_id in prior.leases:
-                    lease = prior.leases[task_id]
-                    if prior_resource == resource_id:
-                        return {"ok": True, "status": "ALREADY_RESERVED", "lease": self._lease_public(lease)}
-                    return {"ok": False, "status": "TASK_ALREADY_LEASED", "resource_id": prior_resource}
-                self._task_leases.pop(task_id, None)
-
             status = record.public(now, self.evidence_ttl_seconds, self._trusted_evidence_sources)
             if physical_execution and not status["eligible_for_physical_work"]:
                 return {"ok": False, "status": "PHYSICAL_EVIDENCE_GATE_BLOCKED", "resource_id": resource_id}
@@ -180,6 +173,25 @@ class HybridResourceFabric:
                 return {"ok": False, "status": "PERMISSION_DENIED", "resource_id": resource_id}
             if not required_capabilities.issubset(record.capabilities):
                 return {"ok": False, "status": "CAPABILITY_MISMATCH", "resource_id": resource_id}
+            prior_resource = self._task_leases.get(task_id)
+            if prior_resource:
+                prior = self._resources.get(prior_resource)
+                if prior and task_id in prior.leases:
+                    lease = prior.leases[task_id]
+                    if prior_resource == resource_id:
+                        same_request = (
+                            dict(lease.capacity) == required_capacity
+                            and lease.required_capabilities == frozenset(required_capabilities)
+                            and lease.permission == permission
+                            and lease.physical_execution is physical_execution
+                        )
+                        if not same_request:
+                            return {"ok": False, "status": "LEASE_REQUEST_MISMATCH",
+                                    "resource_id": resource_id}
+                        return {"ok": True, "status": "ALREADY_RESERVED", "lease": self._lease_public(lease)}
+                    return {"ok": False, "status": "TASK_ALREADY_LEASED", "resource_id": prior_resource}
+                self._task_leases.pop(task_id, None)
+
             capacity = record.measured_host_capacity if physical_execution else (
                 record.modeled_capacity if record.reality_mode == RealityMode.VIRTUAL else record.measured_host_capacity
             )
@@ -196,6 +208,9 @@ class HybridResourceFabric:
                 resource_id=resource_id,
                 task_id=task_id,
                 capacity=required_capacity,
+                required_capabilities=frozenset(required_capabilities),
+                permission=permission,
+                physical_execution=physical_execution,
                 created_at=now,
                 expires_at=now + lease_seconds,
             )
@@ -224,6 +239,9 @@ class HybridResourceFabric:
             "resource_id": lease.resource_id,
             "task_id": lease.task_id,
             "capacity": dict(lease.capacity),
+            "required_capabilities": sorted(lease.required_capabilities),
+            "permission": lease.permission,
+            "physical_execution": lease.physical_execution,
             "created_at": lease.created_at,
             "expires_at": lease.expires_at,
         }
