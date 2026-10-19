@@ -32,7 +32,7 @@ def validate_config() -> None:
         raise RuntimeError("V12_AGENT_ID_MUST_START_WITH_windows-bridge-")
     if not brain_url:
         raise RuntimeError("V12_BRAIN_URL_REQUIRED")
-    if any(c in brain_url for c in "\\r\\n"):
+    if any(c in brain_url for c in "\r\n"):
         raise RuntimeError("INVALID_BRAIN_URL")
     parsed = urlsplit(brain_url)
     if parsed.scheme != "https" and not (
