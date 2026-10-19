@@ -1,0 +1,88 @@
+name: Manual Braiins Live Evidence Probe
+
+# Independent, opt-in telemetry check. This is not CI and never starts a miner.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: braiins-live-evidence-probe
+  cancel-in-progress: false
+
+jobs:
+  pool-evidence:
+    name: Read-only pool telemetry (not mining execution)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install minimal HTTP dependency
+        run: python -m pip install --disable-pip-version-check "httpx<0.28"
+
+      - name: Probe pool only when read-only configuration exists
+        env:
+          BRAIINS_POOL_API_TOKEN: ${{ secrets.BRAIINS_POOL_API_TOKEN }}
+          BRAIINS_POOL_WORKER_ID: ${{ vars.BRAIINS_POOL_WORKER_ID }}
+        shell: bash
+        run: |
+          if [[ -z "${BRAIINS_POOL_API_TOKEN:-}" || -z "${BRAIINS_POOL_WORKER_ID:-}" ]]; then
+            {
+              echo "## Braiins Pool evidence probe"
+              echo
+              echo "- Probe result: LIVE_EVIDENCE_UNAVAILABLE"
+              echo "- Reason: required read-only token secret or worker-ID variable is not configured."
+              echo "- No pool request was made."
+              echo "- This diagnostic workflow is independent of CI and does not affect CI status."
+              echo "- No miner was started; no shares were submitted; no payout or revenue was verified."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          set +e
+          python brain_v12/tools/brain_braiins_pool_evidence_doctor.py > pool-evidence.json
+          doctor_exit=$?
+          set -e
+          export DOCTOR_EXIT="$doctor_exit"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path("pool-evidence.json").read_text(encoding="utf-8"))
+          status = str(data.get("status", "UNKNOWN"))
+          reason = str(data.get("reason") or "none")
+          # Only aggregate telemetry is shown; never print the token or worker identifier.
+          hashrate = data.get("hashrate_5m_provider_units", "unavailable")
+          unit = data.get("hashrate_unit", "")
+          shares = data.get("shares_5m_pool_reported", "unavailable")
+          summary = [
+              "## Braiins Pool evidence probe",
+              "",
+              f"- Probe result: `{status}`",
+              f"- Reason: `{reason}`",
+              f"- Pool-reported 5-minute hashrate: {hashrate} {unit}".rstrip(),
+              f"- Pool-reported 5-minute shares: {shares}",
+              f"- Pool activity verified: {bool(data.get('pool_activity_verified', False))}",
+              f"- Brain runtime activity verified: {bool(data.get('brain_runtime_activity_verified', False))}",
+              f"- Individual accepted-share submission verified: {bool(data.get('accepted_share_submission_verified', False))}",
+              f"- Payout verified: {bool(data.get('payout_verified', False))}",
+              f"- Revenue verified: {bool(data.get('revenue_verified', False))}",
+              "",
+              "This is a read-only aggregate pool telemetry probe. It does not start mining, submit shares, or prove that Brain produced the work. A successful workflow run is not mining proof.",
+              "",
+              f"- Diagnostic exit code: {os.environ.get('DOCTOR_EXIT', 'unknown')} (recorded only; does not gate CI)",
+          ]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write("\n".join(summary) + "\n")
+          PY
+
+          rm -f pool-evidence.json
