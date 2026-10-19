@@ -21,7 +21,7 @@ This file is the durable handoff point for continuing work without repeating pla
 | TRACK-002 | Confirm capability prototypes PR #972 are merged | PASS — prototypes only | Merged PR record | Inspect canonical modules and wire the prototypes into existing services without duplicating modules |
 | TRACK-003 | Execute and record a bounded self-healing verification cycle | PASS — isolated test harness only | Termux clean checkout at `7a6b56e`; `pytest` repair-cycle/evidence/failure-boundary tests: 8 passed; `PYTHONPATH=. python brain_v12/self_healing/self_test.py`: `SELF_TEST=PASS` | Add a durable machine-readable run record; do not change film metadata `self_healing: not_run` without a production-cycle run |
 | TRACK-004 | Persist project handoff and task ledger | PASS | [PR #1052](https://github.com/omarenserat1980/MySimpleProject/pull/1052), merge commit above | Update this file after each material verified change |
-| TRACK-005 | Build a follow-up status view from actual state sources | PLANNED | View/API reading persisted tasks plus current PR/workflow statuses | Inspect existing dashboard/API before adding UI; reuse canonical components |
+| TRACK-005 | Build a follow-up status view from actual state sources | IN_PROGRESS — dashboard/API implemented; production deployment pending | `brain_v12/brain/follow_up_store.py`, `/api/follow-up/status`, `/api/follow-up/tasks`, `/api/follow-up/dashboard`; 8 regression tests passed; app/dashboard smoke test passed; unauthenticated update rejected with HTTP 503 while control plane is unconfigured | Merge after all required checks pass, then verify the dashboard on the actual Brain runtime; keep mutations control-key protected |
 | TRACK-006 | Run safe mining readiness preflight without starting mining | PLANNED | Preflight output; no secrets; simulation/live states explicitly separated | Review the existing preflight endpoint and execute only its read-only/test-vector path |
 | TRACK-007 | Verify live mining and revenue, if separately authorized | BLOCKED — prerequisites absent | Independently verified Brain host attestation, pool session, accepted shares, payout and cost evidence | Do not claim or enable live execution until blockers in mining_node_api.py are resolved and authorization is explicit |
 
@@ -45,6 +45,9 @@ This file is the durable handoff point for continuing work without repeating pla
 6. Continue the next actionable item rather than re-explaining the project plan.
 
 ## Change log
+
+- 2026-10-19: Implemented a SQLite-backed follow-up task ledger, audit history, read-only status/list/history endpoints, and control-key-protected task updates on `feat/sqlite-follow-up-board`. Clean Termux verification: Python compile passed, 8 SQLite/durable-task regression tests passed, app route registration passed, API smoke test passed, and unauthenticated update was rejected.
+- 2026-10-19: Added a read-only HTML follow-up dashboard at `/api/follow-up/dashboard` with 60-second refresh. Clean Termux smoke test returned HTTP 200 for status, task list, and dashboard; protected mutation remained rejected without the control key.
 
 - 2026-10-19: Created and merged durable follow-up tracker in PR #1052.
 - 2026-10-19: Verified PR #971 and PR #972 are merged; recorded that they remain prototypes, not proof of real device execution.
