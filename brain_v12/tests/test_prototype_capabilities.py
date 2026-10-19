@@ -163,3 +163,57 @@ def test_mining_supervisor_fails_closed_when_transport_is_unavailable():
     result = MiningSupervisorPrototype.assess(MiningTelemetry())
     assert result["stop_required"] is True
     assert result["real_mining_verified"] is False
+
+def test_durable_evidence_adapter_persists_and_verifies_in_temporary_sqlite(tmp_path):
+    from brain_v12.brain.evidence_store import EvidenceStore
+    from brain_v12.brain.prototype_capabilities import DurableEvidenceAdapter
+
+    store = EvidenceStore(tmp_path / "evidence.sqlite3")
+    try:
+        adapter = DurableEvidenceAdapter(store)
+        result = adapter.record(
+            task_id="isolated-task",
+            kind="test",
+            source="pytest",
+            payload={"nested": {"state": "ready"}},
+            evidence_class="local_test",
+        )
+        assert result["status"] == "PERSISTED_AND_HASH_VERIFIED"
+        assert result["independent_evidence"] is False
+        saved = store.get(result["evidence_id"])
+        assert saved is not None
+        assert saved["verification_status"] == "VERIFIED"
+        assert saved["payload"]["payload"]["nested"]["state"] == "ready"
+    finally:
+        store.close()
+
+
+def test_durable_evidence_adapter_fails_closed_on_append_and_verifier_errors():
+    from brain_v12.brain.prototype_capabilities import DurableEvidenceAdapter
+
+    class BrokenStore:
+        def append(self, **kwargs):
+            raise RuntimeError("isolated append failure")
+
+    result = DurableEvidenceAdapter(BrokenStore()).record(
+        task_id="task", kind="test", source="pytest", payload={}
+    )
+    assert result["status"] == "PERSISTENCE_FAILED"
+    assert result["independent_evidence"] is False
+
+
+def test_durable_evidence_adapter_requires_exact_verified_status():
+    from brain_v12.brain.prototype_capabilities import DurableEvidenceAdapter
+
+    class InconsistentStore:
+        def append(self, **kwargs):
+            return {"evidence_id": "ev-test", "sha256": "abc"}
+
+        def verify_hash(self, evidence_id):
+            return {"ok": True, "status": "TAMPERED"}
+
+    result = DurableEvidenceAdapter(InconsistentStore()).record(
+        task_id="task", kind="test", source="pytest", payload={}
+    )
+    assert result["status"] == "INTEGRITY_CHECK_FAILED"
+    assert result["independent_evidence"] is False
