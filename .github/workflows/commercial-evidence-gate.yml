@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - ".github/workflows/commercial-evidence-gate.yml"
       - "brain_v12/business/commercial_control_plane.py"
       - "brain_v12/business/commercial_gate.py"
       - "brain_v12/business/test_commercial_gate.py"
