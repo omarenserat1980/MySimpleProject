@@ -277,7 +277,7 @@ class DurableEvidenceAdapter:
             raise ValueError("EVIDENCE_SOURCE_REQUIRED")
         if not isinstance(payload, dict):
             raise ValueError("EVIDENCE_PAYLOAD_MUST_BE_OBJECT")
-        if evidence_class not in {"simulated", "local_test", "device_observed", "external"}:
+        if not isinstance(evidence_class, str) or evidence_class not in {"simulated", "local_test", "device_observed", "external"}:
             raise ValueError("INVALID_EVIDENCE_CLASS")
 
         stored_payload = {
