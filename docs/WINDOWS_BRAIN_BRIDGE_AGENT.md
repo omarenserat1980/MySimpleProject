@@ -10,9 +10,11 @@ PowerShell commands, install software, reserve memory, or provision cloud servic
 - An already running Brain API reachable from the host.
 - A dedicated agent credential accepted by that Brain API. Never copy the phone's
   private key to Windows and never store credentials in Git.
-- Prefer an HTTPS Brain URL. URL user-info, query strings, and fragments are rejected.\n- Set `V12_BRAIN_ALLOWED_HOSTS` to a comma-separated exact hostname allowlist. This is required; the configured endpoint host must match one of the listed hostnames.\n- HTTP is rejected unless
-  `BRAIN_ALLOW_INSECURE_HTTP=1` is explicitly set for a trusted test network;
-  do not use that override on public or untrusted networks.
+- Prefer an HTTPS Brain URL. URL user-info, query strings, and fragments are rejected.
+- Set `V12_BRAIN_ALLOWED_HOSTS` to a comma-separated exact hostname allowlist.
+  This is required; the configured endpoint host must match one of the listed hostnames.
+- HTTP is rejected unless `BRAIN_ALLOW_INSECURE_HTTP=1` is explicitly set for a
+  trusted test network; do not use that override on public or untrusted networks.
 
 ## Configure in the current PowerShell session
 
