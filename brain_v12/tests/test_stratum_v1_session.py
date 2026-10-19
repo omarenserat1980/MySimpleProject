@@ -159,8 +159,8 @@ def test_failed_subscribe_response_never_allows_authorization():
 
 def test_denied_authorization_never_marks_session_authorized():
     incoming = (
-        b'{"id":1,"result":[[], "abcd", 4],"error":null}\\n'
-        b'{"id":2,"result":false,"error":null}\\n'
+        b'{"id":1,"result":[[], "abcd", 4],"error":null}\n'
+        b'{"id":2,"result":false,"error":null}\n'
     )
     session, endpoint, _ = _session(incoming)
     session.connect(explicit_approval=True, approved_host="pool.example.test")
