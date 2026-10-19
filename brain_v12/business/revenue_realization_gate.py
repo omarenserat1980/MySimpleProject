@@ -244,13 +244,29 @@ class RevenueRealizationGate:
         estimate_currency = None
         if estimate is not None:
             from decimal import Decimal, InvalidOperation
+            raw_estimate = str(estimate)
+            # Bound parsing and rendering work: Decimal accepts huge exponents
+            # such as "1e100000000", and fixed-point formatting could allocate
+            # an enormous string even though the input is short.
+            if len(raw_estimate) > 128:
+                raise RevenueGateError("INVALID_ESTIMATED_AMOUNT")
             try:
-                estimate_decimal = Decimal(str(estimate))
+                estimate_decimal = Decimal(raw_estimate)
             except (InvalidOperation, ValueError):
                 raise RevenueGateError("INVALID_ESTIMATED_AMOUNT") from None
             if not estimate_decimal.is_finite() or estimate_decimal < 0:
                 raise RevenueGateError("INVALID_ESTIMATED_AMOUNT")
-            estimate_text = format(estimate_decimal.quantize(Decimal("0.01")), ".2f")
+            exponent = estimate_decimal.as_tuple().exponent
+            if exponent < -100 or exponent > 100:
+                raise RevenueGateError("INVALID_ESTIMATED_AMOUNT")
+            if estimate_decimal != 0 and estimate_decimal.adjusted() > 100:
+                raise RevenueGateError("INVALID_ESTIMATED_AMOUNT")
+            # Estimates may be denominated in BTC or other high-precision units.
+            # Preserve the exact decimal input; unlike fiat settlement, do not
+            # force a universal two-decimal scale.
+            estimate_text = format(estimate_decimal, "f")
+            if len(estimate_text) > 128:
+                raise RevenueGateError("INVALID_ESTIMATED_AMOUNT")
             estimate_currency = str(activity.get("estimated_currency", "")).strip().upper()
             if not estimate_currency:
                 raise RevenueGateError("ESTIMATED_CURRENCY_REQUIRED")
@@ -321,10 +337,22 @@ class RevenueRealizationGate:
             activities = [dict(r) for r in db.execute(
                 "SELECT mode, activity_status, COUNT(*) AS entries FROM mining_activity "
                 "GROUP BY mode, activity_status ORDER BY mode, activity_status")]
-            estimates = [dict(r) for r in db.execute(
-                "SELECT estimated_currency AS currency, SUM(CAST(estimated_amount AS REAL)) AS amount, "
-                "COUNT(*) AS entries FROM mining_activity WHERE estimated_amount IS NOT NULL "
-                "GROUP BY estimated_currency ORDER BY estimated_currency")]
+            estimate_groups = db.execute(
+                "SELECT estimated_currency AS currency, mode, activity_status, "
+                "estimated_amount FROM mining_activity WHERE estimated_amount IS NOT NULL "
+                "ORDER BY estimated_currency, mode, activity_status, id"
+            ).fetchall()
+            estimate_totals: dict[tuple[str, str, str], tuple[Decimal, int]] = {}
+            for row in estimate_groups:
+                group = (row["currency"], row["mode"], row["activity_status"])
+                amount, entries = estimate_totals.get(group, (Decimal("0"), 0))
+                estimate_totals[group] = (amount + Decimal(row["estimated_amount"]), entries + 1)
+            estimates = [
+                {"currency": currency, "mode": mode, "activity_status": activity_status,
+                 "amount": format(amount, "f"), "entries": entries}
+                for (currency, mode, activity_status), (amount, entries)
+                in sorted(estimate_totals.items())
+            ]
         return {
             "status": "OK",
             "realized_revenue_gross": revenue,
