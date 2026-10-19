@@ -29,7 +29,9 @@ remain separate from the `realized_revenue` table.
 - Activity is labelled with its mode (`live`, `simulation`, `test`, or
   `unknown`) and reported activity status. Simulation data remains simulation.
 - Optional estimated earnings are stored separately and summarized under
-  `estimated_earnings_unverified`; they never increase realized revenue.
+  `estimated_earnings_unverified`; summaries retain currency, execution mode, and
+  activity status so simulated estimates are not aggregated with live observations.
+  They never increase realized revenue.
 - A record without independent payment proof returns
   `payment_status=PAYMENT_UNVERIFIED` and `revenue_status=NOT_REALIZED`.
 - Accepted-share counters are activity telemetry, not proof of a payout.
