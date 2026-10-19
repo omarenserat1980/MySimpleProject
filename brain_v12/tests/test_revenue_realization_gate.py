@@ -197,3 +197,35 @@ def test_btc_estimate_precision_is_preserved_and_summed_exactly(tmp_path):
          "amount": "0.00000003", "entries": 2}
     ]
     assert gate.summary()["realized_revenue_gross"] == []
+
+@pytest.mark.parametrize("amount", [
+    "not-a-number",
+    "NaN",
+    "Infinity",
+    "-0.01",
+    "1e100000000",
+    "0e-100000000",
+    "1" + ("0" * 129),
+])
+def test_invalid_or_unbounded_estimates_are_rejected(tmp_path, amount):
+    gate = RevenueRealizationGate(tmp_path / "ledger.sqlite")
+    with pytest.raises(RevenueGateError, match="INVALID_ESTIMATED_AMOUNT"):
+        gate.record_activity(
+            idempotency_key="invalid-estimate",
+            activity={"activity_kind": "MINING_SESSION", "mode": "live",
+                      "estimated_amount": amount, "estimated_currency": "BTC"},
+        )
+    assert gate.summary()["estimated_earnings_unverified"] == []
+    assert gate.summary()["realized_revenue_gross"] == []
+
+
+def test_estimate_requires_currency_and_does_not_record_partial_activity(tmp_path):
+    gate = RevenueRealizationGate(tmp_path / "ledger.sqlite")
+    with pytest.raises(RevenueGateError, match="ESTIMATED_CURRENCY_REQUIRED"):
+        gate.record_activity(
+            idempotency_key="estimate-without-currency",
+            activity={"activity_kind": "MINING_SESSION", "mode": "live",
+                      "estimated_amount": "0.00000001"},
+        )
+    assert gate.summary()["estimated_earnings_unverified"] == []
+    assert gate.summary()["realized_revenue_gross"] == []
