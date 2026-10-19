@@ -28,6 +28,12 @@ class SupervisorSQLiteMemoryTests(unittest.TestCase):
         self.assertTrue(history)
         self.assertTrue(any(item.get("phase") == "plan" for item in history))
         self.assertTrue(all(item.get("job_id") != second_job["job_id"] for item in history))
+        # Prior history must be part of the checkpointed job details, not only
+        # attached to the return value after persistence.
+        self.assertEqual(planned.get("details", {}).get("prior_task_history"), history)
+        persisted_jobs = second.control.jobs
+        persisted = next(item for item in persisted_jobs if item.get("job_id") == second_job["job_id"])
+        self.assertEqual(persisted.get("details", {}).get("prior_task_history"), history)
 
     def test_distinct_task_has_separate_history_subject(self):
         brain = BrainSupervisor(root=self.root)

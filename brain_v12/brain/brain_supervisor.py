@@ -223,7 +223,16 @@ class BrainSupervisor:
                 mission.transition(target, reason=phase)
         if phase=="execute" and enforce_authority:
             self.execution_gateway.authorize("brain-internal-execution"); self.execution_contract(job,"execute")
-        row=dict(job); row.update(phase=phase,status=status,updated_at=time.time(),details=details or {})
+        row_details=dict(details or {})
+        if phase=="plan":
+            prior=self.task_history(job.get("task",""),limit=50)
+            prior=[item for item in prior if item.get("job_id")!=job.get("job_id")]
+            # Keep only safe, bounded metadata and attach it before checkpointing so
+            # the persisted job state and downstream planner can actually consume it.
+            row_details["prior_task_history"]=prior
+        row=dict(job); row.update(phase=phase,status=status,updated_at=time.time(),details=row_details)
+        if phase=="plan":
+            row["prior_task_history"]=row_details["prior_task_history"]
         idx={"discover":0,"plan":1,"select_backend":2,"execute":3,"observe":4,"verify":5,"repair":6,"recover":7,"retry":8,"deliver":9}.get(phase,row.get("step_index",0))
         if idx>=row.get("step_index",0):row=self.control.checkpoint(row,idx,row["details"])
         if status in {"blocked","failed","completed"}:row["status"]=status;self.control._append(self.control.jobs,row)
@@ -231,9 +240,6 @@ class BrainSupervisor:
             row["mission_state"]=mission.state.value
             row["mission_attempts"]=mission.attempts
         self._event(row["job_id"],"phase",{"phase":phase,"status":status,"details":row["details"],"mission_state":mission.state.value if mission else None})
-        if phase=="plan":
-            prior=self.task_history(row.get("task",""),limit=50)
-            row["prior_task_history"]=[item for item in prior if item.get("job_id")!=row["job_id"]]
         self._remember_transition(row,phase,status,mission)
         return row
 
