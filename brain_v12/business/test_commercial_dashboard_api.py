@@ -36,6 +36,10 @@ class CommercialDashboardAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()["offers"]), 5)
 
+    def test_dashboard_requires_control_key(self):
+        response = TestClient(app).get("/api/commercial/dashboard")
+        self.assertEqual(response.status_code, 403)
+
     def test_create_case_requires_control_key(self):
         response = TestClient(app).post(
             "/api/commercial/cases",
