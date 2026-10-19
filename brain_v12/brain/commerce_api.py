@@ -18,6 +18,8 @@ import hmac
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
+from brain_v12.business.commerce_revenue_bridge import CommerceRevenueBridge
+from brain_v12.business.revenue_ledger_store import RevenueLedgerStore
 
 PRODUCTS = [
     {"id": "ai-starter-kit", "name": "BRAIN AI Starter Kit", "price_usd": 9, "type": "digital"},
@@ -82,9 +84,17 @@ class CommerceStore:
         if not self.path.exists():
             return {}
         try:
-            return json.loads(self.path.read_text(encoding="utf-8"))
+            data = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             raise RuntimeError("COMMERCE_STORE_UNREADABLE") from exc
+        if not isinstance(data, dict):
+            raise RuntimeError("COMMERCE_STORE_SCHEMA_INVALID")
+        for order_id, order in data.items():
+            if not isinstance(order_id, str) or not isinstance(order, dict):
+                raise RuntimeError("COMMERCE_STORE_RECORD_INVALID")
+            if order.get("order_id") != order_id:
+                raise RuntimeError("COMMERCE_STORE_RECORD_INVALID")
+        return data
 
     def _write(self, data: dict) -> None:
         payload = json.dumps(data, ensure_ascii=False, indent=2)
@@ -238,6 +248,10 @@ class CommerceStore:
 def router(data_path: str | None = None) -> APIRouter:
     root = Path(os.getenv("BRAIN_COMMERCE_DB", data_path or "brain_v12_commerce.json"))
     store = CommerceStore(str(root))
+    ledger_path = os.getenv("BRAIN_REVENUE_LEDGER_DB", str(root) + ".revenue-ledger.sqlite3")
+    outbox_path = os.getenv("BRAIN_COMMERCE_REVENUE_OUTBOX_DB", str(root) + ".revenue-outbox.sqlite3")
+    revenue_ledger = RevenueLedgerStore(ledger_path)
+    revenue_bridge = CommerceRevenueBridge(outbox_path, store, revenue_ledger)
     api = APIRouter(prefix="/api/commerce", tags=["commerce"])
 
     @api.get("/catalog")
@@ -352,7 +366,34 @@ def router(data_path: str | None = None) -> APIRouter:
     def revenue_realized(request: Request, order_id: str, body: RevenueRealizationIn):
         from .control_auth import require_control_key
         require_control_key(request)
-        return {"ok": True, "order": store.transition(order_id, "REVENUE_REALIZED", body.dict())}
+        order = store.get(order_id)
+        if not order:
+            raise HTTPException(status_code=404, detail="ORDER_NOT_FOUND")
+        transaction_id = str(order.get("payment", {}).get("transaction_id", "")).strip()
+        if not transaction_id:
+            raise HTTPException(status_code=409, detail="PAYMENT_TRANSACTION_ID_REQUIRED")
+        # Write the durable outbox intent first. If the process dies after the
+        # commerce JSON commit, the pending event can be reconciled on retry or
+        # through the authenticated recovery endpoint below.
+        revenue_bridge.enqueue(order_id, transaction_id, body.delivery_evidence_ref, body.reconciliation_ref)
+        try:
+            updated = store.transition(order_id, "REVENUE_REALIZED", body.dict())
+        except Exception:
+            revenue_bridge.cancel_if_uncommitted(order_id, transaction_id)
+            raise
+        try:
+            reconciliation = revenue_bridge.reconcile(order_id, transaction_id)
+        except Exception as exc:
+            # Commerce state is already durable; report ledger lag honestly.
+            reconciliation = {"status": "PENDING", "reason": str(exc)[:300]}
+        return {"ok": True, "order": updated, "revenue_ledger_reconciliation": reconciliation}
+
+    @api.post("/revenue-reconciliation/run")
+    def run_revenue_reconciliation(request: Request):
+        """Recover durable pending revenue events after restarts or partial failures."""
+        from .control_auth import require_control_key
+        require_control_key(request)
+        return {"ok": True, "reconciliation": revenue_bridge.reconcile_pending()}
 
     @api.get("/status")
     def status():

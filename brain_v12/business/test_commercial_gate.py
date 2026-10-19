@@ -247,15 +247,15 @@ def test_missing_event_time_is_rejected():
     assert not revenue_claim_allowed(configured_case(items))
 
 
-def test_event_before_verification_is_required():
+def test_payment_event_may_precede_independent_verification():
     items = valid_evidence()
-    original = items[-1]
     items[-1] = evidence(
         "payment", "payment-001", "PAYMENT_RECEIPT",
         event_at="2026-10-05T23:00:00Z",
         verified_at="2026-10-06T22:00:00Z",
     )
-    assert not revenue_claim_allowed(configured_case(items))
+    # A payment event normally occurs before an independent reviewer verifies it.
+    assert revenue_claim_allowed(configured_case(items))
 
 
 def test_event_chronology_out_of_order_is_rejected():

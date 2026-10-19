@@ -131,3 +131,96 @@ def test_conflicting_realization_evidence_is_rejected_after_realization():
             "delivery_evidence_ref": "evidence://delivery/other",
             "reconciliation_ref": "evidence://reconciliation/other",
         })
+
+
+def test_repeated_mining_realization_is_idempotent():
+    result = _verified_cycle("cloudminecrypto-ledger-idempotent-005")
+    ledger = RevenueRecord("cloudminecrypto-ledger-idempotent-005", "verified mining payout", "BTC")
+    first = ledger.realize_from_mining_verification(result)
+    second = ledger.realize_from_mining_verification(result)
+    assert second == first
+    assert len(second["evidence"]) == 1
+
+
+def test_conflicting_mining_realization_is_rejected():
+    result = _verified_cycle("cloudminecrypto-ledger-conflict-006")
+    ledger = RevenueRecord("cloudminecrypto-ledger-conflict-006", "verified mining payout", "BTC")
+    ledger.realize_from_mining_verification(result)
+    conflicting = {**result, "provider": "DifferentProvider"}
+    with pytest.raises(ValueError, match="conflicting mining evidence"):
+        ledger.realize_from_mining_verification(conflicting)
+
+
+def test_durable_store_survives_reopen_and_retries(tmp_path):
+    from brain_v12.business.revenue_ledger_store import RevenueLedgerStore
+
+    path = tmp_path / "revenue.db"
+    payment = _verified_payment_evidence("durable-tx-001")
+    delivery = {
+        "delivery_evidence_ref": "evidence://delivery/durable-001",
+        "reconciliation_ref": "evidence://reconciliation/durable-001",
+    }
+    store = RevenueLedgerStore(path)
+    store.create("durable-opportunity-001", "100", "USD")
+    first_payment = store.verify("durable-opportunity-001", payment)
+    store = RevenueLedgerStore(path)
+    assert store.get("durable-opportunity-001")["status"] == "PAYMENT_VERIFIED"
+    assert store.verify("durable-opportunity-001", payment) == first_payment
+    first_realization = store.realize("durable-opportunity-001", delivery)
+    store = RevenueLedgerStore(path)
+    assert store.realize("durable-opportunity-001", delivery) == first_realization
+    assert store.get("durable-opportunity-001")["status"] == "REVENUE_REALIZED"
+    assert len(store.get("durable-opportunity-001")["evidence"]) == 2
+
+
+def test_durable_store_rolls_back_invalid_transition(tmp_path):
+    from brain_v12.business.revenue_ledger_store import RevenueLedgerStore
+
+    store = RevenueLedgerStore(tmp_path / "revenue.db")
+    store.create("durable-rollback-001", "100", "USD")
+    with pytest.raises(ValueError, match="independent source required"):
+        store.verify("durable-rollback-001", {"transaction_id": "incomplete"})
+    assert store.get("durable-rollback-001")["status"] == "PAYMENT_PENDING"
+    assert store.get("durable-rollback-001")["evidence"] == []
+
+
+def test_durable_store_rejects_conflicting_retry(tmp_path):
+    from brain_v12.business.revenue_ledger_store import RevenueLedgerStore
+
+    store = RevenueLedgerStore(tmp_path / "revenue.db")
+    store.create("durable-conflict-001", "100", "USD")
+    store.verify("durable-conflict-001", _verified_payment_evidence("original-tx"))
+    with pytest.raises(ValueError, match="conflicting payment evidence"):
+        store.verify("durable-conflict-001", _verified_payment_evidence("different-tx"))
+    assert store.get("durable-conflict-001")["status"] == "PAYMENT_VERIFIED"
+    with pytest.raises(ValueError, match="conflicting revenue record"):
+        store.create("durable-conflict-001", "200", "USD")
+
+
+def test_in_memory_store_supports_multiple_operations():
+    from brain_v12.business.revenue_ledger_store import RevenueLedgerStore
+
+    store = RevenueLedgerStore(":memory:")
+    store.create("memory-opportunity-001", "100", "USD")
+    assert store.get("memory-opportunity-001")["status"] == "PAYMENT_PENDING"
+    assert store.verify("memory-opportunity-001", _verified_payment_evidence("memory-tx"))["status"] == "PAYMENT_VERIFIED"
+    store.close()
+
+
+def test_concurrent_identical_payment_retries_are_serialized(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from brain_v12.business.revenue_ledger_store import RevenueLedgerStore
+
+    path = tmp_path / "concurrent-revenue.db"
+    RevenueLedgerStore(path).create("concurrent-opportunity-001", "100", "USD")
+    evidence = _verified_payment_evidence("concurrent-tx-001")
+
+    def verify_once(_):
+        return RevenueLedgerStore(path).verify("concurrent-opportunity-001", evidence)
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(pool.map(verify_once, range(12)))
+
+    assert all(result == results[0] for result in results)
+    assert results[0]["status"] == "PAYMENT_VERIFIED"
+    assert len(results[0]["evidence"]) == 1
