@@ -118,6 +118,35 @@ class WindowsBridgeAgentTests(unittest.TestCase):
 
 
 
+    def test_run_once_fails_closed_on_malformed_task_payload(self):
+        fake_snapshot = {
+            "memory": {"available_bytes": None, "total_bytes": None},
+            "home_disk": {"free_bytes": 100, "total_bytes": 200},
+            "reality": "OBSERVED_HOST",
+            "resource_reservation": "NONE",
+        }
+        malformed_tasks = [
+            [],
+            {"task_id": "task-1"},
+            {"task_id": True, "task": "status"},
+            {"task_id": "x" * 201, "task": "status"},
+            {"task_id": "task-1", "task": 123},
+        ]
+        for task in malformed_tasks:
+            with self.subTest(task=task), patch.object(
+                bridge, "AGENT_ID", "windows-bridge-test"
+            ), patch.object(
+                bridge, "resource_snapshot", return_value=fake_snapshot
+            ), patch.object(
+                bridge, "request_json", side_effect=[
+                    {"ok": True, "status": "HEARTBEAT"},
+                    {"ok": True, "status": "TASK_AVAILABLE", "task": task},
+                ]
+            ) as request:
+                with self.assertRaisesRegex(RuntimeError, "TASK_(PAYLOAD|ID|NAME)_INVALID"):
+                    bridge.run_once("unit-test-key")
+                self.assertEqual(request.call_count, 2)
+
     def test_run_once_completes_mocked_heartbeat_poll_report_cycle(self):
         fake_snapshot = {
             "memory": {"available_bytes": 1024 * 1024 * 512, "total_bytes": 1024 * 1024 * 1024},
