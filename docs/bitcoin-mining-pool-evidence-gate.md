@@ -1,16 +1,18 @@
 # Bitcoin Mining Pool Evidence Gate
 
-Status: specification only. This document does not claim that a worker is running, a pool is connected, shares have been accepted, or revenue has been received.
+Status: schema/integrity validation only. This document and its validator do not claim that a worker is running, a pool is connected, shares have been accepted, or revenue has been received.
 
 ## Required evidence
 
-The live-mining gate must fail closed unless all of these conditions are satisfied by evidence collected from an authorized worker:
+The evidence validator checks the shape and internal consistency of a supplied artifact. It does **not** authenticate the source, establish that the record came from Braiins Pool, or prove that Brain generated the work. A SHA-256 digest over caller-supplied JSON only detects later changes relative to that digest; the caller can create both the JSON and its digest.
 
-1. **Pool connection** — successful Stratum session to a configured pool, with pool host/port, protocol, worker identifier, connection timestamp, and a successful subscribe/authorize result. Never store passwords, tokens, or wallet secrets in evidence.
-2. **Real hashrate** — a numeric measurement with unit, measurement window, timestamp, and source (worker or pool-side API). Do not substitute a configured target, estimate, synthetic value, or test fixture.
-3. **Accepted shares** — cumulative and interval accepted-share counts from the worker or pool, plus rejected/stale counts where available. Require at least one accepted share for the accepted-share gate. A local log line alone is weaker than pool-side evidence and must be labeled accordingly.
-4. **Integrity and freshness** — UTC timestamps, worker identity, evidence source, schema version, and SHA-256 digest for the finalized evidence artifact. Reject malformed, stale, contradictory, or fixture-marked records.
-5. **Independent revenue gate** — pool connection, hashrate, and accepted shares prove mining activity only. They do not prove a payout. Payout and received BTC require separate payout records, transaction ID, and wallet-side confirmation.
+A future live-mining gate must fail closed unless all of these conditions are satisfied by evidence collected and authenticated by a trusted server-side verifier:
+
+1. **Pool connection** — successful Stratum session to a configured pool, with pool host/port, protocol, worker identifier, connection timestamp, and successful subscribe/authorize result. Never store passwords, tokens, or wallet secrets in evidence.
+2. **Real hashrate** — numeric measurement with unit, measurement window, timestamp, and source. Identify worker-reported data separately from pool-side API data.
+3. **Accepted shares** — cumulative and interval accepted-share counts from the pool-side API or other independently authenticated source, plus rejected/stale counts where available. A caller-provided count or local log alone is not proof of pool acceptance.
+4. **Integrity and freshness** — UTC timestamps, worker identity, schema version, evidence source, and SHA-256 digest for the finalized evidence artifact. Reject malformed, stale, contradictory, or fixture-marked records.
+5. **Independent revenue gate** — pool connection, hashrate, and accepted shares do not prove payout. Payout and received BTC require separate payout records, transaction ID, and independently checked wallet-side confirmation.
 
 ## Evidence artifact schema
 
@@ -42,28 +44,27 @@ Store one JSON record per observation, with fields equivalent to:
     "accepted_interval": 0,
     "rejected_total": 0,
     "stale_total": 0,
-    "source": "worker-or-pool-api"
+    "source": "pool-api"
   },
   "evidence_artifact_sha256": "hex-digest",
   "fixture": false
 }
 ```
 
-The example values are placeholders, not mining measurements. Producers must replace them with observations and validators must reject placeholder or fixture data.
+Example values are placeholders, not mining measurements. A digest proves neither source authenticity nor a live pool event.
 
 ## Gate decisions
 
-- `POOL_CONNECTED`: connection and authorization both confirmed by fresh live evidence.
-- `HASHRATE_OBSERVED`: measured hashrate is numeric, positive, fresh, and source-attributed.
-- `SHARE_ACCEPTED`: at least one accepted share is reported by a live source.
-- `MINING_ACTIVITY_VERIFIED`: all three preceding gates pass and the artifact integrity check passes.
-- `PAYOUT_VERIFIED`: a separate payout record is reconciled with a transaction ID and independently checked wallet/blockchain confirmation.
-- `REVENUE_REALIZED`: BTC receipt is independently verified; do not infer it from shares, estimated earnings, or pool dashboards alone.
+- `EVIDENCE_SCHEMA_VALIDATED_NOT_AUTHENTICATED`: structure, timestamp freshness, and digest checks passed. This is **not** a mining-activity verification.
+- `BLOCKED`: one or more schema, freshness, source-field, or digest checks failed.
+- `MINING_ACTIVITY_VERIFIED`: may only be asserted by a trusted server-side verifier after independently authenticating pool-side evidence and linking it to the Brain runtime. The schema validator in this module always returns `mining_activity_verified: false`.
+- `PAYOUT_VERIFIED`: requires a separate payout record reconciled with a transaction ID and independently checked wallet/blockchain confirmation.
+- `REVENUE_REALIZED`: requires independent verification of the actual receipt; never infer it from shares, estimates, or a dashboard alone.
 
 ## Safety and execution constraints
 
 - Never run mining workloads in GitHub Actions CI or other ephemeral CI runners.
-- Execute only on explicitly authorized compute, within its resource and electricity limits.
+- Execute only on explicitly authorized compute, within resource and electricity limits.
 - Keep pool credentials and wallet keys in a secret manager or protected local environment; never commit them or include them in evidence.
-- CI may validate schemas, fixtures, and fail-closed behavior. CI results must never be represented as proof of live mining.
-- Do not claim success until real evidence artifacts exist and their hashes and timestamps can be inspected.
+- CI may validate schemas, fixtures, and fail-closed behavior. CI results are not proof of live mining.
+- Do not claim success until real evidence is collected from an authenticated source, linked to the Brain runtime, and its freshness and integrity can be inspected.
