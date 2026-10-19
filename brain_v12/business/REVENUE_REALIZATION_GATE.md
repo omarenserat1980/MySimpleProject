@@ -31,7 +31,9 @@ remain separate from the `realized_revenue` table.
 - Optional estimated earnings are stored separately and summarized under
   `estimated_earnings_unverified`; summaries retain currency, execution mode, and
   activity status so simulated estimates are not aggregated with live observations.
-  They never increase realized revenue.
+  Estimate amounts are returned as exact decimal strings (not binary floating-point
+  totals) so small BTC amounts such as one satoshi are not rounded away. They never
+  increase realized revenue.
 - A record without independent payment proof returns
   `payment_status=PAYMENT_UNVERIFIED` and `revenue_status=NOT_REALIZED`.
 - Accepted-share counters are activity telemetry, not proof of a payout.
