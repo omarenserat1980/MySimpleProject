@@ -304,7 +304,14 @@ class RevenueRealizationGate:
             except sqlite3.IntegrityError:
                 row = db.execute("SELECT * FROM operating_costs WHERE idempotency_key=?",
                                  (values[4],)).fetchone()
-                if row and row["task_id"] == values[0] and row["amount"] == format(cost, ".2f") and row["currency"] == values[2]:
+                if (
+                    row
+                    and row["task_id"] == values[0]
+                    and row["opportunity_id"] == values[1]
+                    and row["amount"] == format(cost, ".2f")
+                    and row["currency"] == values[2]
+                    and row["evidence_ref"] == values[3]
+                ):
                     return {"status": "COST_RECORDED", "duplicate": True, "cost_id": row["id"]}
                 raise RevenueGateError("DUPLICATE_COST_KEY_CONFLICT") from None
             return {"status": "COST_RECORDED", "duplicate": False, "cost_id": cur.lastrowid}
