@@ -27,3 +27,31 @@ def test_stratum_pipeline_status_route_is_read_only():
     result = get_stratum_candidate_pipeline_status()
     assert result["execution_performed"] is False
     assert result["pool_contacted"] is False
+
+
+def test_stratum_session_status_is_read_only_and_fail_closed():
+    from brain_v12.brain.mining_node_api import (
+        get_stratum_session_capability_status,
+        stratum_session_capability_status,
+    )
+
+    result = stratum_session_capability_status()
+    assert result["ok"] is True
+    assert result["status"] == "AVAILABLE_EXPLICIT_CALLS_ONLY"
+    assert result["explicit_approval_required"] is True
+    assert result["automatic_connection"] is False
+    assert result["automatic_authorization"] is False
+    assert result["share_submission_enabled"] is False
+    assert result["live_mining_verified"] is False
+    assert result["payout_verified"] is False
+    assert result["revenue_verified"] is False
+    assert result["network_access_performed"] is False
+    assert result["pool_contacted"] is False
+
+    from brain_v12.brain.mining_node_api import router
+    route = next(
+        route for route in router.routes
+        if getattr(route, "path", None) == "/api/mining-node/stratum-session/status"
+    )
+    assert route.methods == {"GET"}
+    assert get_stratum_session_capability_status()["share_submission_enabled"] is False
