@@ -86,7 +86,7 @@ def test_tls_transport_connects_only_after_both_gates_and_sends_json_line():
 def test_receive_parses_json_line_and_keeps_next_buffered_message():
     fake = FakeSocket(b'{"id":1,"result":true,"error":null}\n{"method":"mining.set_difficulty","params":[2]}\n')
     transport, _, _, _ = _transport(fake)
-    transport.connect(explicit_approval=True, endpoint_verified=True)
+    transport.connect(explicit_approval=True, approved_host="pool.example.test")
     assert transport.receive_message()["id"] == 1
     second = transport.receive_message()
     assert second["method"] == "mining.set_difficulty"
@@ -96,13 +96,13 @@ def test_receive_parses_json_line_and_keeps_next_buffered_message():
 def test_transport_rejects_oversized_inbound_and_outbound_lines():
     fake = FakeSocket(b'{"payload":"' + b"x" * 500 + b'"}\n')
     transport, _, _, _ = _transport(fake, max_line_bytes=256)
-    transport.connect(explicit_approval=True, endpoint_verified=True)
+    transport.connect(explicit_approval=True, approved_host="pool.example.test")
     with pytest.raises(StratumTransportError, match="INBOUND_LINE_TOO_LARGE"):
         transport.receive_message()
     assert transport.connected is False
 
     other, _, _, _ = _transport(FakeSocket(), max_line_bytes=256)
-    other.connect(explicit_approval=True, endpoint_verified=True)
+    other.connect(explicit_approval=True, approved_host="pool.example.test")
     with pytest.raises(StratumTransportError, match="OUTBOUND_LINE_TOO_LARGE"):
         other.send_message({"payload": "x" * 400})
 
@@ -110,14 +110,14 @@ def test_transport_rejects_oversized_inbound_and_outbound_lines():
 def test_transport_rejects_non_object_json_and_closes_on_eof():
     fake = FakeSocket(b'[]\n')
     transport, _, _, _ = _transport(fake)
-    transport.connect(explicit_approval=True, endpoint_verified=True)
+    transport.connect(explicit_approval=True, approved_host="pool.example.test")
     with pytest.raises(StratumTransportError, match="STRATUM_MESSAGE_MUST_BE_OBJECT"):
         transport.receive_message()
     assert transport.connected is False
 
     eof = FakeSocket()
     second, _, _, _ = _transport(eof)
-    second.connect(explicit_approval=True, endpoint_verified=True)
+    second.connect(explicit_approval=True, approved_host="pool.example.test")
     with pytest.raises(StratumTransportError, match="STRATUM_CONNECTION_CLOSED"):
         second.receive_message()
     assert second.connected is False
