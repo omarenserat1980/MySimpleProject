@@ -120,7 +120,7 @@ class EvidenceEnginePrototype:
                evidence_class: str = "simulated") -> dict[str, Any]:
         if not isinstance(kind, str) or not kind.strip() or not isinstance(source, str) or not source.strip() or not isinstance(payload, dict):
             raise ValueError("INVALID_EVIDENCE_RECORD")
-        if evidence_class not in {"simulated", "local_test", "device_observed", "external"}:
+        if not isinstance(evidence_class, str) or evidence_class not in {"simulated", "local_test", "device_observed", "external"}:
             raise ValueError("INVALID_EVIDENCE_CLASS")
         # Isolate stored evidence from caller-owned nested objects.
         safe_payload = deepcopy(payload)
