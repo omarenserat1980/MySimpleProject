@@ -225,5 +225,30 @@ class DeviceBridgeTests(unittest.TestCase):
         self.assertEqual(result["requeued"], 0)
 
 
+    def test_heartbeat_expires_after_ttl(self):
+        os.environ["TERMUX_AGENT_TTL_SECONDS"] = "10"
+        with unittest.mock.patch("brain_v12.brain.device_bridge.time.time", return_value=1000.0):
+            self.bridge.heartbeat("realme-test", {"reality": "TEST_FIXTURE"})
+        with unittest.mock.patch("brain_v12.brain.device_bridge.time.time", return_value=1011.0):
+            status = self.bridge.agent_status()
+        record = next(item for item in status["agents"] if item["agent_id"] == "realme-test")
+        self.assertFalse(record["online"])
+        self.assertEqual(record["state"], "STALE")
+        self.assertEqual(record["age_seconds"], 11.0)
+        self.assertFalse(status["online"])
+        os.environ.pop("TERMUX_AGENT_TTL_SECONDS", None)
+
+    def test_heartbeat_is_online_at_ttl_boundary(self):
+        os.environ["TERMUX_AGENT_TTL_SECONDS"] = "10"
+        with unittest.mock.patch("brain_v12.brain.device_bridge.time.time", return_value=1000.0):
+            self.bridge.heartbeat("realme-boundary-test", {"reality": "TEST_FIXTURE"})
+        with unittest.mock.patch("brain_v12.brain.device_bridge.time.time", return_value=1010.0):
+            status = self.bridge.agent_status()
+        record = next(item for item in status["agents"] if item["agent_id"] == "realme-boundary-test")
+        self.assertTrue(record["online"])
+        self.assertEqual(record["state"], "ONLINE")
+        os.environ.pop("TERMUX_AGENT_TTL_SECONDS", None)
+
+
 if __name__ == "__main__":
     unittest.main()
