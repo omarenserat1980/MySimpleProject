@@ -268,7 +268,40 @@ class BrainSupervisor:
         return result
 
     def reason(self,evidence):
-        decision=self.reasoner.next(evidence);self._event(evidence.get("job_id","unknown"),"reasoning_decision",self.reasoner.explain(decision));return decision
+        # Enrich reasoning input with prior safe history when the task identity is known.
+        # Never infer execution success from history; the reasoner still requires current evidence.
+        context=dict(evidence or {})
+        job_id=str(context.get("job_id","unknown"))
+        task=context.get("task")
+        if not task and job_id != "unknown":
+            task_record=next((item for item in self.control.jobs if str(item.get("job_id"))==job_id),None)
+            if task_record:
+                task=task_record.get("task")
+        if task:
+            prior=self.task_history(task,limit=50)
+            context["prior_task_history"]=[
+                item for item in prior if item.get("job_id") != job_id
+            ]
+        history=context.get("prior_task_history",[])
+        decision=self.reasoner.next(context)
+        if history:
+            blocked_or_failed=sum(
+                1 for item in history
+                if str(item.get("status","")).upper() in {"BLOCKED","FAILED"}
+            )
+            decision.reason=(
+                f"{decision.reason}; prior_task_history_events={len(history)};"
+                f" prior_blocked_or_failed={blocked_or_failed}"
+            )
+        self._event(job_id,"reasoning_decision",{
+            **self.reasoner.explain(decision),
+            "prior_history_count":len(history),
+            "prior_blocked_or_failed":sum(
+                1 for item in history
+                if str(item.get("status","")).upper() in {"BLOCKED","FAILED"}
+            ),
+        })
+        return decision
 
     def _completion_decision(self,verification):
         c=verification.get("completion_contract")

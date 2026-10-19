@@ -35,6 +35,24 @@ class SupervisorSQLiteMemoryTests(unittest.TestCase):
         persisted = next(item for item in persisted_jobs if item.get("job_id") == second_job["job_id"])
         self.assertEqual(persisted.get("details", {}).get("prior_task_history"), history)
 
+    def test_reasoning_receives_prior_task_history_as_context(self):
+        task = "reasoning context persistence check"
+        brain = BrainSupervisor(root=self.root)
+        first = brain.create(task)
+        brain.transition(first, "plan", enforce_authority=False)
+        second = brain.create(task)
+
+        decision = brain.reason({
+            "job_id": second["job_id"],
+            "failures": [{"class": "CODE_OR_LOGIC", "id": "test-failure"}],
+            "attempts": 0,
+            "max_attempts": 3,
+        })
+
+        self.assertIn("prior_task_history_events=", decision.reason)
+        self.assertIn("prior_blocked_or_failed=", decision.reason)
+        self.assertEqual(decision.action, "repair")
+
     def test_distinct_task_has_separate_history_subject(self):
         brain = BrainSupervisor(root=self.root)
         job = brain.create("task alpha")
