@@ -67,6 +67,7 @@ class WindowsBridgeAgentTests(unittest.TestCase):
             "V12_AGENT_ID": "windows-bridge-test",
             "V12_BRAIN_URL": "http://192.168.1.10:8012",
             "V12_BRAIN_ALLOWED_HOSTS": "192.168.1.10",
+            "V12_AGENT_KEY_FILE": "/tmp/windows-bridge-test.key",
             "BRAIN_ALLOW_INSECURE_HTTP": "1",
         }, clear=True):
             validate_config()
