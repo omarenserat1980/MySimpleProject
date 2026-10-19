@@ -265,3 +265,28 @@ def test_durable_evidence_adapter_rejects_malformed_append_results(record):
     )
     assert result["status"] == "PERSISTENCE_RESULT_INVALID"
     assert result["independent_evidence"] is False
+
+@pytest.mark.parametrize(
+    "verification",
+    [
+        {"ok": True, "status": "VERIFIED", "evidence_id": "ev-other", "sha256": "abc"},
+        {"ok": True, "status": "VERIFIED", "evidence_id": "ev-test", "sha256": "different"},
+        {"ok": True, "status": "VERIFIED"},
+    ],
+)
+def test_durable_evidence_adapter_binds_verification_to_persisted_record(verification):
+    from brain_v12.brain.prototype_capabilities import DurableEvidenceAdapter
+
+    class MismatchedVerifierStore:
+        def append(self, **kwargs):
+            return {"evidence_id": "ev-test", "sha256": "abc"}
+
+        def verify_hash(self, evidence_id):
+            return verification
+
+    result = DurableEvidenceAdapter(MismatchedVerifierStore()).record(
+        task_id="task", kind="test", source="pytest", payload={}
+    )
+    assert result["status"] == "INTEGRITY_CHECK_FAILED"
+    assert result["independent_evidence"] is False
+
