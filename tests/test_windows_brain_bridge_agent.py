@@ -37,6 +37,28 @@ class WindowsBridgeAgentTests(unittest.TestCase):
         }, clear=True):
             validate_config()
 
+    def test_rejects_url_credentials_query_and_fragment(self):
+        for url in (
+            "https://user:secret@brain.example.invalid",
+            "https://brain.example.invalid?token=oops",
+            "https://brain.example.invalid#fragment",
+        ):
+            with self.subTest(url=url), patch.dict("os.environ", {
+                "V12_AGENT_ID": "windows-bridge-test",
+                "V12_BRAIN_URL": url,
+            }, clear=True):
+                with self.assertRaisesRegex(RuntimeError, "INVALID_BRAIN_URL"):
+                    validate_config()
+
+    def test_optional_host_allowlist_blocks_unapproved_host(self):
+        with patch.dict("os.environ", {
+            "V12_AGENT_ID": "windows-bridge-test",
+            "V12_BRAIN_URL": "https://unexpected.example.invalid",
+            "V12_BRAIN_ALLOWED_HOSTS": "brain.example.invalid",
+        }, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "BRAIN_HOST_NOT_ALLOWLISTED"):
+                validate_config()
+
     def test_agent_id_must_be_namespaced(self):
         with patch.dict("os.environ", {
             "V12_AGENT_ID": "redmi3-01",
