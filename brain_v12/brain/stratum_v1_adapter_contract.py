@@ -120,11 +120,9 @@ class StratumV1AdapterContract:
                 raise ValueError("INVALID_CLEAN_JOBS_FLAG")
             self._jobs[job_id] = {"clean_jobs": params[8]}
             if params[8]:
+                # A clean job invalidates old job IDs, but pending share responses
+                # must remain correlated so late replies cannot crash or be misattributed.
                 self._jobs = {job_id: self._jobs[job_id]}
-                self._shares = {
-                    share_id: record for share_id, record in self._shares.items()
-                    if record.job_id == job_id or record.status in {"ACCEPTED", "REJECTED"}
-                }
             return {"status": "JOB_RECEIVED_UNVERIFIED", "job_id": job_id, "clean_jobs": params[8],
                     "pool_acceptance_verified": False}
         raise ValueError("UNSUPPORTED_NOTIFICATION")
