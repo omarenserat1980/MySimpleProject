@@ -68,6 +68,23 @@ class RevenueRealizationGate:
                     evidence_ref TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
+                CREATE TABLE IF NOT EXISTS mining_activity (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    idempotency_key TEXT NOT NULL UNIQUE,
+                    activity_kind TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    activity_status TEXT NOT NULL,
+                    worker_id TEXT,
+                    hashrate_value REAL,
+                    hashrate_unit TEXT,
+                    accepted_shares INTEGER,
+                    rejected_shares INTEGER,
+                    estimated_amount TEXT,
+                    estimated_currency TEXT,
+                    evidence_ref TEXT,
+                    payload_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
             """)
 
     def _connect(self) -> sqlite3.Connection:
@@ -165,6 +182,109 @@ class RevenueRealizationGate:
                     "ledger_id": cursor.lastrowid, "amount": format(amount, ".2f"),
                     "currency": currency}
 
+    def record_activity(self, *, activity: dict[str, Any],
+                        idempotency_key: str) -> dict[str, Any]:
+        """Record mining observations/simulations without promoting them to revenue.
+
+        All activity and estimated-earning fields remain explicitly unverified.
+        Only realize() can create realized revenue after independent payment proof.
+        """
+        key = str(idempotency_key).strip()
+        if not key:
+            raise RevenueGateError("IDEMPOTENCY_KEY_REQUIRED")
+        if not isinstance(activity, dict):
+            raise RevenueGateError("ACTIVITY_MUST_BE_OBJECT")
+
+        kind = str(activity.get("activity_kind", "")).strip().upper()
+        if kind not in {"HASHRATE", "SHA256D_RESULT", "SHARE", "MINING_SESSION", "SIMULATION", "OTHER"}:
+            raise RevenueGateError("INVALID_ACTIVITY_KIND")
+        mode = str(activity.get("mode", "")).strip().lower()
+        if mode not in {"live", "simulation", "test", "unknown"}:
+            raise RevenueGateError("INVALID_ACTIVITY_MODE")
+        status = str(activity.get("activity_status", "OBSERVED")).strip().upper()
+        if status not in {"OBSERVED", "SUBMITTED", "ACCEPTED", "REJECTED", "SIMULATED", "UNVERIFIED"}:
+            raise RevenueGateError("INVALID_ACTIVITY_STATUS")
+
+        worker_id = activity.get("worker_id")
+        if worker_id is not None and (not isinstance(worker_id, str) or not worker_id.strip()):
+            raise RevenueGateError("INVALID_ACTIVITY_WORKER_ID")
+        evidence_ref = activity.get("evidence_ref")
+        if evidence_ref is not None and (not isinstance(evidence_ref, str) or not evidence_ref.strip()):
+            raise RevenueGateError("INVALID_ACTIVITY_EVIDENCE_REF")
+
+        hashrate = activity.get("hashrate")
+        hashrate_value = None
+        hashrate_unit = None
+        if hashrate is not None:
+            if not isinstance(hashrate, dict):
+                raise RevenueGateError("INVALID_HASHRATE_OBJECT")
+            value = hashrate.get("value")
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise RevenueGateError("INVALID_HASHRATE_VALUE")
+            import math
+            if not math.isfinite(value) or value < 0:
+                raise RevenueGateError("INVALID_HASHRATE_VALUE")
+            unit = hashrate.get("unit")
+            if not isinstance(unit, str) or not unit.strip():
+                raise RevenueGateError("INVALID_HASHRATE_UNIT")
+            hashrate_value, hashrate_unit = float(value), unit.strip()
+
+        def share_count(field: str) -> int | None:
+            value = activity.get(field)
+            if value is None:
+                return None
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise RevenueGateError(f"INVALID_{field.upper()}")
+            return value
+
+        accepted = share_count("accepted_shares")
+        rejected = share_count("rejected_shares")
+        estimate = activity.get("estimated_amount")
+        estimate_text = None
+        estimate_currency = None
+        if estimate is not None:
+            from decimal import Decimal, InvalidOperation
+            try:
+                estimate_decimal = Decimal(str(estimate))
+            except (InvalidOperation, ValueError):
+                raise RevenueGateError("INVALID_ESTIMATED_AMOUNT") from None
+            if not estimate_decimal.is_finite() or estimate_decimal < 0:
+                raise RevenueGateError("INVALID_ESTIMATED_AMOUNT")
+            estimate_text = format(estimate_decimal.quantize(Decimal("0.01")), ".2f")
+            estimate_currency = str(activity.get("estimated_currency", "")).strip().upper()
+            if not estimate_currency:
+                raise RevenueGateError("ESTIMATED_CURRENCY_REQUIRED")
+
+        # Canonical JSON rejects NaN/Infinity and preserves the original reported
+        # evidence without allowing it to affect the verified-revenue table.
+        try:
+            payload_json = json.dumps(activity, sort_keys=True, separators=(",", ":"),
+                                      ensure_ascii=False, allow_nan=False)
+        except (TypeError, ValueError):
+            raise RevenueGateError("ACTIVITY_NOT_JSON_SAFE") from None
+
+        with self._connect() as db:
+            prior = db.execute("SELECT * FROM mining_activity WHERE idempotency_key=?", (key,)).fetchone()
+            if prior:
+                if prior["payload_json"] == payload_json:
+                    return {"status": "ACTIVITY_RECORDED", "duplicate": True,
+                            "activity_id": prior["id"], "activity_status": prior["activity_status"],
+                            "revenue_status": "NOT_REALIZED"}
+                raise RevenueGateError("DUPLICATE_ACTIVITY_KEY_CONFLICT")
+            cur = db.execute("""
+                INSERT INTO mining_activity
+                (idempotency_key, activity_kind, mode, activity_status, worker_id,
+                 hashrate_value, hashrate_unit, accepted_shares, rejected_shares,
+                 estimated_amount, estimated_currency, evidence_ref, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (key, kind, mode, status, worker_id, hashrate_value, hashrate_unit,
+                  accepted, rejected, estimate_text, estimate_currency, evidence_ref, payload_json))
+            return {"status": "ACTIVITY_RECORDED", "duplicate": False,
+                    "activity_id": cur.lastrowid, "activity_status": status,
+                    "mode": mode, "revenue_status": "NOT_REALIZED",
+                    "estimated_earnings_status": "ESTIMATED_UNVERIFIED" if estimate_text is not None else "NOT_PROVIDED",
+                    "payment_status": "PAYMENT_UNVERIFIED"}
+
     def record_cost(self, *, task_id: str, opportunity_id: str, amount: Any,
                     currency: str, evidence_ref: str, idempotency_key: str) -> dict[str, Any]:
         """Record a cost separately; this never changes gross realized revenue."""
@@ -198,4 +318,22 @@ class RevenueRealizationGate:
             costs = [dict(r) for r in db.execute(
                 "SELECT currency, SUM(CAST(amount AS REAL)) AS amount, COUNT(*) AS entries "
                 "FROM operating_costs GROUP BY currency ORDER BY currency")]
-        return {"status": "OK", "realized_revenue_gross": revenue, "operating_costs_separate": costs}
+            activities = [dict(r) for r in db.execute(
+                "SELECT mode, activity_status, COUNT(*) AS entries FROM mining_activity "
+                "GROUP BY mode, activity_status ORDER BY mode, activity_status")]
+            estimates = [dict(r) for r in db.execute(
+                "SELECT estimated_currency AS currency, SUM(CAST(estimated_amount AS REAL)) AS amount, "
+                "COUNT(*) AS entries FROM mining_activity WHERE estimated_amount IS NOT NULL "
+                "GROUP BY estimated_currency ORDER BY estimated_currency")]
+        return {
+            "status": "OK",
+            "realized_revenue_gross": revenue,
+            "operating_costs_separate": costs,
+            "mining_activity_separate": activities,
+            "estimated_earnings_unverified": estimates,
+            "policy": {
+                "activity_recording_requires_payment_proof": False,
+                "estimated_earnings_are_revenue": False,
+                "only_independently_verified_settled_payment_is_realized_revenue": True,
+            },
+        }
