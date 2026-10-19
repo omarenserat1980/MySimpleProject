@@ -100,7 +100,8 @@ def test_notify_validates_protocol_fields_and_difficulty_is_positive():
 def test_api_status_exposes_contract_without_claiming_live_transport():
     status = stratum_adapter_contract_status()
     assert status["status"] == "CONTRACT_ONLY"
-    assert status["live_transport_implemented"] is False
+    assert status["tls_transport_module_available"] is True
+    assert status["live_transport_integrated"] is False
     assert status["live_transport_enabled"] is False
     assert status["network_access_performed"] is False
     assert status["share_submission_enabled"] is False
