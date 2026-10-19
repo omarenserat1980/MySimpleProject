@@ -233,6 +233,46 @@ class WindowsBridgeAgentTests(unittest.TestCase):
         self.assertIn("python", report_call.args[3]["result"])
 
 
+    def test_run_once_rejects_poll_task_state_mismatch(self):
+        fake_snapshot = {
+            "memory": {"available_bytes": None, "total_bytes": None},
+            "home_disk": {"free_bytes": 100, "total_bytes": 200},
+            "reality": "OBSERVED_HOST",
+            "resource_reservation": "NONE",
+        }
+        with patch.object(bridge, "AGENT_ID", "windows-bridge-test"), patch.object(
+            bridge, "resource_snapshot", return_value=fake_snapshot
+        ), patch.object(bridge, "request_json", side_effect=[
+            {"ok": True, "status": "HEARTBEAT", "agent_id": "windows-bridge-test"},
+            {"ok": True, "status": "IDLE", "task": {
+                "task_id": "test-task-poll-mismatch", "task": "python_version"
+            }},
+        ]) as request:
+            with self.assertRaisesRegex(RuntimeError, "POLL_TASK_STATE_MISMATCH"):
+                bridge.run_once("unit-test-key")
+            self.assertEqual(request.call_count, 2)
+
+    def test_run_once_rejects_report_for_different_task_id(self):
+        fake_snapshot = {
+            "memory": {"available_bytes": None, "total_bytes": None},
+            "home_disk": {"free_bytes": 100, "total_bytes": 200},
+            "reality": "OBSERVED_HOST",
+            "resource_reservation": "NONE",
+        }
+        with patch.object(bridge, "AGENT_ID", "windows-bridge-test"), patch.object(
+            bridge, "resource_snapshot", return_value=fake_snapshot
+        ), patch.object(bridge, "request_json", side_effect=[
+            {"ok": True, "status": "HEARTBEAT", "agent_id": "windows-bridge-test"},
+            {"ok": True, "status": "TASK_AVAILABLE", "task": {
+                "task_id": "test-task-003", "task": "python_version"
+            }},
+            {"ok": True, "status": "COMPLETED", "task": {
+                "task_id": "different-task-id"
+            }},
+        ]):
+            with self.assertRaisesRegex(RuntimeError, "REPORT_NOT_CONFIRMED"):
+                bridge.run_once("unit-test-key")
+
 
 if __name__ == "__main__":
     unittest.main()
