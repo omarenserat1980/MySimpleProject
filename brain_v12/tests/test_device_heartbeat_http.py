@@ -46,6 +46,26 @@ class DeviceHeartbeatHttpTests(unittest.TestCase):
         self.assertEqual(response.json()["detail"], "DEVICE_AGENT_ID_REQUIRED")
         self.assertEqual(self.bridge.heartbeats, [])
 
+    def test_non_string_body_identity_is_rejected(self):
+        response = self.client.post(
+            "/api/device/heartbeat",
+            headers={"X-V12-Agent-Key": "realme-test-key"},
+            json={"agent_id": 123, "metadata": {"source": "unit-test"}},
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"], "INVALID_DEVICE_AGENT_ID")
+        self.assertEqual(self.bridge.heartbeats, [])
+
+    def test_non_object_metadata_is_rejected(self):
+        response = self.client.post(
+            "/api/device/heartbeat",
+            headers={"X-V12-Agent-Id": "realme-01", "X-V12-Agent-Key": "realme-test-key"},
+            json={"metadata": ["not", "an", "object"]},
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"], "INVALID_DEVICE_METADATA")
+        self.assertEqual(self.bridge.heartbeats, [])
+
     def test_missing_key_is_rejected_without_heartbeat(self):
         response = self.client.post(
             "/api/device/heartbeat",
