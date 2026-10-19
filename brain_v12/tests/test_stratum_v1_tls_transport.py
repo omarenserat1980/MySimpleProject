@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 from brain_v12.brain.stratum_v1_tls_transport import (
@@ -126,7 +124,7 @@ def test_transport_rejects_non_object_json_and_closes_on_eof():
 
 
 def test_invalid_endpoint_and_timeout_fail_before_socket_creation():
-    with pytest.raises(ValueError, match="STRATUM_TLS_REQUIRED"):
-        StratumV1TLSTransport("pool.example.test", 3333, timeout_seconds=2)
+    with pytest.raises(ValueError, match="INVALID_STRATUM_HOST"):
+        StratumV1TLSTransport("pool.example.test/path", 3333, timeout_seconds=2)
     with pytest.raises(ValueError, match="STRATUM_TIMEOUT_OUT_OF_RANGE"):
         StratumV1TLSTransport("pool.example.test", 3333, timeout_seconds=0)
