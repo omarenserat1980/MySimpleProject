@@ -98,6 +98,26 @@ class HybridResourceFabricTests(unittest.TestCase):
         self.assertEqual(second["status"], "ALREADY_RESERVED")
         self.assertEqual(first["lease"]["lease_id"], second["lease"]["lease_id"])
 
+    def test_same_task_cannot_escalate_simulation_lease_to_physical(self):
+        self.fabric.register(self.physical())
+        simulation = self.fabric.reserve(
+            "host-01", "same-task", {"cpu": 1}, {"cpu"}, permission="simulate"
+        )
+        self.assertEqual(simulation["status"], "RESERVED")
+        escalation = self.fabric.reserve(
+            "host-01", "same-task", {"cpu": 1}, {"cpu"},
+            permission="execute_physical", physical_execution=True,
+        )
+        self.assertEqual(escalation["status"], "LEASE_REQUEST_MISMATCH")
+        self.assertFalse(simulation["lease"]["physical_execution"])
+        self.assertEqual(self.fabric.get("host-01")["resource"]["active_leases"], 1)
+
+    def test_same_task_cannot_change_capacity_on_active_lease(self):
+        self.fabric.register(self.virtual(capacity={"cpu": 4}))
+        self.fabric.reserve("sim-01", "same-task", {"cpu": 1}, {"cpu"})
+        changed = self.fabric.reserve("sim-01", "same-task", {"cpu": 2}, {"cpu"})
+        self.assertEqual(changed["status"], "LEASE_REQUEST_MISMATCH")
+
     def test_expired_lease_is_reclaimed(self):
         self.fabric.register(self.virtual(capacity={"cpu": 1}))
         self.assertTrue(self.fabric.reserve("sim-01", "task-1", {"cpu": 1}, {"cpu"}, lease_seconds=2)["ok"])
