@@ -107,6 +107,7 @@ def test_session_never_submits_shares_and_does_not_echo_password():
     assert "sensitive-placeholder" not in repr(session.status())
     with pytest.raises(StratumTransportError, match="LIVE_SHARE_SUBMISSION_NOT_IMPLEMENTED"):
         session.submit_share("job1", "00", "65aa0000", "00000000")
-    assert len(endpoint.sent) == 1
+    assert len(endpoint.sent) == 2
+    assert all(b"mining.submit" not in message for message in endpoint.sent)
     session.close()
     assert endpoint.closed is True
