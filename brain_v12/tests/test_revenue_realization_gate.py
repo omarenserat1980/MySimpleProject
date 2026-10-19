@@ -155,3 +155,30 @@ def test_invalid_activity_measurement_is_rejected_without_revenue(tmp_path):
                       "hashrate": {"value": float("nan"), "unit": "H/s"}},
         )
     assert gate.summary()["realized_revenue_gross"] == []
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"opportunity_id": "different-opportunity"},
+        {"evidence_ref": "different-receipt"},
+    ],
+)
+def test_cost_idempotency_rejects_changed_linkage_or_evidence(tmp_path, change):
+    gate = RevenueRealizationGate(tmp_path / "ledger.sqlite")
+    original = {
+        "task_id": "task-1",
+        "opportunity_id": "opp-1",
+        "amount": "2.00",
+        "currency": "JOD",
+        "evidence_ref": "receipt-1",
+        "idempotency_key": "cost-1",
+    }
+    gate.record_cost(**original)
+
+    conflicting = {**original, **change}
+    with pytest.raises(RevenueGateError, match="DUPLICATE_COST_KEY_CONFLICT"):
+        gate.record_cost(**conflicting)
+
+    summary = gate.summary()
+    assert summary["operating_costs_separate"][0]["entries"] == 1
+
