@@ -49,6 +49,15 @@ class BitcoinStratumWorkerTests(unittest.TestCase):
                 )
             connect.assert_not_called()
 
+    def test_plaintext_probe_is_rejected_before_network_access(self):
+        with patch("brain_v12.brain.bitcoin_stratum_worker.socket.create_connection") as connect:
+            with self.assertRaisesRegex(ValueError, "STRATUM_TLS_REQUIRED"):
+                probe_stratum_v1(
+                    host="pool.example", port=3333, worker_name="worker",
+                    worker_password="password", enabled=True, use_tls=False,
+                )
+            connect.assert_not_called()
+
     def test_invalid_port_is_rejected_before_network_access(self):
         with patch("brain_v12.brain.bitcoin_stratum_worker.socket.create_connection") as connect:
             with self.assertRaisesRegex(ValueError, "INVALID_POOL_PORT"):

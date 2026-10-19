@@ -78,6 +78,8 @@ def probe_stratum_v1(
     """
     if enabled is not True:
         raise RuntimeError("LIVE_POOL_PROBE_DISABLED")
+    if use_tls is not True:
+        raise ValueError("STRATUM_TLS_REQUIRED")
     if not isinstance(host, str) or not host.strip() or any(c in host for c in "\r\n"):
         raise ValueError("INVALID_POOL_HOST")
     if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
