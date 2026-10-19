@@ -111,3 +111,29 @@ def test_session_never_submits_shares_and_does_not_echo_password():
     assert all(b"mining.submit" not in message for message in endpoint.sent)
     session.close()
     assert endpoint.closed is True
+
+
+def test_authorize_is_blocked_until_subscribe_response_is_processed():
+    session, endpoint, _ = _session(b'{"id":1,"result":[[], "abcd", 4],"error":null}\\n')
+    session.connect(explicit_approval=True, approved_host="pool.example.test")
+    session.subscribe()
+
+    with pytest.raises(ValueError, match="STRATUM_SUBSCRIBE_REQUIRED"):
+        session.authorize("placeholder-secret")
+
+    assert len(endpoint.sent) == 1
+    assert b"mining.authorize" not in endpoint.sent[0]
+    assert session.status()["protocol"]["authorized"] is False
+    session.close()
+
+
+def test_session_rejects_approved_host_mismatch_before_opening_socket():
+    session, endpoint, raw_sockets = _session()
+    with pytest.raises(StratumTransportError):
+        session.connect(
+            explicit_approval=True,
+            approved_host="attacker.example.test",
+        )
+    assert raw_sockets == []
+    assert endpoint.sent == []
+    assert session.status()["connected"] is False
