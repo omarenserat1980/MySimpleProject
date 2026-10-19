@@ -1,6 +1,6 @@
 """Brain Supervisor: bounded autonomous orchestration over the existing Control Plane."""
 from __future__ import annotations
-import json, os, time
+import hashlib, json, os, time
 from dataclasses import asdict, is_dataclass
 from enum import Enum
 from pathlib import Path
@@ -16,6 +16,7 @@ from .verification_core import VerificationCore
 from .golden_acceptance_gate import GoldenAcceptanceGate
 from .asic_resource_adapter import ASICResourceAdapter
 from .multi_agent_collaboration import CollaborationCoordinator, TaskEnvelope
+from ..asic.unit_001.sqlite_evidence_store import ExperimentMemory
 from ..self_healing.problem_completion_gate import CompletionContract, ProblemCompletionGate
 from ..self_healing.emergency_resource_guard import EmergencyResourceGuard
 
@@ -41,6 +42,11 @@ class BrainSupervisor:
             root = runtime_home / "brain6_artifacts" / "supervisor"
         self.root=Path(root); self.root.mkdir(parents=True,exist_ok=True)
         self.state_path=self.root/"state.json"; self.events_path=self.root/"events.jsonl"
+        self.experiment_memory=ExperimentMemory(self.root/"experiment_memory.sqlite3")
+        try:
+            self.experiment_memory.init()
+        except Exception as exc:
+            self._event("supervisor","experiment_memory_init_failed",{"error_type":type(exc).__name__})
         self.max_cycles=max(1,min(int(max_cycles),5))
         self.control=ControlPlane(str(self.root/"control_plane")); self.reasoner=AutonomousReasoner()
         self.execution_gateway=execution_gateway or BrainExecutionGateway(); self.resource_guard=EmergencyResourceGuard()
@@ -89,11 +95,59 @@ class BrainSupervisor:
         row={"ts":time.time(),"job_id":job_id,"event":event,"data":data or {}}
         with self.events_path.open("a",encoding="utf-8") as f:f.write(json.dumps(row,ensure_ascii=False,default=_event_json_default)+"\n")
 
+    @staticmethod
+    def _task_subject(task):
+        """Fingerprint task text so SQLite history can be matched without storing the prompt."""
+        normalized=" ".join(str(task).split()).casefold()
+        return "task-sha256:"+hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def task_history(self,task,limit=20):
+        """Read prior safe task outcomes by fingerprint; raw task text is never stored in SQLite."""
+        try:
+            events=self.experiment_memory.list_events(subject=self._task_subject(task),limit=limit)
+        except Exception as exc:
+            self._event("supervisor","experiment_memory_read_failed",{"error_type":type(exc).__name__})
+            return []
+        return [{
+            "event_type":event["event_type"],"status":event["status"],
+            "occurred_at_utc":event["occurred_at_utc"],
+            "job_id":event["measurements"].get("job_id"),
+            "phase":event["measurements"].get("phase"),
+            "mission_state":event["measurements"].get("mission_state"),
+        } for event in events]
+
+    def _remember_transition(self,job,phase,status,mission):
+        """Persist a whitelist of orchestration metadata, never arbitrary task details."""
+        try:
+            self.experiment_memory.record({
+                "project":"Electronic Brain",
+                "subject":self._task_subject(job.get("task","")),
+                "event_type":"supervisor_phase",
+                "status":str(status or "running").upper(),
+                "environment":{"runtime":"brain_supervisor"},
+                "measurements":{
+                    "job_id":str(job.get("job_id","")),
+                    "phase":str(phase),
+                    "mission_state":mission.state.value if mission else None,
+                    "attempts":int(mission.attempts) if mission else int(job.get("attempts",0)),
+                    "step_index":int(job.get("step_index",0)),
+                },
+                "evidence":[],
+                "limitations":[
+                    "Records orchestration metadata only; it is not independent execution evidence.",
+                    "Does not prove physical hardware, mining, pool acceptance, or realized revenue.",
+                ],
+            })
+        except Exception as exc:
+            self._event(job.get("job_id","supervisor"),"experiment_memory_write_failed",{"error_type":type(exc).__name__})
+
     def create(self,task,steps=None,budget=8):
         steps=steps or ["discover","plan","select_backend","execute","observe","verify","repair","recover","retry","deliver"]
         job=self.control.create(task,steps,max_attempts=self.max_cycles,budget=budget); job=self.control.start_attempt(job)
         self.missions[job["job_id"]]=Mission(job["job_id"],task,max_attempts=self.max_cycles)
-        self._event(job["job_id"],"supervisor_created",{"steps":steps,"v13":"enabled"}); return job
+        self._event(job["job_id"],"supervisor_created",{"steps":steps,"v13":"enabled"})
+        self._remember_transition(job,"created","created",self.missions[job["job_id"]])
+        return job
 
     def execution_contract(self,job,action,executor="brain-supervisor",risk="LOW",expected_results=()):
         c=ExecutionContract(job["job_id"],job["job_id"],action,executor,expected_results=tuple(expected_results),risk=risk,
@@ -177,6 +231,10 @@ class BrainSupervisor:
             row["mission_state"]=mission.state.value
             row["mission_attempts"]=mission.attempts
         self._event(row["job_id"],"phase",{"phase":phase,"status":status,"details":row["details"],"mission_state":mission.state.value if mission else None})
+        if phase=="plan":
+            prior=self.task_history(row.get("task",""),limit=50)
+            row["prior_task_history"]=[item for item in prior if item.get("job_id")!=row["job_id"]]
+        self._remember_transition(row,phase,status,mission)
         return row
 
     def verify_evidence(self,job_id,required_kind=None):
