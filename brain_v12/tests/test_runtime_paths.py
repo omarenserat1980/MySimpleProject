@@ -24,6 +24,7 @@ PATH_VARIABLES = (
     "BRAIN_SUPERVISOR_ROOT",
     "BRAIN_SUCCESS_BOT_ROOT",
     "BRAIN_VIRTUAL_TASK_DB",
+    "BRAIN_REVENUE_LEDGER_DB",
 )
 
 
@@ -43,6 +44,8 @@ class RuntimePathsTests(unittest.TestCase):
             source.mkdir()
 
             legacy_db = source / "brain_v12.db"
+            legacy_revenue = root / "brain_v12_commerce.json.revenue-ledger.sqlite3"
+            create_db(legacy_revenue, "revenue_legacy")
             legacy_evidence = source / "brain6_artifacts" / "evidence" / "evidence.db"
             create_db(legacy_db, "brain_state")
             create_db(legacy_evidence, "evidence_state")
@@ -109,6 +112,12 @@ class RuntimePathsTests(unittest.TestCase):
                     Path(os.environ["BRAIN_VIRTUAL_TASK_DB"]),
                     runtime_home / "brain6_artifacts" / "virtual_tasks" / "tasks.db",
                 )
+                self.assertEqual(
+                    Path(os.environ["BRAIN_REVENUE_LEDGER_DB"]),
+                    runtime_home / "brain6_artifacts" / "revenue" / "revenue_ledger.db",
+                )
+                with sqlite3.connect(os.environ["BRAIN_REVENUE_LEDGER_DB"]) as db:
+                    self.assertEqual(db.execute("SELECT value FROM revenue_legacy").fetchone()[0], "legacy-revenue_legacy")
                 with sqlite3.connect(os.environ["BRAIN_VIRTUAL_TASK_DB"]) as db:
                     self.assertEqual(
                         db.execute("SELECT value FROM virtual_tasks").fetchone()[0],
@@ -140,6 +149,7 @@ class RuntimePathsTests(unittest.TestCase):
 
             # Migration is copy-only: every original state source remains available.
             self.assertTrue(legacy_db.is_file())
+            self.assertTrue(legacy_revenue.is_file())
             self.assertTrue(legacy_evidence.is_file())
             self.assertTrue(legacy_queue.is_file())
             self.assertTrue((legacy_workflows / "legacy.json").is_file())
