@@ -70,6 +70,18 @@ class LocalResourceBudget:
     max_disk_mb_per_task: int = 512
     max_concurrent_tasks: int = 1
 
+    def __post_init__(self) -> None:
+        cpu = self.max_cpu_cores_per_task
+        if isinstance(cpu, bool) or not isinstance(cpu, (int, float)) or not math.isfinite(float(cpu)) or cpu < 0:
+            raise ValueError("INVALID_LOCAL_CPU_BUDGET")
+        for name, value in (
+            ("max_memory_mb_per_task", self.max_memory_mb_per_task),
+            ("max_disk_mb_per_task", self.max_disk_mb_per_task),
+            ("max_concurrent_tasks", self.max_concurrent_tasks),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"INVALID_LOCAL_{name.upper()}")
+
 
 @dataclass(frozen=True)
 class ScheduleRequest:
@@ -176,6 +188,10 @@ class PortableResourceOrchestrator:
                 reason = "PERMISSION_MISSING"
             elif not _fits(request.demand, executor):
                 reason = "INSUFFICIENT_CAPACITY"
+            elif executor.tier in {"PAID_EXTERNAL", "PAID_CLOUD"} and not allow_paid:
+                # Tier policy is authoritative even when a provider reports a
+                # zero/unknown estimate; a $0 estimate is not proof of free use.
+                reason = "PAID_DISABLED"
             elif executor.estimated_cost > 0 and not allow_paid:
                 reason = "PAID_DISABLED"
             elif executor.estimated_cost > request.max_cost_usd:
