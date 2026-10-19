@@ -97,3 +97,11 @@ def test_heartbeat_renews_existing_lease_and_capabilities():
     assert worker["capabilities"] == ["python", "tests"]
     assert worker["lease_until"] == 130
     assert snapshot["targets"][0]["online"] is True
+
+
+def test_snapshot_reports_expired_worker_as_offline_in_both_views():
+    registry = WorkerRegistry()
+    registry.register("software-01", "software", {"python"}, lease_seconds=10, now=100)
+    snapshot = registry.snapshot(now=111)
+    assert snapshot["workers"][0]["online"] is False
+    assert snapshot["targets"][0]["online"] is False
