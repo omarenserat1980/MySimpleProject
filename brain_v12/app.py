@@ -2309,7 +2309,11 @@ def device_heartbeat(request: Request, body: dict | None = None):
     body_agent_id = str((body or {}).get("agent_id", "")).strip()
     if header_agent_id and body_agent_id and header_agent_id != body_agent_id:
         raise HTTPException(status_code=401, detail="DEVICE_AGENT_ID_MISMATCH")
-    agent_id = header_agent_id or body_agent_id or "android-termux-v12"
+    agent_id = header_agent_id or body_agent_id
+    # Per-agent mode must never silently substitute a shared/default identity.
+    if not agent_id and os.getenv("BRAIN_AGENT_KEYS_JSON", "").strip():
+        raise HTTPException(status_code=401, detail="DEVICE_AGENT_ID_REQUIRED")
+    agent_id = agent_id or "android-termux-v12"
     if not device_bridge.authenticate(request.headers.get("X-V12-Agent-Key", ""), agent_id):
         raise HTTPException(status_code=401, detail="UNAUTHORIZED_AGENT")
     return device_bridge.heartbeat(agent_id, (body or {}).get("metadata") or {})
