@@ -152,7 +152,7 @@ class WindowsBridgeAgentTests(unittest.TestCase):
                 bridge, "resource_snapshot", return_value=fake_snapshot
             ), patch.object(
                 bridge, "request_json", side_effect=[
-                    {"ok": True, "status": "HEARTBEAT"},
+                    {"ok": True, "status": "HEARTBEAT", "agent_id": "windows-bridge-test"},
                     {"ok": True, "status": "TASK_AVAILABLE", "task": task},
                 ]
             ) as request:
@@ -207,11 +207,11 @@ class WindowsBridgeAgentTests(unittest.TestCase):
         with patch.object(bridge, "AGENT_ID", "windows-bridge-test"), patch.object(
             bridge, "resource_snapshot", return_value=fake_snapshot
         ), patch.object(bridge, "request_json", side_effect=[
-            {"ok": True, "status": "HEARTBEAT"},
+            {"ok": True, "status": "HEARTBEAT", "agent_id": "windows-bridge-test"},
             {"ok": True, "status": "TASK_AVAILABLE", "task": {
                 "task_id": "test-task-001", "task": "python_version"
             }},
-            {"ok": True, "status": "COMPLETED"},
+            {"ok": True, "status": "COMPLETED", "task": {"task_id": "test-task-001"}},
         ]) as request:
             result = bridge.run_once("unit-test-key")
 
