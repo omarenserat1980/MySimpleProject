@@ -16,6 +16,7 @@ from .compute_resource_manager import build_compute_resource_report
 from .braiins_pool_evidence_collector import BRAIINS_WORKERS_URL
 from .stratum_v1_adapter_contract import StratumV1AdapterContract
 from .stratum_v1_tls_transport import StratumV1TLSTransport
+from .stratum_v1_session import StratumV1Session
 
 router = APIRouter(prefix="/api/mining-node", tags=["Brain Mining Node"])
 
@@ -303,6 +304,31 @@ def stratum_adapter_contract_status() -> dict[str, Any]:
         "revenue_verified": False,
         "note": "TLS transport module is available but is not connected to the API or mining execution path; this endpoint opens no sockets and performs no live mining.",
     }
+
+
+def stratum_session_capability_status() -> dict[str, Any]:
+    """Report session-coordinator capability without constructing a session or opening sockets."""
+    return {
+        "ok": True,
+        "component": "stratum_v1_session",
+        "status": "AVAILABLE_EXPLICIT_CALLS_ONLY",
+        "session_class": StratumV1Session.__name__,
+        "explicit_approval_required": True,
+        "automatic_connection": False,
+        "automatic_authorization": False,
+        "share_submission_enabled": False,
+        "live_mining_verified": False,
+        "payout_verified": False,
+        "revenue_verified": False,
+        "network_access_performed": False,
+        "pool_contacted": False,
+        "note": "Read-only capability report. It creates no session, reads no credentials, opens no sockets, and does not enable share submission.",
+    }
+
+
+@router.get("/stratum-session/status")
+def get_stratum_session_capability_status() -> dict[str, Any]:
+    return stratum_session_capability_status()
 
 
 @router.get("/stratum-adapter/status")
