@@ -1,0 +1,89 @@
+import pytest
+
+from brain_v12.brain.stratum_v1_adapter_contract import (
+    StratumV1AdapterContract,
+    validate_endpoint,
+)
+
+
+def _authorize(adapter):
+    subscribe = adapter.request("mining.subscribe", [])
+    assert subscribe["method"] == "mining.subscribe"
+    assert adapter.handle_response({"id": subscribe["id"], "result": [[], "00", 4], "error": None})["status"] == "SUBSCRIBED"
+    authorize = adapter.request("mining.authorize", [adapter.worker_name, "offline-test-placeholder"])
+    assert adapter.handle_response({"id": authorize["id"], "result": True, "error": None})["status"] == "AUTHORIZED"
+
+
+def test_endpoint_validation_requires_tls_and_performs_no_network():
+    endpoint = validate_endpoint("pool.example.test", 3333, tls=True)
+    assert endpoint == {
+        "host": "pool.example.test",
+        "port": 3333,
+        "tls_required": True,
+        "network_access_performed": False,
+    }
+    with pytest.raises(ValueError, match="STRATUM_TLS_REQUIRED"):
+        validate_endpoint("pool.example.test", 3333, tls=False)
+    with pytest.raises(ValueError):
+        validate_endpoint("pool.example.test/path", 3333, tls=True)
+
+
+def test_submit_is_blocked_until_authorization_and_job_notification():
+    adapter = StratumV1AdapterContract("sim.worker")
+    with pytest.raises(ValueError, match="STRATUM_SESSION_NOT_AUTHORIZED"):
+        adapter.prepare_share("job-1", "00000000", "65aa0000", "00000000")
+    _authorize(adapter)
+    with pytest.raises(ValueError, match="UNKNOWN_OR_STALE_JOB"):
+        adapter.prepare_share("job-1", "00000000", "65aa0000", "00000000")
+
+
+def test_share_acceptance_requires_correlated_positive_pool_response():
+    adapter = StratumV1AdapterContract("sim.worker")
+    _authorize(adapter)
+    notification = {
+        "id": None,
+        "method": "mining.notify",
+        "params": ["job-1", "00" * 32, "00" * 32, "00000002", "1d00ffff", "65aa0000", [], "version", False],
+    }
+    assert adapter.handle_notification(notification)["status"] == "JOB_RECEIVED_UNVERIFIED"
+    share = adapter.prepare_share("job-1", "00000000", "65aa0000", "00000000")
+    assert share["status"] == "SUBMITTED_PENDING_RESPONSE"
+    assert share["pool_acceptance_verified"] is False
+
+    result = adapter.handle_response({"id": share["id"], "result": True, "error": None})
+    assert result["status"] == "ACCEPTED"
+    assert result["pool_acceptance_verified"] is True
+    status = adapter.status()
+    assert status["network_access_performed"] is False
+    assert status["real_mining_verified"] is False
+    assert status["share_counts"]["ACCEPTED"] == 1
+
+
+def test_negative_submit_response_is_rejected_not_accepted():
+    adapter = StratumV1AdapterContract("sim.worker")
+    _authorize(adapter)
+    adapter.handle_notification({
+        "id": None,
+        "method": "mining.notify",
+        "params": ["job-1", "00" * 32, "00" * 32, "00000002", "1d00ffff", "65aa0000", [], "version", False],
+    })
+    share = adapter.prepare_share("job-1", "00000000", "65aa0000", "00000000")
+    result = adapter.handle_response({"id": share["id"], "result": False, "error": None})
+    assert result["status"] == "REJECTED"
+    assert result["pool_acceptance_verified"] is False
+    assert adapter.status()["share_counts"]["REJECTED"] == 1
+
+
+def test_unmatched_responses_and_invalid_fields_fail_closed():
+    adapter = StratumV1AdapterContract("sim.worker")
+    with pytest.raises(ValueError, match="UNMATCHED_STRATUM_RESPONSE"):
+        adapter.handle_response({"id": 999, "result": True, "error": None})
+    _authorize(adapter)
+    adapter.handle_notification({
+        "id": None,
+        "method": "mining.notify",
+        "params": ["job-1", "00" * 32, "00" * 32, "00000002", "1d00ffff", "65aa0000", [], "version", False],
+    })
+    with pytest.raises(ValueError, match="INVALID_NONCE_LENGTH"):
+        adapter.prepare_share("job-1", "00000000", "65aa0000", "00")
+    assert adapter.status()["live_transport_enabled"] is False
