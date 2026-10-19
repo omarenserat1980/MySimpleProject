@@ -59,11 +59,12 @@ class ResourceBudgetPrototype:
 
     @staticmethod
     def _finite_number(value: Any) -> bool:
-        return (
-            not isinstance(value, bool)
-            and isinstance(value, (int, float))
-            and math.isfinite(value)
-        )
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False
+        try:
+            return math.isfinite(float(value))
+        except (OverflowError, ValueError):
+            return False
 
     def __post_init__(self) -> None:
         if not isinstance(self.capacity, dict) or not isinstance(self.reserved, dict):
