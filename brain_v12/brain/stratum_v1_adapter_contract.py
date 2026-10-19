@@ -72,10 +72,15 @@ class StratumV1AdapterContract:
         if method == "mining.authorize":
             if not self.subscribed:
                 raise ValueError("STRATUM_SUBSCRIBE_REQUIRED")
+            if self.authorized or "mining.authorize" in self._pending.values():
+                raise ValueError("STRATUM_AUTHORIZE_ALREADY_PENDING_OR_COMPLETE")
             if len(params) != 2 or params[0] != self.worker_name or not isinstance(params[1], str) or not params[1]:
                 raise ValueError("INVALID_AUTHORIZE_PARAMS")
-        if method == "mining.subscribe" and params:
-            raise ValueError("INVALID_SUBSCRIBE_PARAMS")
+        if method == "mining.subscribe":
+            if params:
+                raise ValueError("INVALID_SUBSCRIBE_PARAMS")
+            if self.subscribed or "mining.subscribe" in self._pending.values():
+                raise ValueError("STRATUM_SUBSCRIBE_ALREADY_PENDING_OR_COMPLETE")
         request_id = self._allocate_id()
         self._pending[request_id] = method
         return {"id": request_id, "method": method, "params": params}

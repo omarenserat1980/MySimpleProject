@@ -192,3 +192,31 @@ def test_unmatched_response_closes_session_fail_closed():
     assert session.status()["share_submission_enabled"] is False
     assert session.status()["live_mining_verified"] is False
 
+def test_duplicate_subscribe_is_rejected_while_first_request_is_pending():
+    session, endpoint, _ = _session()
+    session.connect(explicit_approval=True, approved_host="pool.example.test")
+    session.subscribe()
+
+    with pytest.raises(ValueError, match="STRATUM_SUBSCRIBE_ALREADY_PENDING_OR_COMPLETE"):
+        session.subscribe()
+
+    assert len(endpoint.sent) == 1
+    assert endpoint.sent[0].count(b"mining.subscribe") == 1
+    session.close()
+
+
+def test_duplicate_authorize_is_rejected_while_first_request_is_pending():
+    incoming = b'{"id":1,"result":[[], "abcd", 4],"error":null}\n'
+    session, endpoint, _ = _session(incoming)
+    session.connect(explicit_approval=True, approved_host="pool.example.test")
+    session.subscribe()
+    assert session.process_one()["result"]["status"] == "SUBSCRIBED"
+
+    session.authorize("placeholder-secret")
+    with pytest.raises(ValueError, match="STRATUM_AUTHORIZE_ALREADY_PENDING_OR_COMPLETE"):
+        session.authorize("placeholder-secret")
+
+    assert len(endpoint.sent) == 2
+    assert endpoint.sent[1].count(b"mining.authorize") == 1
+    session.close()
+
