@@ -74,3 +74,50 @@ def test_activity_routes_are_post_and_authenticated_get():
     }
     assert routes["/api/mining-node/activity"] == {"POST"}
     assert routes["/api/mining-node/activity/{activity_id}"] == {"GET"}
+
+
+def test_cpu_benchmark_endpoint_is_authenticated_bounded_and_records_activity(monkeypatch, tmp_path):
+    db_path = tmp_path / "cpu-benchmark.db"
+    monkeypatch.setattr(api, "require_control_key", lambda request: None)
+    monkeypatch.setattr(api, "MiningActivityLedger", lambda: MiningActivityLedger(db_path))
+    result = api.run_cpu_sha256d_benchmark(_Request(), {
+        "activity_id": "api-cpu-bench",
+        "run_id": "api-cpu-bench-run",
+        "header_prefix_hex": bytes(76).hex(),
+        "hashes_per_sample": 8,
+        "repeats": 2,
+    })
+    assert result["measurement"]["execution"] == "host_cpu_software"
+    assert result["measurement"]["is_live_mining"] is False
+    assert result["activity"]["activity_type"] == "HASHRATE_MEASUREMENT"
+    assert result["activity"]["counts_as_verified_revenue"] is False
+    assert api.get_mining_activity(_Request(), "api-cpu-bench")["income_status"] == "NO_REVENUE_CLAIM"
+
+
+def test_cpu_benchmark_endpoint_rejects_unbounded_and_invalid_inputs(monkeypatch):
+    monkeypatch.setattr(api, "require_control_key", lambda request: None)
+    base = {
+        "activity_id": "invalid-cpu-bench",
+        "run_id": "invalid-cpu-bench-run",
+        "header_prefix_hex": bytes(76).hex(),
+    }
+    with pytest.raises(HTTPException) as exc:
+        api.run_cpu_sha256d_benchmark(_Request(), {**base, "hashes_per_sample": 100_001})
+    assert exc.value.status_code == 400
+    with pytest.raises(HTTPException) as exc:
+        api.run_cpu_sha256d_benchmark(_Request(), {**base, "header_prefix_hex": "bad"})
+    assert exc.value.status_code == 400
+
+
+def test_cpu_benchmark_endpoint_requires_control_key(monkeypatch):
+    def reject(_request):
+        raise HTTPException(status_code=403, detail="forbidden")
+    monkeypatch.setattr(api, "require_control_key", reject)
+    with pytest.raises(HTTPException) as exc:
+        api.run_cpu_sha256d_benchmark(_Request(), {})
+    assert exc.value.status_code == 403
+
+
+def test_cpu_benchmark_route_is_post_only():
+    route = next(route for route in api.router.routes if getattr(route, "path", None) == "/api/mining-node/cpu-sha256d-benchmark")
+    assert route.methods == {"POST"}
