@@ -61,6 +61,27 @@ def test_evidence_engine_hash_chain_detects_tampering():
     assert not evidence.verify_chain()
 
 
+def test_evidence_engine_isolates_nested_payload_from_caller_mutation():
+    payload = {"nested": {"state": "ready"}}
+    evidence = EvidenceEnginePrototype()
+    returned = evidence.record(kind="status", source="test", payload=payload, evidence_class="local_test")
+    payload["nested"]["state"] = "tampered"
+    returned["payload"]["nested"]["state"] = "also-tampered"
+    assert evidence.records[0]["payload"]["nested"]["state"] == "ready"
+    assert evidence.verify_chain()
+
+
+@pytest.mark.parametrize("payload", [
+    {"value": float("nan")},
+    {"value": float("inf")},
+    {"value": object()},
+])
+def test_evidence_engine_rejects_non_canonical_payload_values(payload):
+    evidence = EvidenceEnginePrototype()
+    with pytest.raises(ValueError, match="INVALID_EVIDENCE_PAYLOAD"):
+        evidence.record(kind="test", source="pytest", payload=payload)
+
+
 def test_visual_agent_does_not_claim_screen_capture_and_rejects_low_confidence():
     low = VisualAgentPrototype.assess(VisualObservation("unknown", 0.3))
     assert low["decision"] == "STOP_FOR_REVIEW"

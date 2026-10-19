@@ -6,6 +6,7 @@ commands, open network connections, or prove real mining/revenue.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
@@ -117,31 +118,41 @@ class EvidenceEnginePrototype:
 
     def record(self, *, kind: str, source: str, payload: dict[str, Any],
                evidence_class: str = "simulated") -> dict[str, Any]:
-        if not kind or not source or not isinstance(payload, dict):
+        if not isinstance(kind, str) or not kind.strip() or not isinstance(source, str) or not source.strip() or not isinstance(payload, dict):
             raise ValueError("INVALID_EVIDENCE_RECORD")
         if evidence_class not in {"simulated", "local_test", "device_observed", "external"}:
             raise ValueError("INVALID_EVIDENCE_CLASS")
+        # Isolate stored evidence from caller-owned nested objects.
+        safe_payload = deepcopy(payload)
         previous = self.records[-1]["digest"] if self.records else "GENESIS"
         body = {
             "sequence": len(self.records) + 1,
             "kind": kind,
             "source": source,
             "evidence_class": evidence_class,
-            "payload": payload,
+            "payload": safe_payload,
             "previous_digest": previous,
         }
-        canonical = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        try:
+            canonical = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("INVALID_EVIDENCE_PAYLOAD") from exc
         entry = {**body, "digest": hashlib.sha256(canonical.encode("utf-8")).hexdigest()}
         self.records.append(entry)
-        return dict(entry)
+        return deepcopy(entry)
 
     def verify_chain(self) -> bool:
         previous = "GENESIS"
         for index, entry in enumerate(self.records, start=1):
+            if not isinstance(entry, dict):
+                return False
             body = {k: v for k, v in entry.items() if k != "digest"}
             if body.get("sequence") != index or body.get("previous_digest") != previous:
                 return False
-            canonical = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+            try:
+                canonical = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+            except (TypeError, ValueError):
+                return False
             digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
             if digest != entry.get("digest"):
                 return False
