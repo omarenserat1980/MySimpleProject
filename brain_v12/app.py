@@ -2176,7 +2176,9 @@ def brain_workers():
     return worker_registry.snapshot()
 
 @app.post("/api/brain/workers/register")
-def brain_worker_register(body:dict):
+def brain_worker_register(request: Request, body:dict):
+    # Worker enrollment changes routing state; require the control-plane gate.
+    require_control_key(request)
     return worker_registry.register(
         body.get("worker_id",""),
         body.get("kind","local"),
