@@ -77,6 +77,17 @@ DEFAULT_TASKS = (
         "next_action": "Do not enable execution until host attestation, pool adapter, accepted-share evidence, payout and cost evidence are verified and explicitly authorized.",
         "evidence": ["https://github.com/omarenserat1980/MySimpleProject/blob/main/brain_v12/brain/mining_node_api.py"],
     },
+    {
+        "task_id": "TRACK-008",
+        "title": "Thin Membrane cloud handoff",
+        "status": "BLOCKED",
+        "detail": "Live Termux DeviceBridge reports the Realme agent online and authenticated, but Thin Membrane has no approved cloud endpoint or configured device identity; cloud connection, heartbeat and task round-trip are not verified.",
+        "next_action": "Configure an approved HTTPS Brain Cloud Hub URL and explicit BRAIN_DEVICE_ID through the authorized deployment environment, then verify TLS connectivity, authenticated heartbeat and a harmless task round-trip. Do not create or print credentials.",
+        "evidence": [
+            "https://github.com/omarenserat1980/MySimpleProject/blob/main/brain_v12/brain/thin_membrane.py",
+            "https://github.com/omarenserat1980/MySimpleProject/blob/main/brain_v12/brain/device_bridge.py",
+        ],
+    },
 )
 
 
