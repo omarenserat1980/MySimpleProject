@@ -110,7 +110,7 @@ def test_activity_records_without_payment_proof_and_never_counts_as_revenue(tmp_
     assert summary["realized_revenue_gross"] == []
     assert summary["estimated_earnings_unverified"] == [
         {"currency": "BTC", "mode": "live", "activity_status": "OBSERVED",
-         "amount": 0.02, "entries": 1}
+         "amount": "0.02", "entries": 1}
     ]
     assert summary["mining_activity_separate"][0]["entries"] == 1
 
@@ -176,8 +176,24 @@ def test_simulated_estimates_are_not_aggregated_with_live_estimates(tmp_path):
     estimates = gate.summary()["estimated_earnings_unverified"]
     assert estimates == [
         {"currency": "BTC", "mode": "live", "activity_status": "OBSERVED",
-         "amount": 0.1, "entries": 1},
+         "amount": "0.10", "entries": 1},
         {"currency": "BTC", "mode": "simulation", "activity_status": "SIMULATED",
-         "amount": 9.99, "entries": 1},
+         "amount": "9.99", "entries": 1},
+    ]
+    assert gate.summary()["realized_revenue_gross"] == []
+
+def test_btc_estimate_precision_is_preserved_and_summed_exactly(tmp_path):
+    gate = RevenueRealizationGate(tmp_path / "ledger.sqlite")
+    for key, amount in (("sat-1", "0.00000001"), ("sat-2", "0.00000002")):
+        gate.record_activity(
+            idempotency_key=key,
+            activity={"activity_kind": "MINING_SESSION", "mode": "live",
+                      "activity_status": "OBSERVED", "estimated_amount": amount,
+                      "estimated_currency": "BTC"},
+        )
+    estimates = gate.summary()["estimated_earnings_unverified"]
+    assert estimates == [
+        {"currency": "BTC", "mode": "live", "activity_status": "OBSERVED",
+         "amount": "0.00000003", "entries": 2}
     ]
     assert gate.summary()["realized_revenue_gross"] == []
