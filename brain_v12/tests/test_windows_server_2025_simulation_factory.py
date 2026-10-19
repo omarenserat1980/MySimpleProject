@@ -15,7 +15,7 @@ class WindowsServer2025SimulationFactoryTests(unittest.TestCase):
         result = simulate_windows_server_2025()
         self.assertEqual(result["status"], "SIMULATED_BOOT_SUCCESS")
         self.assertEqual(result["execution_mode"], "SIMULATION_ONLY")
-        self.assertEqual(result["implementation_progress"]["percent"], 18)
+        self.assertEqual(result["implementation_progress"]["percent"], 30)
         self.assertFalse(result["implementation_progress"]["real_windows_boot_verified"])
         self.assertFalse(result["real_windows_boot_verified"])
         self.assertFalse(result["side_effects_performed"])
@@ -105,7 +105,7 @@ class WindowsServer2025SimulationFactoryTests(unittest.TestCase):
             hardware=VirtualHardwareModel(boot_disk_present=False)
         )
         self.assertEqual(result["status"], "SIMULATED_BOOT_FAILED")
-        self.assertEqual(result["reason_code"], "NO_BOOT_DISK")
+        self.assertEqual(result["reason_code"], "BOOT_DISK_NOT_PRESENT")
 
     def test_markdown_report_preserves_simulation_boundary(self):
         report = simulate_windows_server_2025()

@@ -2,7 +2,7 @@
 
 This is implementation coverage, not a probability of boot success and not
 real-Windows boot evidence. The first three completed milestones are each
-weighted at six points, producing a conservative 18% baseline.
+the first three milestones are six points each, and the newly verified UEFI/boot-configuration milestone adds twelve points, producing a 30% baseline.
 """
 from __future__ import annotations
 
@@ -20,9 +20,9 @@ MILESTONES: tuple[dict[str, Any], ...] = (
     {"id": "boot_state_machine_and_faults", "weight": 6, "status": "complete",
      "title": "Boot-stage state machine and failure injection",
      "evidence": "Modeled firmware, disk, boot manager, kernel, drivers, services, network, health, and failure scenarios."},
-    {"id": "boot_config_semantics", "weight": 12, "status": "pending",
+    {"id": "boot_config_semantics", "weight": 12, "status": "complete",
      "title": "Deeper firmware and boot-configuration semantics",
-     "evidence": "Pending implementation and tests."},
+     "evidence": "The simulator now validates the modeled UEFI firmware family and fails closed on invalid boot configuration or missing boot disk, with factory tests covering the failure contract."},
     {"id": "kernel_driver_dependency_model", "weight": 12, "status": "pending",
      "title": "Kernel and driver dependency model",
      "evidence": "Pending implementation and tests."},
