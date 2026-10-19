@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Collect a read-only audit of Brain's local network/ASIC/mining APIs.
 
-This tool only calls explicitly listed HTTP endpoints on loopback. It does not
-scan a LAN, contact routers or ASICs, change configuration, or start mining.
+The default mode calls only local status endpoints over loopback. The optional
+--include-network-diagnostics flag calls an aggregate diagnostic endpoint that
+may probe a configured gateway's TCP ports. No mode scans a LAN, contacts an
+ASIC, changes configuration, or starts mining.
 """
 from __future__ import annotations
 
@@ -76,7 +78,11 @@ def build_report(
         "observed_at": datetime.now(timezone.utc).isoformat(),
         "base_url": base_url,
         "network_diagnostics_included": include_network_diagnostics,
-        "mode": "READ_ONLY_NO_SCAN_NO_CONFIGURATION_CHANGES",
+        "mode": (
+            "READ_ONLY_WITH_OPTIONAL_GATEWAY_DIAGNOSTICS"
+            if include_network_diagnostics
+            else "READ_ONLY_NO_SCAN_NO_CONFIGURATION_CHANGES"
+        ),
         "results": results,
         "conclusion": {
             "brain_local_api_reachable": all_reachable,
@@ -91,6 +97,10 @@ def build_report(
                 "Gateway reachability does not identify an ASIC.",
                 "Only devices already present in Brain's local inventory are counted.",
                 "This audit does not scan the LAN, contact an ASIC, change settings, or start mining.",
+                *(
+                    ["Optional network diagnostics may perform TCP reachability probes against the configured gateway."]
+                    if include_network_diagnostics else []
+                ),
             ],
         },
     }
