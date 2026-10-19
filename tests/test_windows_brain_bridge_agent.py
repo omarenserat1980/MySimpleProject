@@ -245,7 +245,7 @@ class WindowsBridgeAgentTests(unittest.TestCase):
         ), patch.object(bridge, "request_json", side_effect=[
             {"ok": True, "status": "HEARTBEAT", "agent_id": "windows-bridge-test"},
             {"ok": True, "status": "IDLE", "task": {
-                "task_id": "test-task-poll-mismatch", "task": "python_version"
+                "task_id": "pollcase001", "task": "python_version"
             }},
         ]) as request:
             with self.assertRaisesRegex(RuntimeError, "POLL_TASK_STATE_MISMATCH"):
