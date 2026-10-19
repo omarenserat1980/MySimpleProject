@@ -63,6 +63,7 @@ from .brain.error_recovery_api import router as error_recovery_router
 from .brain.universal_simulator_api import router as universal_simulator_router
 from .brain.windows_server_2025_simulation_api import router as windows_server_2025_simulation_router
 from .brain.device_bridge import DeviceBridge
+from .brain.device_heartbeat_api import build_device_heartbeat_router
 from .brain.thin_membrane import router as thin_membrane_router
 from .brain.brain_mcp import build_mcp_router
 from .brain.device_cloud_federation import build_fleet_status
@@ -2303,16 +2304,10 @@ def device_enqueue(request:Request, body:DeviceTask):
     return result
 
 
-@app.post("/api/device/heartbeat")
-def device_heartbeat(request: Request, body: dict | None = None):
-    header_agent_id = request.headers.get("X-V12-Agent-Id", "").strip()
-    body_agent_id = str((body or {}).get("agent_id", "")).strip()
-    if header_agent_id and body_agent_id and header_agent_id != body_agent_id:
-        raise HTTPException(status_code=401, detail="DEVICE_AGENT_ID_MISMATCH")
-    agent_id = header_agent_id or body_agent_id or "android-termux-v12"
-    if not device_bridge.authenticate(request.headers.get("X-V12-Agent-Key", ""), agent_id):
-        raise HTTPException(status_code=401, detail="UNAUTHORIZED_AGENT")
-    return device_bridge.heartbeat(agent_id, (body or {}).get("metadata") or {})
+app.include_router(build_device_heartbeat_router(
+    device_bridge,
+    lambda: bool(os.getenv("BRAIN_AGENT_KEYS_JSON", "").strip()),
+))
 
 
 @app.get("/api/device/poll")
