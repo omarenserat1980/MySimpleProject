@@ -43,6 +43,10 @@ class CommercialDashboardAPITests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_cases_endpoint_requires_control_key(self):
+        response = TestClient(app).get("/api/commercial/cases")
+        self.assertEqual(response.status_code, 403)
+
     def test_create_case_is_durable_and_evidence_gated(self):
         case_id = f"case-{uuid4().hex[:10]}"
         response = self.client.post(
