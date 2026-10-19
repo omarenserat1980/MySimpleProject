@@ -52,3 +52,56 @@ def test_worker_id_must_be_present():
     import pytest
     with pytest.raises(ValueError, match="WORKER_ID_REQUIRED"):
         WorkerRegistry().register(" ", "software", {"python"}, now=100)
+
+
+def test_registry_rejects_invalid_ttl_and_lease_values():
+    import pytest
+    for value in (True, 1.5, float("nan")):
+        with pytest.raises(ValueError):
+            WorkerRegistry(ttl_seconds=value)
+    registry = WorkerRegistry()
+    for value in (True, 1.5, float("nan"), float("inf")):
+        with pytest.raises(ValueError):
+            registry.register("software-01", "software", lease_seconds=value, now=100)
+
+
+def test_registry_rejects_non_finite_or_boolean_timestamps():
+    import pytest
+    registry = WorkerRegistry()
+    for value in (True, float("nan"), float("inf"), float("-inf")):
+        with pytest.raises(ValueError, match="INVALID_WORKER_TIMESTAMP"):
+            registry.register("software-01", "software", now=value)
+
+
+def test_registry_rejects_malformed_capabilities_and_empty_kind():
+    import pytest
+    registry = WorkerRegistry()
+    with pytest.raises(ValueError, match="WORKER_KIND_REQUIRED"):
+        registry.register("software-01", "  ", now=100)
+    for caps in ("python", [""], [None], 17):
+        with pytest.raises(ValueError, match="INVALID_WORKER_CAPABILITIES"):
+            registry.register("software-01", "software", caps, now=100)
+
+
+def test_heartbeat_cannot_create_unregistered_worker():
+    import pytest
+    with pytest.raises(ValueError, match="WORKER_NOT_REGISTERED"):
+        WorkerRegistry().heartbeat("unknown-worker", now=100)
+
+
+def test_heartbeat_renews_existing_lease_and_capabilities():
+    registry = WorkerRegistry()
+    registry.register("software-01", "software", {"python"}, lease_seconds=10, now=100)
+    snapshot = registry.heartbeat("software-01", {"python", "tests"}, lease_seconds=20, now=110)
+    worker = snapshot["workers"][0]
+    assert worker["capabilities"] == ["python", "tests"]
+    assert worker["lease_until"] == 130
+    assert snapshot["targets"][0]["online"] is True
+
+
+def test_snapshot_reports_expired_worker_as_offline_in_both_views():
+    registry = WorkerRegistry()
+    registry.register("software-01", "software", {"python"}, lease_seconds=10, now=100)
+    snapshot = registry.snapshot(now=111)
+    assert snapshot["workers"][0]["online"] is False
+    assert snapshot["targets"][0]["online"] is False
