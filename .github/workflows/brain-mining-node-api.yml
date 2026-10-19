@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "brain_v12/brain/mining_node_api.py"
+      - "brain_v12/business/mining_activity_ledger.py"
+      - "brain_v12/tests/test_mining_activity_ledger.py"
+      - "brain_v12/tests/test_mining_activity_api.py"
       - "brain_v12/brain/braiins_pool_evidence_collector.py"
       - "brain_v12/tools/brain_braiins_pool_evidence_doctor.py"
       - "brain_v12/tests/test_braiins_pool_evidence_collector.py"
@@ -83,7 +86,7 @@ jobs:
       - name: Run mining node contract tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
-        run: python -m pytest -q tests/test_brain_mining_node_api.py brain_v12/tests/test_mining_node_api_software_only.py brain_v12/tests/test_mining_node_stratum_status.py
+        run: python -m pytest -q tests/test_brain_mining_node_api.py brain_v12/tests/test_mining_node_api_software_only.py brain_v12/tests/test_mining_node_stratum_status.py brain_v12/tests/test_mining_activity_ledger.py brain_v12/tests/test_mining_activity_api.py
       - name: Validate fail-closed Stratum V1 response correlation
         run: python -m pytest -q brain_v12/tests/test_stratum_v1_protocol.py
       - name: Validate offline Stratum-to-header candidate pipeline
