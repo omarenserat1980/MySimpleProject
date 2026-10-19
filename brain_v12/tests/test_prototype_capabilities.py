@@ -217,3 +217,51 @@ def test_durable_evidence_adapter_requires_exact_verified_status():
     )
     assert result["status"] == "INTEGRITY_CHECK_FAILED"
     assert result["independent_evidence"] is False
+
+
+@pytest.mark.parametrize("evidence_class", [None, [], {}, 1, True])
+def test_durable_evidence_adapter_rejects_non_string_evidence_class(evidence_class):
+    from brain_v12.brain.prototype_capabilities import DurableEvidenceAdapter
+
+    class NeverCalledStore:
+        def append(self, **kwargs):
+            raise AssertionError("invalid evidence class must be rejected before persistence")
+
+    with pytest.raises(ValueError, match="INVALID_EVIDENCE_CLASS"):
+        DurableEvidenceAdapter(NeverCalledStore()).record(
+            task_id="task", kind="test", source="pytest", payload={},
+            evidence_class=evidence_class,
+        )
+
+
+def test_durable_evidence_adapter_fails_closed_when_verifier_raises():
+    from brain_v12.brain.prototype_capabilities import DurableEvidenceAdapter
+
+    class VerifierRaisesStore:
+        def append(self, **kwargs):
+            return {"evidence_id": "ev-test", "sha256": "abc"}
+
+        def verify_hash(self, evidence_id):
+            raise RuntimeError("isolated verifier failure")
+
+    result = DurableEvidenceAdapter(VerifierRaisesStore()).record(
+        task_id="task", kind="test", source="pytest", payload={}
+    )
+    assert result["status"] == "HASH_VERIFICATION_FAILED"
+    assert result["independent_evidence"] is False
+
+
+@pytest.mark.parametrize("record", [None, {}, {"evidence_id": "", "sha256": "abc"},
+                                    {"evidence_id": "ev-test", "sha256": ""}])
+def test_durable_evidence_adapter_rejects_malformed_append_results(record):
+    from brain_v12.brain.prototype_capabilities import DurableEvidenceAdapter
+
+    class MalformedStore:
+        def append(self, **kwargs):
+            return record
+
+    result = DurableEvidenceAdapter(MalformedStore()).record(
+        task_id="task", kind="test", source="pytest", payload={}
+    )
+    assert result["status"] == "PERSISTENCE_RESULT_INVALID"
+    assert result["independent_evidence"] is False
