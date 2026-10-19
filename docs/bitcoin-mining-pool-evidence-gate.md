@@ -66,6 +66,7 @@ Example values are placeholders, not mining measurements. A digest proves neithe
 - Never run mining workloads in GitHub Actions CI or other ephemeral CI runners.
 - Execute only on explicitly authorized compute, within resource and electricity limits.
 - Keep pool credentials and wallet keys in a secret manager or protected local environment; never commit them or include them in evidence.
+- The one-share transport rejects TLS sockets unless the associated `SSLContext` requires certificate validation (`CERT_REQUIRED`) and hostname checking (`check_hostname=True`); certificate presence alone is insufficient. A successful connection/auth probe is not proof of mining or accepted shares.
 - Live Stratum connection probes must use TLS with certificate verification; the probe rejects `use_tls=False` before opening a socket. A successful TLS/subscribe/authorize probe is connection evidence only, not proof of mining or accepted shares.
 - CI may validate schemas, fixtures, and fail-closed behavior. CI results are not proof of live mining.
 - Do not claim success until real evidence is collected from an authenticated source, linked to the Brain runtime, and its freshness and integrity can be inspected.
