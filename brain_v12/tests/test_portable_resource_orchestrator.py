@@ -138,3 +138,70 @@ class PortableResourceOrchestratorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PortableResourceOrchestratorInvalidNumericTests(unittest.TestCase):
+    def test_resource_demand_rejects_non_finite_and_boolean_cpu(self):
+        for value in (float("nan"), float("inf"), float("-inf"), True):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    ResourceDemand(cpu_cores=value)
+
+    def test_resource_demand_rejects_boolean_integer_capacity_fields(self):
+        for field in ("memory_mb", "disk_mb", "gpu_count", "timeout_seconds"):
+            with self.subTest(field=field):
+                with self.assertRaises(ValueError):
+                    ResourceDemand(**{field: True})
+
+    def test_executor_capacity_rejects_non_finite_cpu_and_cost(self):
+        for field, value in (
+            ("cpu_cores", float("nan")),
+            ("cpu_cores", float("inf")),
+            ("estimated_cost", float("nan")),
+            ("estimated_cost", float("inf")),
+            ("estimated_cost", True),
+        ):
+            with self.subTest(field=field, value=value):
+                args = {
+                    "executor_id": "invalid",
+                    "capabilities": frozenset({"python.test"}),
+                    "cpu_cores": 2,
+                    "memory_mb": 1024,
+                    "disk_mb": 1024,
+                }
+                args[field] = value
+                with self.assertRaises(ValueError):
+                    ExecutorCapacity(**args)
+
+    def test_executor_capacity_rejects_boolean_integer_fields(self):
+        for field in ("memory_mb", "disk_mb", "gpu_count"):
+            with self.subTest(field=field):
+                args = {
+                    "executor_id": "invalid",
+                    "capabilities": frozenset({"python.test"}),
+                    "cpu_cores": 2,
+                    "memory_mb": 1024,
+                    "disk_mb": 1024,
+                }
+                args[field] = True
+                with self.assertRaises(ValueError):
+                    ExecutorCapacity(**args)
+
+    def test_schedule_request_rejects_non_finite_and_boolean_cost(self):
+        for value in (float("nan"), float("inf"), float("-inf"), True):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    ScheduleRequest(
+                        task_id="invalid-cost",
+                        capability="python.test",
+                        max_cost_usd=value,
+                    )
+
+    def test_intent_digest_rejects_non_canonical_nan(self):
+        request = ScheduleRequest(
+            task_id="nan-intent",
+            capability="python.test",
+            intent={"unsafe": float("nan")},
+        )
+        with self.assertRaises(ValueError):
+            intent_digest(request)
