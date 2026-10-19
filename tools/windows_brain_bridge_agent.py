@@ -15,13 +15,20 @@ import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 AGENT_ID = os.getenv("V12_AGENT_ID", "windows-bridge-01").strip()
 BRAIN_URL = os.getenv("V12_BRAIN_URL", "").strip().rstrip("/")
 KEY_FILE = Path(os.getenv("V12_AGENT_KEY_FILE", str(Path.home() / ".brain" / "agent.key")))
 POLL_SECONDS = 10.0
 ALLOWED_TASKS = frozenset({"status", "platform", "python_version"})
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Reject redirects so agent credentials stay bound to the configured endpoint."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 def validate_config() -> None:
@@ -95,7 +102,9 @@ def request_json(method: str, path: str, key: str, payload: dict | None = None) 
     if data is not None:
         headers["Content-Type"] = "application/json"
     request = Request(BRAIN_URL + path, data=data, headers=headers, method=method)
-    with urlopen(request, timeout=8) as response:
+    # urllib's default redirect handler can follow a server-supplied Location.
+    # Disable redirects so X-V12-Agent-Key is never sent to a redirected host.
+    with build_opener(_NoRedirectHandler()).open(request, timeout=8) as response:
         raw = response.read(1_000_001)
     if len(raw) > 1_000_000:
         raise RuntimeError("BRAIN_RESPONSE_TOO_LARGE")
