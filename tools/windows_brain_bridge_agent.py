@@ -47,7 +47,9 @@ def validate_config() -> None:
         for item in os.getenv("V12_BRAIN_ALLOWED_HOSTS", "").split(",")
         if item.strip()
     }
-    if allowed_hosts and parsed.hostname.lower() not in allowed_hosts:
+    if not allowed_hosts:
+        raise RuntimeError("V12_BRAIN_ALLOWED_HOSTS_REQUIRED")
+    if parsed.hostname.lower() not in allowed_hosts:
         raise RuntimeError("BRAIN_HOST_NOT_ALLOWLISTED")
 
 def load_key() -> str:
