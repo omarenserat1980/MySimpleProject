@@ -29,6 +29,14 @@ class WindowsBridgeAgentTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "HTTPS_REQUIRED"):
                 validate_config()
 
+    def test_valid_https_endpoint_with_allowlist(self):
+        with patch.dict("os.environ", {
+            "V12_AGENT_ID": "windows-bridge-test",
+            "V12_BRAIN_URL": "https://brain.example.invalid/api",
+            "V12_BRAIN_ALLOWED_HOSTS": "brain.example.invalid",
+        }, clear=True):
+            validate_config()
+
     def test_http_override_must_be_explicit(self):
         with patch.dict("os.environ", {
             "V12_AGENT_ID": "windows-bridge-test",
@@ -59,7 +67,7 @@ class WindowsBridgeAgentTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "V12_BRAIN_ALLOWED_HOSTS_REQUIRED"):
                 validate_config()
 
-    def test_optional_host_allowlist_blocks_unapproved_host(self):
+    def test_host_allowlist_blocks_unapproved_host(self):
         with patch.dict("os.environ", {
             "V12_AGENT_ID": "windows-bridge-test",
             "V12_BRAIN_URL": "https://unexpected.example.invalid",
