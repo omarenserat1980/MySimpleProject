@@ -94,5 +94,23 @@ class WindowsBridgeAgentTests(unittest.TestCase):
                 validate_config()
 
 
+    def test_invalid_poll_interval_fails_closed_without_partial_config_update(self):
+        for poll_value in ("not-a-number", "nan", "inf", "-inf"):
+            with self.subTest(poll_value=poll_value), patch.dict("os.environ", {
+                "V12_AGENT_ID": "windows-bridge-invalid-poll",
+                "V12_BRAIN_URL": "https://brain.example.invalid",
+                "V12_BRAIN_ALLOWED_HOSTS": "brain.example.invalid",
+                "V12_POLL_SECONDS": poll_value,
+            }, clear=True), patch.object(bridge, "AGENT_ID", "stable-agent-id"), patch.object(
+                bridge, "BRAIN_URL", "https://stable.example.invalid"
+            ), patch.object(bridge, "POLL_SECONDS", 23.0):
+                with self.assertRaisesRegex(RuntimeError, "INVALID_V12_POLL_SECONDS"):
+                    validate_config()
+                self.assertEqual(bridge.AGENT_ID, "stable-agent-id")
+                self.assertEqual(bridge.BRAIN_URL, "https://stable.example.invalid")
+                self.assertEqual(bridge.POLL_SECONDS, 23.0)
+
+
+
 if __name__ == "__main__":
     unittest.main()
