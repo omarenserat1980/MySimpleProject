@@ -137,3 +137,21 @@ def test_session_rejects_approved_host_mismatch_before_opening_socket():
     assert raw_sockets == []
     assert endpoint.sent == []
     assert session.status()["connected"] is False
+
+def test_failed_subscribe_response_never_allows_authorization():
+    incoming = b'{"id":1,"result":null,"error":[20,"unauthorized",null]}\\n'
+    session, endpoint, _ = _session(incoming)
+    session.connect(explicit_approval=True, approved_host="pool.example.test")
+    session.subscribe()
+
+    result = session.process_one()
+    assert result["result"]["status"] == "REJECTED"
+    assert session.status()["protocol"]["subscribed"] is False
+
+    with pytest.raises(ValueError, match="STRATUM_SUBSCRIBE_REQUIRED"):
+        session.authorize("placeholder-secret")
+
+    assert len(endpoint.sent) == 1
+    assert b"mining.authorize" not in endpoint.sent[0]
+    assert session.status()["protocol"]["authorized"] is False
+    session.close()
