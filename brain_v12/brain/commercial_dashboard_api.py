@@ -44,7 +44,9 @@ def router() -> APIRouter:
     api = APIRouter(prefix="/api/commercial", tags=["commercial"])
 
     @api.get("/dashboard")
-    def dashboard() -> dict:
+    def dashboard(request: Request) -> dict:
+        # The dashboard includes internal case identifiers and action queues.
+        require_control_key(request)
         store = CommercialCaseStore()
         result = build_commercial_operations_dashboard(INITIAL_MONETIZATION_CATALOG, store.list_cases())
         return {"ok": True, **result.to_record()}
