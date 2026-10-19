@@ -1,7 +1,7 @@
 """TLS-only Stratum V1 line transport, fail-closed by default.
 
 The transport is deliberately not instantiated or connected by API endpoints.
-Callers must pass explicit approval and endpoint verification to connect().
+Callers must pass explicit approval and an exact host confirmation to connect().
 No credentials or payload contents are logged. Unit tests inject a fake socket.
 """
 from __future__ import annotations
@@ -49,12 +49,12 @@ class StratumV1TLSTransport:
     def connected(self) -> bool:
         return self._sock is not None
 
-    def connect(self, *, explicit_approval: bool, endpoint_verified: bool) -> None:
-        """Open TLS transport only after caller supplies both independent gates."""
+    def connect(self, *, explicit_approval: bool, approved_host: str) -> None:
+        """Open TLS transport only after explicit approval and exact host confirmation."""
         if explicit_approval is not True:
             raise StratumTransportError("EXPLICIT_USER_APPROVAL_REQUIRED")
-        if endpoint_verified is not True:
-            raise StratumTransportError("POOL_ENDPOINT_VERIFICATION_REQUIRED")
+        if not isinstance(approved_host, str) or approved_host.strip().lower() != self.host.lower():
+            raise StratumTransportError("POOL_ENDPOINT_CONFIRMATION_MISMATCH")
         if self._sock is not None:
             raise StratumTransportError("TRANSPORT_ALREADY_CONNECTED")
         raw = None
@@ -118,8 +118,10 @@ class StratumV1TLSTransport:
         try:
             message = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            self.close()
             raise StratumTransportError("INVALID_STRATUM_JSON") from exc
         if not isinstance(message, dict):
+            self.close()
             raise StratumTransportError("STRATUM_MESSAGE_MUST_BE_OBJECT")
         return message
 
