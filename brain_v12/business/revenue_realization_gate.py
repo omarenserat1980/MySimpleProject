@@ -322,9 +322,11 @@ class RevenueRealizationGate:
                 "SELECT mode, activity_status, COUNT(*) AS entries FROM mining_activity "
                 "GROUP BY mode, activity_status ORDER BY mode, activity_status")]
             estimates = [dict(r) for r in db.execute(
-                "SELECT estimated_currency AS currency, SUM(CAST(estimated_amount AS REAL)) AS amount, "
-                "COUNT(*) AS entries FROM mining_activity WHERE estimated_amount IS NOT NULL "
-                "GROUP BY estimated_currency ORDER BY estimated_currency")]
+                "SELECT estimated_currency AS currency, mode, activity_status, "
+                "SUM(CAST(estimated_amount AS REAL)) AS amount, COUNT(*) AS entries "
+                "FROM mining_activity WHERE estimated_amount IS NOT NULL "
+                "GROUP BY estimated_currency, mode, activity_status "
+                "ORDER BY estimated_currency, mode, activity_status")]
         return {
             "status": "OK",
             "realized_revenue_gross": revenue,
