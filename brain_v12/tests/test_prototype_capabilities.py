@@ -106,3 +106,42 @@ def test_mining_supervisor_fails_closed_when_transport_is_unavailable():
     result = MiningSupervisorPrototype.assess(MiningTelemetry())
     assert result["stop_required"] is True
     assert result["real_mining_verified"] is False
+
+
+def test_durable_evidence_adapter_persists_and_verifies_with_canonical_store(tmp_path):
+    from brain_v12.brain.evidence_store import EvidenceStore
+    from brain_v12.brain.prototype_capabilities import DurableEvidenceAdapter
+
+    store = EvidenceStore(tmp_path / "evidence.db")
+    try:
+        adapter = DurableEvidenceAdapter(store)
+        result = adapter.record(
+            task_id="capability-task-1",
+            kind="visual_observation",
+            source="test-fixture",
+            payload={"state": "ready"},
+            evidence_class="local_test",
+        )
+        assert result["status"] == "PERSISTED_AND_HASH_VERIFIED"
+        assert result["independent_evidence"] is False
+        saved = store.get(result["evidence_id"])
+        assert saved["payload"]["payload"] == {"state": "ready"}
+        assert saved["verification_status"] == "VERIFIED"
+    finally:
+        store.close()
+
+
+def test_durable_evidence_adapter_rejects_missing_task_and_invalid_class(tmp_path):
+    from brain_v12.brain.evidence_store import EvidenceStore
+    from brain_v12.brain.prototype_capabilities import DurableEvidenceAdapter
+
+    store = EvidenceStore(tmp_path / "evidence.db")
+    try:
+        adapter = DurableEvidenceAdapter(store)
+        with pytest.raises(ValueError, match="TASK_ID_REQUIRED"):
+            adapter.record(task_id=" ", kind="test", source="test", payload={})
+        with pytest.raises(ValueError, match="INVALID_EVIDENCE_CLASS"):
+            adapter.record(task_id="task", kind="test", source="test", payload={},
+                           evidence_class="pool_confirmed")
+    finally:
+        store.close()
