@@ -139,7 +139,7 @@ def test_session_rejects_approved_host_mismatch_before_opening_socket():
     assert session.status()["connected"] is False
 
 def test_failed_subscribe_response_never_allows_authorization():
-    incoming = b'{"id":1,"result":null,"error":[20,"unauthorized",null]}\\n'
+    incoming = b'{"id":1,"result":null,"error":[20,"unauthorized",null]}\n'
     session, endpoint, _ = _session(incoming)
     session.connect(explicit_approval=True, approved_host="pool.example.test")
     session.subscribe()
