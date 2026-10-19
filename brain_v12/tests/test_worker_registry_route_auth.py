@@ -25,7 +25,9 @@ def test_worker_registration_requires_control_auth_before_registry_mutation():
     endpoint = _function_for_route(tree, "/api/brain/workers/register")
     arguments = {arg.arg for arg in endpoint.args.args}
     assert "request" in arguments
-    assert any(arg.arg == "Request" for arg in endpoint.args.args if arg.arg == "request") is False
+    request_arg = next(arg for arg in endpoint.args.args if arg.arg == "request")
+    assert isinstance(request_arg.annotation, ast.Name)
+    assert request_arg.annotation.id == "Request"
     statements = endpoint.body
     auth_index = next(
         i for i, stmt in enumerate(statements)
