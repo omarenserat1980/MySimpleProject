@@ -26,7 +26,7 @@ def build_device_heartbeat_router(
         raw_body_agent_id = payload.get("agent_id", "")
         if not isinstance(raw_body_agent_id, str):
             raise HTTPException(status_code=422, detail="INVALID_DEVICE_AGENT_ID")
-        metadata = payload.get("metadata") or {}
+        metadata = payload.get("metadata", {})
         if not isinstance(metadata, dict):
             raise HTTPException(status_code=422, detail="INVALID_DEVICE_METADATA")
         try:
