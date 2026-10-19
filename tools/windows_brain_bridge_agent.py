@@ -40,7 +40,16 @@ def validate_config() -> None:
         and os.getenv("BRAIN_ALLOW_INSECURE_HTTP", "").strip() == "1"
     ):
         raise RuntimeError("HTTPS_REQUIRED_SET_BRAIN_ALLOW_INSECURE_HTTP=1_ONLY_FOR_TRUSTED_TEST_NETWORK")
-    if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+    if (
+        not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in ("", "/")
+    ):
+        # API paths are appended by this client; accepting a base path here
+        # would silently produce duplicated paths such as /api/api/device/heartbeat.
         raise RuntimeError("INVALID_BRAIN_URL")
     allowed_hosts = {
         item.strip().lower()
@@ -51,6 +60,17 @@ def validate_config() -> None:
         raise RuntimeError("V12_BRAIN_ALLOWED_HOSTS_REQUIRED")
     if parsed.hostname.lower() not in allowed_hosts:
         raise RuntimeError("BRAIN_HOST_NOT_ALLOWLISTED")
+
+    # Apply the validated runtime configuration to every subsequent request.
+    # Import-time globals alone would otherwise validate one endpoint but use another.
+    global AGENT_ID, BRAIN_URL, KEY_FILE, POLL_SECONDS
+    AGENT_ID = agent_id
+    BRAIN_URL = brain_url.rstrip("/")
+    KEY_FILE = Path(os.getenv("V12_AGENT_KEY_FILE", str(Path.home() / ".brain" / "agent.key")))
+    try:
+        POLL_SECONDS = max(5.0, min(60.0, float(os.getenv("V12_POLL_SECONDS", "10"))))
+    except ValueError as exc:
+        raise RuntimeError("INVALID_V12_POLL_SECONDS") from exc
 
 def load_key() -> str:
     key = KEY_FILE.read_text(encoding="utf-8").strip()
