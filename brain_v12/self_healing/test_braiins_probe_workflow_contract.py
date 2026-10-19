@@ -17,7 +17,7 @@ def test_live_evidence_probe_does_not_start_or_configure_mining():
     workflow = PROBE.read_text(encoding="utf-8").lower()
     assert "stratum" not in workflow
     assert "miner start" not in workflow
-    assert "pool settings" in workflow
+    assert "read-only pool telemetry" in workflow.lower()
     assert "no shares were submitted" in workflow
 
 
