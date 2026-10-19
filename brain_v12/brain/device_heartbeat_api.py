@@ -22,16 +22,23 @@ def build_device_heartbeat_router(
 
     @router.post("/api/device/heartbeat")
     def device_heartbeat(request: Request, body: dict | None = None):
+        payload = body or {}
+        raw_body_agent_id = payload.get("agent_id", "")
+        if not isinstance(raw_body_agent_id, str):
+            raise HTTPException(status_code=422, detail="INVALID_DEVICE_AGENT_ID")
+        metadata = payload.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            raise HTTPException(status_code=422, detail="INVALID_DEVICE_METADATA")
         try:
             agent_id = authorize_heartbeat_identity(
                 request.headers.get("X-V12-Agent-Id", ""),
-                str((body or {}).get("agent_id", "")),
+                raw_body_agent_id,
                 request.headers.get("X-V12-Agent-Key", ""),
                 per_agent_registry_configured(),
                 device_bridge.authenticate,
             )
         except HeartbeatAuthorizationError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-        return device_bridge.heartbeat(agent_id, (body or {}).get("metadata") or {})
+        return device_bridge.heartbeat(agent_id, metadata)
 
     return router
