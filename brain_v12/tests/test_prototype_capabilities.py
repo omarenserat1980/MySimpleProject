@@ -32,6 +32,26 @@ def test_resource_budget_prevents_overcommit_and_supports_release():
     assert budget.reserved["cpu_units"] == 2
 
 
+@pytest.mark.parametrize("amount", [float("nan"), float("inf"), float("-inf"), True, 0, -1])
+def test_resource_budget_rejects_invalid_reservation_amounts(amount):
+    budget = ResourceBudgetPrototype({"cpu_units": 4})
+    with pytest.raises(ValueError, match="INVALID_RESOURCE_AMOUNT"):
+        budget.reserve("cpu_units", amount)
+
+
+@pytest.mark.parametrize("capacity", [float("nan"), float("inf"), float("-inf"), True, -1])
+def test_resource_budget_rejects_invalid_capacities(capacity):
+    with pytest.raises(ValueError, match="INVALID_RESOURCE_CAPACITY"):
+        ResourceBudgetPrototype({"cpu_units": capacity})
+
+
+def test_resource_budget_rejects_non_finite_or_overcommitted_initial_reservations():
+    with pytest.raises(ValueError, match="INVALID_RESERVED_RESOURCE_AMOUNT"):
+        ResourceBudgetPrototype({"cpu_units": 4}, {"cpu_units": float("nan")})
+    with pytest.raises(ValueError, match="RESOURCE_BUDGET_EXCEEDED"):
+        ResourceBudgetPrototype({"cpu_units": 4}, {"cpu_units": 5})
+
+
 def test_evidence_engine_hash_chain_detects_tampering():
     evidence = EvidenceEnginePrototype()
     evidence.record(kind="test", source="pytest", payload={"passed": True}, evidence_class="local_test")
