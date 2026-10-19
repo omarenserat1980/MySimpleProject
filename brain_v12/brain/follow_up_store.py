@@ -9,6 +9,7 @@ import json
 import os
 import sqlite3
 import threading
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -105,8 +106,17 @@ class FollowUpStore:
         con.execute("PRAGMA busy_timeout=10000")
         return con
 
+    @contextmanager
+    def _connection(self):
+        con = self._connect()
+        try:
+            with con:
+                yield con
+        finally:
+            con.close()
+
     def _initialize(self) -> None:
-        with _LOCK, self._connect() as con:
+        with _LOCK, self._connection() as con:
             con.executescript("""
                 CREATE TABLE IF NOT EXISTS follow_up_tasks (
                     task_id TEXT PRIMARY KEY,
@@ -150,7 +160,7 @@ class FollowUpStore:
         return item
 
     def list_tasks(self) -> list[dict[str, Any]]:
-        with _LOCK, self._connect() as con:
+        with _LOCK, self._connection() as con:
             rows = con.execute(
                 "SELECT * FROM follow_up_tasks ORDER BY "
                 "CASE status WHEN 'IN_PROGRESS' THEN 0 WHEN 'BLOCKED' THEN 1 "
