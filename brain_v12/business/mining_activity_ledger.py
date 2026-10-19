@@ -109,6 +109,7 @@ class MiningActivityLedger:
         if not isinstance(payload, dict):
             raise ValueError("payload must be a structured object")
 
+        timestamp_was_supplied = observed_at is not None
         timestamp = str(observed_at or datetime.now(timezone.utc).isoformat()).strip()
         if not timestamp:
             raise ValueError("observed_at must not be empty")
@@ -149,7 +150,8 @@ class MiningActivityLedger:
                 snapshot = self._snapshot(existing)
                 requested = {
                     "activity_id": activity_id, "run_id": run_id, "mode": mode,
-                    "activity_type": activity_type, "observed_at": timestamp,
+                    "activity_type": activity_type,
+                    "observed_at": timestamp if timestamp_was_supplied else snapshot["observed_at"],
                     "source": str(source).strip(), "evidence_ref": str(evidence_ref).strip(),
                     "payload": json.loads(payload_json), "estimated_amount": amount_text,
                     "estimated_currency": currency_text, "activity_status": activity_status,
