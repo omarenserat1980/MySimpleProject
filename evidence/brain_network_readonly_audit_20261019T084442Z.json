@@ -1,0 +1,268 @@
+{
+  "schema": "brain-network-readonly-audit/v1",
+  "observed_at": "2026-10-19T08:44:42.886697+00:00",
+  "base_url": "http://127.0.0.1:8012",
+  "mode": "READ_ONLY_NO_SCAN_NO_CONFIGURATION_CHANGES",
+  "results": {
+    "directory_status": {
+      "http_status": 200,
+      "data": {
+        "ok": true,
+        "module": "Brain Network Device Directory",
+        "mode": "LOCAL_INVENTORY_ONLY",
+        "devices": 0,
+        "network_scan_performed": false,
+        "dhcp_enabled": false,
+        "router_contacted": false,
+        "device_settings_changed": false,
+        "writes_enabled": false
+      }
+    },
+    "directory_devices": {
+      "http_status": 200,
+      "data": {
+        "items": []
+      }
+    },
+    "directory_overview": {
+      "http_status": 200,
+      "data": {
+        "ok": true,
+        "module": "Brain Network Directory Overview",
+        "networks": [],
+        "reservations": [],
+        "devices": [],
+        "mode": "LOCAL_DATABASE_JOIN_ONLY",
+        "network_scan_performed": false,
+        "asic_contacted": false,
+        "dhcp_changed": false
+      }
+    },
+    "network_diagnostics": {
+      "http_status": 200,
+      "data": {
+        "ok": true,
+        "module": "Brain Unified Network Diagnostic Report",
+        "mode": "READ_ONLY_AGGREGATION",
+        "summary": {
+          "api_local_health": true,
+          "supervisor_health": true,
+          "registered_devices": 0,
+          "registered_networks": 0,
+          "ip_reservations": 0,
+          "asic_state": "WAITING_FOR_EXPLICIT_PRIVATE_IP",
+          "real_mining_verified": false
+        },
+        "modules": {
+          "network_manager": {
+            "ok": true,
+            "module": "Network Manager",
+            "mode": "READ_ONLY_DIAGNOSTICS",
+            "device": {
+              "hostname": "localhost",
+              "platform": "Android-15-aarch64-64bit-ELF"
+            },
+            "gateway_probe": {
+              "address": "192.168.1.1",
+              "tcp_ports": {
+                "80": true,
+                "443": true
+              }
+            },
+            "brain_local_health": {
+              "ok": true,
+              "status_code": 200
+            },
+            "brain_supervisor": {
+              "ok": true,
+              "status_code": 200
+            },
+            "settings_changed": false,
+            "execution_interface": {
+              "enabled": false,
+              "reason": "READ_ONLY_PHASE; authorized executor not configured"
+            },
+            "limitations": [
+              "Android may restrict access to interface addresses and routing tables.",
+              "Gateway probe is a connectivity hint, not proof of internet access.",
+              "No Wi-Fi, DHCP, IP, router, firewall, or production settings were changed."
+            ],
+            "observed_at_unix": 1792399482
+          },
+          "device_directory": {
+            "ok": true,
+            "module": "Brain Network Device Directory",
+            "mode": "LOCAL_INVENTORY_ONLY",
+            "devices": 0,
+            "network_scan_performed": false,
+            "dhcp_enabled": false,
+            "router_contacted": false,
+            "device_settings_changed": false,
+            "writes_enabled": false
+          },
+          "ipam": {
+            "ok": true,
+            "module": "Brain Network IPAM",
+            "mode": "DATABASE_RECORDS_ONLY",
+            "networks": 0,
+            "reservations": 0,
+            "writes_enabled": false,
+            "dhcp_integration_enabled": false,
+            "router_contacted": false,
+            "network_scan_performed": false,
+            "device_ip_changed": false,
+            "settings_changed": false
+          },
+          "directory_overview": {
+            "ok": true,
+            "module": "Brain Network Directory Overview",
+            "networks": [],
+            "reservations": [],
+            "devices": [],
+            "mode": "LOCAL_DATABASE_JOIN_ONLY",
+            "network_scan_performed": false,
+            "asic_contacted": false,
+            "dhcp_changed": false
+          },
+          "asic_bridge": {
+            "ok": true,
+            "module": "ASIC Read-only Bridge",
+            "state": "WAITING_FOR_EXPLICIT_PRIVATE_IP",
+            "device_contacted": false,
+            "api_port": 4028,
+            "read_only_commands": [
+              "summary",
+              "devs"
+            ],
+            "required_configuration": "Set BRAIN_ASIC_HOST to the ASIC's known private IPv4 address.",
+            "network_scan_performed": false,
+            "settings_changed": false,
+            "mining_started": false,
+            "real_mining_verified": false
+          }
+        },
+        "errors": {},
+        "network_scan_performed": false,
+        "dhcp_changed": false,
+        "router_settings_changed": false,
+        "device_settings_changed": false,
+        "mining_started": false
+      }
+    },
+    "asic_bridge": {
+      "http_status": 200,
+      "data": {
+        "ok": true,
+        "module": "ASIC Read-only Bridge",
+        "state": "WAITING_FOR_EXPLICIT_PRIVATE_IP",
+        "device_contacted": false,
+        "api_port": 4028,
+        "read_only_commands": [
+          "summary",
+          "devs"
+        ],
+        "required_configuration": "Set BRAIN_ASIC_HOST to the ASIC's known private IPv4 address.",
+        "network_scan_performed": false,
+        "settings_changed": false,
+        "mining_started": false,
+        "real_mining_verified": false
+      }
+    },
+    "mining_readiness": {
+      "http_status": 200,
+      "data": {
+        "ok": true,
+        "node_mode": "SIMULATOR",
+        "software_api_ready": true,
+        "real_mining_ready": false,
+        "state": "BLOCKED",
+        "execution_mode": "BRAIN_OWNED_SOFTWARE_ONLY_PLAN_ONLY",
+        "physical_devices_role": "CONNECTIVITY_OBSERVATION_ONLY",
+        "native_mining_backend": "NOT_IMPLEMENTED",
+        "capability_report": {
+          "probe_mode": "LOCAL_READ_ONLY_NO_NETWORK",
+          "python_sha256d_primitive": "AVAILABLE",
+          "native_mining_backend": "NOT_IMPLEMENTED",
+          "native_build_artifacts": [],
+          "stratum_protocol_modules": {
+            "stratum_v1_protocol.py": true,
+            "stratum_v1_session.py": true,
+            "stratum_v1_transport.py": true,
+            "stratum_v1_pipeline.py": true,
+            "stratum_v1_jobs.py": true
+          },
+          "live_pool_adapter": "NOT_IMPLEMENTED",
+          "attested_brain_compute_host": false,
+          "zero_cost_compute_resource_verified": false,
+          "execution_started": false,
+          "accepted_pool_shares_verified": false,
+          "payout_verified": false,
+          "revenue_verified": false,
+          "live_mining_supported": false,
+          "blockers": [
+            "BRAIN_OWNED_NATIVE_MINING_BACKEND_NOT_IMPLEMENTED",
+            "LIVE_STRATUM_POOL_ADAPTER_NOT_IMPLEMENTED",
+            "BRAIN_COMPUTE_HOST_NOT_ATTESTED",
+            "ZERO_COST_COMPUTE_RESOURCE_NOT_VERIFIED",
+            "NO_INDEPENDENT_POOL_SHARE_OR_PAYOUT_EVIDENCE"
+          ]
+        },
+        "gates": {
+          "G0_api_contract": "READY",
+          "G1_simulation": "READY",
+          "G2_brain_owned_compute_backend": "BLOCKED_NOT_IMPLEMENTED",
+          "G3_brain_runtime_attestation": "NOT_VERIFIED_BY_THIS_API",
+          "G4_gateway_connectivity": "NOT_REQUIRED_FOR_COMPUTE",
+          "G5_pool_shares": "BLOCKED_NO_VERIFIED_POOL_SHARES",
+          "G6_payout": "BLOCKED_NO_VERIFIED_PAYOUT",
+          "G7_profit": "BLOCKED_NO_VERIFIED_COST_AND_REVENUE"
+        },
+        "blockers": [
+          "The Brain-owned native mining compute backend is not implemented.",
+          "No independently verified pool session or accepted-share evidence is bound to a Brain runtime.",
+          "Payout and profit evidence are not available through this API."
+        ],
+        "real_mining_claim": false,
+        "revenue_claim": false,
+        "timestamp_utc": "2026-10-19T08:44:42.872532+00:00"
+      }
+    },
+    "follow_up": {
+      "http_status": 200,
+      "data": {
+        "ok": true,
+        "schema": "brain-follow-up/v1",
+        "storage": "sqlite",
+        "database_path": "/data/data/com.termux/files/home/.brain/runtime/state/follow_up.sqlite3",
+        "total_tasks": 8,
+        "counts": {
+          "BLOCKED": 2,
+          "FAIL": 0,
+          "IN_PROGRESS": 1,
+          "NOT_PROVEN": 0,
+          "NOT_RUN": 0,
+          "PASS": 5,
+          "PLANNED": 0
+        },
+        "active_tasks": 1,
+        "blocked_tasks": 2,
+        "last_updated_at": "2026-10-19T08:30:59.962213+00:00"
+      }
+    }
+  },
+  "conclusion": {
+    "brain_local_api_reachable": true,
+    "known_device_count": 0,
+    "known_asic_count": 0,
+    "asic_contacted": false,
+    "network_scan_performed": false,
+    "settings_changed": false,
+    "mining_started": false,
+    "real_mining_verified": false,
+    "limitations": [
+      "Gateway reachability does not identify an ASIC.",
+      "Only devices already present in Brain's local inventory are counted.",
+      "This audit does not scan the LAN, contact an ASIC, change settings, or start mining."
+    ]
+  }
+}
