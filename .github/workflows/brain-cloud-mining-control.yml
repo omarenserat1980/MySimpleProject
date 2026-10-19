@@ -148,3 +148,19 @@ jobs:
         run: |
           python -m brain_v12.brain.cloud_mining_control_plane
           echo "Cloud layer coordinates registered workers; it does not mine on GitHub Actions."
+
+      - name: Report live-mining evidence separately from CI
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Mining evidence status"
+            echo
+            echo "- CI validation result: ${{ job.status }}"
+            echo "- Live worker evidence: NOT_CHECKED_BY_THIS_CI_RUN"
+            echo "- Accepted pool shares: NOT_VERIFIED_BY_THIS_CI_RUN"
+            echo "- Payout/revenue: NOT_VERIFIED_BY_THIS_CI_RUN"
+            echo "- Mining execution on GitHub Actions: NOT_PERFORMED"
+            echo
+            echo "A green CI result means only that the configured software tests passed. It is not evidence of live Bitcoin mining, accepted shares, payout, or revenue."
+          } >> "$GITHUB_STEP_SUMMARY"
