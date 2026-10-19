@@ -1,0 +1,42 @@
+name: ASIC Node Compiler RTL Integration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "brain_v12/asic/node_compiler.py"
+      - "brain_v12/asic/examples/**"
+      - "brain_v12/tests/test_asic_node_compiler*.py"
+      - ".github/workflows/asic-node-compiler-rtl.yml"
+  push:
+    branches: [main]
+    paths:
+      - "brain_v12/asic/node_compiler.py"
+      - "brain_v12/asic/examples/**"
+      - "brain_v12/tests/test_asic_node_compiler*.py"
+      - ".github/workflows/asic-node-compiler-rtl.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generated-rtl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Icarus Verilog
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes iverilog
+      - name: Install test dependency
+        run: python -m pip install pytest
+      - name: Run compiler unit and generated RTL integration tests
+        run: |
+          python -m pytest -q \
+            brain_v12/tests/test_asic_node_compiler.py \
+            brain_v12/tests/test_asic_node_compiler_rtl.py
