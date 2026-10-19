@@ -251,5 +251,24 @@ class DeviceBridgeTests(unittest.TestCase):
         os.environ.pop("TERMUX_AGENT_TTL_SECONDS", None)
 
 
+    def test_heartbeat_recovers_after_stale(self):
+        os.environ["TERMUX_AGENT_TTL_SECONDS"] = "10"
+        with patch("brain_v12.brain.device_bridge.time.time", return_value=1000.0):
+            self.bridge.heartbeat("realme-recovery-test", {"reality": "TEST_FIXTURE"})
+        with patch("brain_v12.brain.device_bridge.time.time", return_value=1011.0):
+            stale = self.bridge.agent_status()
+        record = next(item for item in stale["agents"] if item["agent_id"] == "realme-recovery-test")
+        self.assertEqual(record["state"], "STALE")
+        with patch("brain_v12.brain.device_bridge.time.time", return_value=1012.0):
+            heartbeat = self.bridge.heartbeat("realme-recovery-test", {"reality": "TEST_FIXTURE"})
+            recovered = self.bridge.agent_status()
+        self.assertTrue(heartbeat["ok"])
+        record = next(item for item in recovered["agents"] if item["agent_id"] == "realme-recovery-test")
+        self.assertTrue(record["online"])
+        self.assertEqual(record["state"], "ONLINE")
+        self.assertEqual(record["age_seconds"], 0.0)
+        os.environ.pop("TERMUX_AGENT_TTL_SECONDS", None)
+
+
 if __name__ == "__main__":
     unittest.main()
