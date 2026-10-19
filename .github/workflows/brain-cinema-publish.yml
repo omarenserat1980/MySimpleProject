@@ -42,7 +42,22 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Verify production master
+        shell: bash
         run: |
+          set -euo pipefail
+          # Multi-path upload-artifact bundles may preserve a directory prefix.
+          # Normalize the downloaded master to the canonical path before validation.
+          if [ ! -s docs/assets/last_light_city.mp4 ]; then
+            master_path="$(find docs/assets -type f -name 'last_light_city.mp4' -print -quit)"
+            if [ -z "$master_path" ]; then
+              echo "::error::Verified production artifact does not contain last_light_city.mp4"
+              find docs/assets -maxdepth 4 -type f -printf '%p (%s bytes)\\n' || true
+              exit 1
+            fi
+            if [ "$master_path" != "docs/assets/last_light_city.mp4" ]; then
+              cp "$master_path" docs/assets/last_light_city.mp4
+            fi
+          fi
           test -s docs/assets/last_light_city.mp4
           sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
           ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,duration -of json docs/assets/last_light_city.mp4 > /tmp/film-probe.json
