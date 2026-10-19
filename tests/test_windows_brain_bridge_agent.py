@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 
+import tools.windows_brain_bridge_agent as bridge
 from tools.windows_brain_bridge_agent import (
     ALLOWED_TASKS, execute, validate_config,
 )
@@ -32,10 +33,16 @@ class WindowsBridgeAgentTests(unittest.TestCase):
     def test_valid_https_endpoint_with_allowlist(self):
         with patch.dict("os.environ", {
             "V12_AGENT_ID": "windows-bridge-test",
-            "V12_BRAIN_URL": "https://brain.example.invalid/api",
+            "V12_BRAIN_URL": "https://brain.example.invalid",
             "V12_BRAIN_ALLOWED_HOSTS": "brain.example.invalid",
+            "V12_AGENT_KEY_FILE": "/tmp/windows-bridge-test.key",
+            "V12_POLL_SECONDS": "17",
         }, clear=True):
             validate_config()
+            self.assertEqual(bridge.AGENT_ID, "windows-bridge-test")
+            self.assertEqual(bridge.BRAIN_URL, "https://brain.example.invalid")
+            self.assertEqual(str(bridge.KEY_FILE), "/tmp/windows-bridge-test.key")
+            self.assertEqual(bridge.POLL_SECONDS, 17.0)
 
     def test_http_override_must_be_explicit(self):
         with patch.dict("os.environ", {
@@ -51,6 +58,7 @@ class WindowsBridgeAgentTests(unittest.TestCase):
             "https://user:secret@brain.example.invalid",
             "https://brain.example.invalid?token=oops",
             "https://brain.example.invalid#fragment",
+            "https://brain.example.invalid/api",
         ):
             with self.subTest(url=url), patch.dict("os.environ", {
                 "V12_AGENT_ID": "windows-bridge-test",
