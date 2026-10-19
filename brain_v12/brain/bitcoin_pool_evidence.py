@@ -5,7 +5,7 @@ a worker, or independently verify that a claimed pool API response is genuine.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import hashlib
 import json
 import math
@@ -35,13 +35,20 @@ def validate_pool_evidence(
     now: datetime | None = None,
     max_age_seconds: int = 300,
 ) -> dict[str, Any]:
-    """Validate a live Bitcoin pool evidence record; never claims payout or revenue."""
+    """Validate record structure/integrity only; never authenticates source or proves mining."""
     errors: list[str] = []
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         raise ValueError("now must be timezone-aware")
     if not isinstance(record, dict):
-        return {"status": "BLOCKED", "errors": ["RECORD_NOT_OBJECT"], "mining_activity_verified": False, "payout_verified": False, "revenue_verified": False}
+        return {
+            "status": "BLOCKED",
+            "errors": ["RECORD_NOT_OBJECT"],
+            "evidence_schema_validated": False,
+            "mining_activity_verified": False,
+            "payout_verified": False,
+            "revenue_verified": False,
+        }
     if record.get("schema_version") != "1.0":
         errors.append("UNSUPPORTED_SCHEMA_VERSION")
     if record.get("mode") != "live":
@@ -116,12 +123,13 @@ def validate_pool_evidence(
     elif digest != evidence_digest(record):
         errors.append("EVIDENCE_DIGEST_MISMATCH")
 
-    passed = not errors
+    schema_valid = not errors
     return {
-        "status": "MINING_ACTIVITY_EVIDENCE_VALIDATED" if passed else "BLOCKED",
+        "status": "EVIDENCE_SCHEMA_VALIDATED_NOT_AUTHENTICATED" if schema_valid else "BLOCKED",
         "errors": errors,
-        "mining_activity_verified": passed,
+        "evidence_schema_validated": schema_valid,
+        "mining_activity_verified": False,
         "payout_verified": False,
         "revenue_verified": False,
-        "evidence_limit": "Schema, freshness and digest checks do not authenticate the source. Pool payout and wallet-side receipt require separate independent evidence.",
+        "evidence_limit": "Schema, freshness and digest checks validate structure and integrity only; they do not authenticate the source or prove pool-side activity. Trusted server-side verification is required. Pool payout and wallet-side receipt require separate independent evidence.",
     }
