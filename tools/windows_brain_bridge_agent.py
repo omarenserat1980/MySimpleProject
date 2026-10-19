@@ -81,7 +81,8 @@ def validate_config() -> None:
     # This prevents a partially updated runtime if one setting is malformed.
     AGENT_ID = agent_id
     BRAIN_URL = brain_url.rstrip("/")
-    KEY_FILE = Path(os.getenv("V12_AGENT_KEY_FILE", str(Path.home() / ".brain" / "agent.key")))
+    key_file_env = os.getenv("V12_AGENT_KEY_FILE")
+    KEY_FILE = Path(key_file_env) if key_file_env else Path.home() / ".brain" / "agent.key"
     POLL_SECONDS = max(5.0, min(60.0, poll_seconds))
 
 def load_key() -> str:
