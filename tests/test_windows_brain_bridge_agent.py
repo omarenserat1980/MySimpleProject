@@ -112,5 +112,42 @@ class WindowsBridgeAgentTests(unittest.TestCase):
 
 
 
+    def test_run_once_completes_mocked_heartbeat_poll_report_cycle(self):
+        fake_snapshot = {
+            "memory": {"available_bytes": 1024 * 1024 * 512, "total_bytes": 1024 * 1024 * 1024},
+            "home_disk": {"free_bytes": 1024 * 1024 * 100, "total_bytes": 1024 * 1024 * 500},
+            "reality": "OBSERVED_HOST",
+            "resource_reservation": "NONE",
+        }
+        with patch.object(bridge, "AGENT_ID", "windows-bridge-test"), patch.object(
+            bridge, "resource_snapshot", return_value=fake_snapshot
+        ), patch.object(bridge, "request_json", side_effect=[
+            {"ok": True, "status": "HEARTBEAT"},
+            {"ok": True, "status": "TASK_AVAILABLE", "task": {
+                "task_id": "test-task-001", "task": "python_version"
+            }},
+            {"ok": True, "status": "COMPLETED"},
+        ]) as request:
+            result = bridge.run_once("unit-test-key")
+
+        self.assertEqual(result, "REPORTED:python_version")
+        self.assertEqual(request.call_count, 3)
+        self.assertEqual(request.call_args_list[0].args[:3], (
+            "POST", "/api/device/heartbeat", "unit-test-key"
+        ))
+        self.assertEqual(request.call_args_list[1].args[:3], (
+            "GET", "/api/device/poll?agent_id=windows-bridge-test", "unit-test-key"
+        ))
+        report_call = request.call_args_list[2]
+        self.assertEqual(report_call.args[:3], (
+            "POST", "/api/device/report", "unit-test-key"
+        ))
+        self.assertEqual(report_call.args[3]["task_id"], "test-task-001")
+        self.assertEqual(report_call.args[3]["agent_id"], "windows-bridge-test")
+        self.assertTrue(report_call.args[3]["ok"])
+        self.assertIn("python", report_call.args[3]["result"])
+
+
+
 if __name__ == "__main__":
     unittest.main()
