@@ -6,6 +6,7 @@ on:
       - "tools/windows_brain_bridge_agent.py"
       - "tests/test_windows_brain_bridge_agent.py"
       - "docs/WINDOWS_BRAIN_BRIDGE_AGENT.md"
+      - "docs/WINDOWS_BRAIN_BRIDGE_SETUP.md"
       - ".github/workflows/windows-brain-bridge-tests.yml"
   workflow_dispatch:
 
