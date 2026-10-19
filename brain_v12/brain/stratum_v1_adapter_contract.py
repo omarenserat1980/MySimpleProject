@@ -14,8 +14,8 @@ from typing import Any
 _HEX = re.compile(r"^[0-9a-fA-F]*$")
 
 
-def _hex_field(value: Any, field: str, *, exact_bytes: int | None = None) -> str:
-    if not isinstance(value, str) or not value or len(value) % 2 or not _HEX.fullmatch(value):
+def _hex_field(value: Any, field: str, *, exact_bytes: int | None = None, allow_empty: bool = False) -> str:
+    if not isinstance(value, str) or (not value and not allow_empty) or len(value) % 2 or not _HEX.fullmatch(value):
         raise ValueError(f"INVALID_{field.upper()}_HEX")
     if exact_bytes is not None and len(value) != exact_bytes * 2:
         raise ValueError(f"INVALID_{field.upper()}_LENGTH")
@@ -70,6 +70,8 @@ class StratumV1AdapterContract:
         if not isinstance(params, list):
             raise ValueError("INVALID_PARAMS")
         if method == "mining.authorize":
+            if not self.subscribed:
+                raise ValueError("STRATUM_SUBSCRIBE_REQUIRED")
             if len(params) != 2 or params[0] != self.worker_name or not isinstance(params[1], str) or not params[1]:
                 raise ValueError("INVALID_AUTHORIZE_PARAMS")
         if method == "mining.subscribe" and params:
@@ -101,12 +103,21 @@ class StratumV1AdapterContract:
             self.difficulty = difficulty
             return {"status": "DIFFICULTY_UPDATED", "difficulty": difficulty}
         if method == "mining.notify":
-            if len(params) < 9 or not isinstance(params[0], str) or not params[0]:
+            if len(params) != 9 or not isinstance(params[0], str) or not params[0]:
                 raise ValueError("INVALID_MINING_NOTIFY")
             job_id = params[0]
+            _hex_field(params[1], "prevhash", exact_bytes=32)
+            _hex_field(params[2], "coinb1", allow_empty=True)
+            _hex_field(params[3], "coinb2", allow_empty=True)
+            if not isinstance(params[4], list):
+                raise ValueError("INVALID_MERKLE_BRANCH")
+            for branch in params[4]:
+                _hex_field(branch, "merkle_branch", exact_bytes=32)
+            _hex_field(params[5], "version", exact_bytes=4)
+            _hex_field(params[6], "nbits", exact_bytes=4)
+            _hex_field(params[7], "ntime", exact_bytes=4)
             if not isinstance(params[8], bool):
                 raise ValueError("INVALID_CLEAN_JOBS_FLAG")
-            # Keep only the fields needed for lifecycle checks; no credentials.
             self._jobs[job_id] = {"clean_jobs": params[8]}
             if params[8]:
                 self._jobs = {job_id: self._jobs[job_id]}
@@ -147,9 +158,10 @@ class StratumV1AdapterContract:
         request_id = message["id"]
         if request_id not in self._pending:
             raise ValueError("UNMATCHED_STRATUM_RESPONSE")
+        method = self._pending[request_id]
         if message.get("error") is not None:
-            method = self._pending.pop(request_id)
-            share_id = self._share_by_request.get(request_id)
+            self._pending.pop(request_id)
+            share_id = self._share_by_request.pop(request_id, None)
             if share_id:
                 previous = self._shares[share_id]
                 self._shares[share_id] = ShareRecord(previous.request_id, previous.job_id, "REJECTED")
@@ -158,10 +170,10 @@ class StratumV1AdapterContract:
             return {"status": "REJECTED", "method": method, "share_id": share_id,
                     "pool_acceptance_verified": False}
         result = message.get("result")
-        method = self._pending.pop(request_id)
+        if method == "mining.subscribe" and (not isinstance(result, list) or len(result) < 3):
+            raise ValueError("INVALID_SUBSCRIBE_RESPONSE")
+        self._pending.pop(request_id)
         if method == "mining.subscribe":
-            if not isinstance(result, list) or len(result) < 3:
-                raise ValueError("INVALID_SUBSCRIBE_RESPONSE")
             self.subscribed = True
             return {"status": "SUBSCRIBED", "pool_acceptance_verified": False}
         if method == "mining.authorize":
