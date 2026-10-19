@@ -239,7 +239,7 @@ class FollowUpStore:
                 """SELECT event_id,task_id,previous_status,new_status,note,
                           evidence_json,created_at FROM follow_up_events
                    WHERE task_id=? ORDER BY event_id DESC LIMIT ?""",
-                (task_id, max(1, min(int(limit), 100)),
+                (task_id, max(1, min(int(limit), 100))),
             ).fetchall()
             result = []
             for row in rows:
