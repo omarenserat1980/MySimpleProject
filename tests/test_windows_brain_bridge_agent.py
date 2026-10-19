@@ -50,6 +50,18 @@ class WindowsBridgeAgentTests(unittest.TestCase):
             self.assertEqual(str(bridge.KEY_FILE), "/tmp/windows-bridge-test.key")
             self.assertEqual(bridge.POLL_SECONDS, 17.0)
 
+    def test_explicit_key_file_does_not_require_home_directory(self):
+        with patch.dict("os.environ", {
+            "V12_AGENT_ID": "windows-bridge-test",
+            "V12_BRAIN_URL": "https://brain.example.invalid",
+            "V12_BRAIN_ALLOWED_HOSTS": "brain.example.invalid",
+            "V12_AGENT_KEY_FILE": "/tmp/explicit-agent.key",
+        }, clear=True), patch.object(
+            bridge.Path, "home", side_effect=RuntimeError("home unavailable")
+        ):
+            validate_config()
+            self.assertEqual(str(bridge.KEY_FILE), "/tmp/explicit-agent.key")
+
     def test_http_override_must_be_explicit(self):
         with patch.dict("os.environ", {
             "V12_AGENT_ID": "windows-bridge-test",
