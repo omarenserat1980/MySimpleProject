@@ -205,3 +205,30 @@ class PortableResourceOrchestratorInvalidNumericTests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             intent_digest(request)
+
+
+class PortableResourceOrchestratorCostAndBudgetGateTests(unittest.TestCase):
+    def test_paid_tier_with_zero_estimated_cost_stays_blocked_without_opt_in(self):
+        paid = ExecutorCapacity(
+            executor_id="paid-but-zero-estimate",
+            capabilities=frozenset({"python.test"}),
+            cpu_cores=8,
+            memory_mb=16000,
+            disk_mb=50000,
+            tier="PAID_CLOUD",
+            estimated_cost=0.0,
+        )
+        request = ScheduleRequest(task_id="no-spend", capability="python.test")
+        decision = PortableResourceOrchestrator().plan(request, [paid])
+        self.assertEqual(decision.status, "BLOCKED_NO_EXECUTOR")
+        self.assertEqual(decision.rejected[0]["reason"], "PAID_DISABLED")
+
+    def test_local_resource_budget_rejects_non_finite_and_boolean_values(self):
+        for value in (float("nan"), float("inf"), True):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    LocalResourceBudget(max_cpu_cores_per_task=value)
+        for field in ("max_memory_mb_per_task", "max_disk_mb_per_task", "max_concurrent_tasks"):
+            with self.subTest(field=field):
+                with self.assertRaises(ValueError):
+                    LocalResourceBudget(**{field: True})
