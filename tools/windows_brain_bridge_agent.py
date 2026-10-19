@@ -126,6 +126,8 @@ def execute(task_name: str) -> dict:
 
 
 def run_once(key: str) -> str:
+    snapshot = resource_snapshot()
+    memory = snapshot["memory"]
     metadata = {
         "platform": platform.system(),
         "model": platform.node(),
@@ -134,8 +136,14 @@ def run_once(key: str) -> str:
         "healthy": True,
         "capabilities": ["device.status", "device.info"],
         "cpu_cores": os.cpu_count() or 1,
-        "memory_mb": int((resource_snapshot()["memory"]["total_bytes"] or 0) / (1024 * 1024)),
-        "disk_mb": int(shutil.disk_usage(Path.home()).total / (1024 * 1024)),
+        # The scheduler-facing capacity is currently available RAM, not total
+        # installed RAM, so a memory-constrained host is not over-advertised.
+        "memory_mb": int((memory["available_bytes"] or 0) / (1024 * 1024)),
+        "total_memory_mb": int((memory["total_bytes"] or 0) / (1024 * 1024)),
+        "disk_mb": int(snapshot["home_disk"]["free_bytes"] / (1024 * 1024)),
+        "total_disk_mb": int(snapshot["home_disk"]["total_bytes"] / (1024 * 1024)),
+        "resource_reality": "OBSERVED_HOST",
+        "resource_reservation": "NONE",
     }
     request_json("POST", "/api/device/heartbeat", key, {"agent_id": AGENT_ID, "metadata": metadata})
     response = request_json("GET", "/api/device/poll?agent_id=" + quote(AGENT_ID, safe=""), key)
