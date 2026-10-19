@@ -96,23 +96,29 @@ jobs:
         continue-on-error: true
         run: |
           python -m pytest -q brain_v12/tests/test_bitcoin_stratum_bridge.py
-      - name: Diagnostic only — Stratum V1 job and share response lifecycle
-        id: stratum_v1_diagnostic
+      - name: Diagnostic only — Stratum V1 jobs
+        id: stratum_v1_jobs_diagnostic
         continue-on-error: true
         run: |
           python -m pytest -q brain_v12/tests/test_stratum_v1_jobs.py
+      - name: Diagnostic only — Stratum V1 protocol
+        id: stratum_v1_protocol_diagnostic
+        continue-on-error: true
+        run: |
           python -m pytest -q brain_v12/tests/test_stratum_v1_protocol.py
       - name: Report Stratum diagnostic status without gating CI
         if: always()
         env:
           STRATUM_BRIDGE_OUTCOME: ${{ steps.stratum_bridge_diagnostic.outcome }}
-          STRATUM_V1_OUTCOME: ${{ steps.stratum_v1_diagnostic.outcome }}
+          STRATUM_V1_JOBS_OUTCOME: ${{ steps.stratum_v1_jobs_diagnostic.outcome }}
+          STRATUM_V1_PROTOCOL_OUTCOME: ${{ steps.stratum_v1_protocol_diagnostic.outcome }}
         run: |
           {
             echo "## Stratum test status (diagnostic only)"
             echo
             echo "- Mocked TLS bridge tests: ${STRATUM_BRIDGE_OUTCOME:-unknown}"
-            echo "- Stratum V1 lifecycle tests: ${STRATUM_V1_OUTCOME:-unknown}"
+            echo "- Stratum V1 jobs tests: ${STRATUM_V1_JOBS_OUTCOME:-unknown}"
+            echo "- Stratum V1 protocol tests: ${STRATUM_V1_PROTOCOL_OUTCOME:-unknown}"
             echo "- These test outcomes do not gate this workflow."
             echo "- Live mining readiness, accepted shares, and revenue remain independently gated by evidence."
           } >> "$GITHUB_STEP_SUMMARY"
