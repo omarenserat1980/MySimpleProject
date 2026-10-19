@@ -106,3 +106,19 @@ def test_api_status_exposes_contract_without_claiming_live_transport():
     assert status["share_submission_enabled"] is False
     assert status["real_mining_verified"] is False
     assert status["revenue_verified"] is False
+
+
+
+def test_clean_job_keeps_old_pending_share_response_correlated():
+    adapter = StratumV1AdapterContract("sim.worker")
+    _authorize(adapter)
+    _notify(adapter, clean_jobs=False)
+    share = adapter.prepare_share("job-1", "00000000", "65aa0000", "00000000")
+    _notify(adapter, clean_jobs=True)
+    # A late response remains associated with its original request even after
+    # the old job is no longer valid for preparing new shares.
+    response = adapter.handle_response({"id": share["id"], "result": False, "error": None})
+    assert response["status"] == "REJECTED"
+    assert adapter.status()["share_counts"]["REJECTED"] == 1
+    with pytest.raises(ValueError, match="UNKNOWN_OR_STALE_JOB"):
+        adapter.prepare_share("job-1", "00000000", "65aa0000", "00000000")
