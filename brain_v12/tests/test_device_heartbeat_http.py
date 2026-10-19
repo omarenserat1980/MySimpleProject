@@ -1,4 +1,3 @@
-import os
 import unittest
 
 from fastapi import FastAPI
@@ -66,6 +65,16 @@ class DeviceHeartbeatHttpTests(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["detail"], "DEVICE_AGENT_ID_MISMATCH")
         self.assertEqual(self.bridge.heartbeats, [])
+
+    def test_valid_body_identity_without_header(self):
+        response = self.client.post(
+            "/api/device/heartbeat",
+            headers={"X-V12-Agent-Key": "realme-test-key"},
+            json={"agent_id": "realme-01", "metadata": {"source": "unit-test"}},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["agent_id"], "realme-01")
+        self.assertEqual(len(self.bridge.heartbeats), 1)
 
     def test_valid_per_agent_heartbeat_reaches_bridge(self):
         response = self.client.post(
