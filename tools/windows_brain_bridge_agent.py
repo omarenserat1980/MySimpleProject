@@ -24,6 +24,7 @@ ALLOWED_TASKS = frozenset({"status", "platform", "python_version"})
 
 
 def validate_config() -> None:
+    global AGENT_ID, BRAIN_URL, KEY_FILE, POLL_SECONDS
     # Read the environment at call time so tests and startup validation use the
     # active process configuration rather than import-time defaults.
     agent_id = os.getenv("V12_AGENT_ID", AGENT_ID).strip()
@@ -63,7 +64,6 @@ def validate_config() -> None:
 
     # Apply the validated runtime configuration to every subsequent request.
     # Import-time globals alone would otherwise validate one endpoint but use another.
-    global AGENT_ID, BRAIN_URL, KEY_FILE, POLL_SECONDS
     AGENT_ID = agent_id
     BRAIN_URL = brain_url.rstrip("/")
     KEY_FILE = Path(os.getenv("V12_AGENT_KEY_FILE", str(Path.home() / ".brain" / "agent.key")))
