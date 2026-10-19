@@ -69,7 +69,8 @@ def router() -> APIRouter:
         }
 
     @api.get("/cases")
-    def cases() -> dict:
+    def cases(request: Request) -> dict:
+        require_control_key(request)
         return {"ok": True, "cases": [_record(x) for x in CommercialCaseStore().list_cases()]}
 
     @api.post("/cases")
