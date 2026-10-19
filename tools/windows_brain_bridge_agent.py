@@ -24,18 +24,21 @@ ALLOWED_TASKS = frozenset({"status", "platform", "python_version"})
 
 
 def validate_config() -> None:
-    if not AGENT_ID.startswith("windows-bridge-"):
+    # Read the environment at call time so tests and startup validation use the
+    # active process configuration rather than import-time defaults.
+    agent_id = os.getenv("V12_AGENT_ID", AGENT_ID).strip()
+    brain_url = os.getenv("V12_BRAIN_URL", BRAIN_URL).strip().rstrip("/")
+    if not agent_id.startswith("windows-bridge-"):
         raise RuntimeError("V12_AGENT_ID_MUST_START_WITH_windows-bridge-")
-    if not BRAIN_URL:
+    if not brain_url:
         raise RuntimeError("V12_BRAIN_URL_REQUIRED")
-    if not (BRAIN_URL.startswith("https://") or (
+    if not (brain_url.startswith("https://") or (
         os.getenv("BRAIN_ALLOW_INSECURE_HTTP", "").strip() == "1"
-        and BRAIN_URL.startswith("http://")
+        and brain_url.startswith("http://")
     )):
         raise RuntimeError("HTTPS_REQUIRED_SET_BRAIN_ALLOW_INSECURE_HTTP=1_ONLY_FOR_TRUSTED_TEST_NETWORK")
-    if any(c in BRAIN_URL for c in "\r\n"):
+    if any(c in brain_url for c in "\\r\\n"):
         raise RuntimeError("INVALID_BRAIN_URL")
-
 
 def load_key() -> str:
     key = KEY_FILE.read_text(encoding="utf-8").strip()
