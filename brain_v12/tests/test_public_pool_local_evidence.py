@@ -20,7 +20,7 @@ def test_positive_pool_counter_is_activity_not_revenue():
         pool_snapshot={"ok": True, "workers_count": 1, "total_accepted_shares_reported": 2}
     )
     assert result["status"] == "POOL_SHARE_ACTIVITY_OBSERVED_NOT_REVENUE_PROOF"
-    assert result["share_acceptance_verified"] is True
+    assert result["share_acceptance_verified"] is False
     assert result["payout_verified"] is False
     assert result["revenue_verified"] is False
 
