@@ -33,6 +33,12 @@ references also include `brain-realme` and `realme-01`; confirm the existing wor
 in the pool dashboard before renaming anything. A worker label alone is not proof
 that a pool currently sees the worker.
 
+The Termux launcher is `scripts/run-public-pool-pplns.sh`. It defaults to
+`Realme01` and accepts an optional `BRAIN_MINING_WORKER_NAME` override, validated
+against letters, digits, underscore, and hyphen. It prompts for the payout address
+at launch rather than saving it in the repository. Launching this script starts
+mining; do not run it during read-only diagnosis.
+
 Set local configuration through environment variables (never commit the payout
 address):
 
