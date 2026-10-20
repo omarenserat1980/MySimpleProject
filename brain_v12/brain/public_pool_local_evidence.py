@@ -13,7 +13,7 @@ from typing import Any
 _SESSION_RE = re.compile(r"Stratum session id", re.IGNORECASE)
 _JOB_RE = re.compile(r"job_id\s*=|Stratum requested work", re.IGNORECASE)
 _HASHRATE_RE = re.compile(r"\b\d+(?:\.\d+)?\s*(?:khash|mhash|ghash|thash)/s", re.IGNORECASE)
-_ACCEPT_RE = re.compile(r"\baccepted\b", re.IGNORECASE)
+_ACCEPT_RE = re.compile(r"(?im)^\s*(?:accepted\s*[:#]|share\s+accepted\b)")
 _REJECT_RE = re.compile(r"\brejected\b", re.IGNORECASE)
 
 
@@ -67,7 +67,7 @@ def classify_public_pool_evidence(
         "pool_workers_count": workers if pool_valid else None,
         "pool_total_accepted_shares_reported": accepted if pool_valid else None,
         "pool_activity_reported": pool_activity,
-        "share_acceptance_verified": bool(local_accept or pool_activity),
+        "share_acceptance_verified": False,
         "brain_runtime_activity_verified": False,
         "payout_verified": False,
         "revenue_verified": False,
