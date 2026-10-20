@@ -66,6 +66,51 @@ def evaluate_persisted_public_pool_evidence(
     return result
 
 
+def persist_public_pool_evidence(
+    evidence_store: Any,
+    task_id: str,
+    *,
+    miner_log_path: str | Path | None = None,
+    pool_snapshot_path: str | Path | None = None,
+    mission_id: str | None = None,
+    attempt: int | None = None,
+    phase: str | None = None,
+) -> dict[str, Any]:
+    """Persist a classification of existing local artifacts as unverified evidence.
+
+    This is an explicit call site, not a background poller. It only reads the
+    paths supplied by the caller and appends one diagnostic record. EvidenceStore
+    integrity verification must not be interpreted as proof of shares, payout,
+    revenue, or attribution to a Brain process.
+    """
+    if not isinstance(task_id, str) or not task_id.strip():
+        raise ValueError("TASK_ID_REQUIRED")
+    report = evaluate_persisted_public_pool_evidence(
+        miner_log_path=miner_log_path,
+        pool_snapshot_path=pool_snapshot_path,
+    )
+    item = evidence_store.append(
+        task_id.strip(),
+        "public_pool_diagnostic",
+        report,
+        producer="brain.public_pool_evidence_runtime_adapter",
+        mission_id=mission_id,
+        attempt=attempt,
+        phase=phase,
+    )
+    return {
+        "evidence_id": item["evidence_id"],
+        "task_id": item["task_id"],
+        "kind": item["kind"],
+        "verification_status": item["verification_status"],
+        "sha256": item["sha256"],
+        "report": item["payload"],
+        "revenue_verified": False,
+        "payout_verified": False,
+        "financial_execution_enabled": False,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--miner-log", help="Existing local miner log; read only")
