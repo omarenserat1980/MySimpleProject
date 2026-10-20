@@ -20,7 +20,7 @@ def test_positive_pool_counter_is_activity_not_revenue():
         pool_snapshot={"ok": True, "workers_count": 1, "total_accepted_shares_reported": 2}
     )
     assert result["status"] == "POOL_SHARE_ACTIVITY_OBSERVED_NOT_REVENUE_PROOF"
-    assert result["share_acceptance_verified"] is True
+    assert result["share_acceptance_verified"] is False
     assert result["payout_verified"] is False
     assert result["revenue_verified"] is False
 
@@ -28,7 +28,24 @@ def test_positive_pool_counter_is_activity_not_revenue():
 def test_local_accepted_message_does_not_verify_payout():
     result = classify_public_pool_evidence(miner_log="accepted: 1/1")
     assert result["local_accepted_message_observed"] is True
-    assert result["share_acceptance_verified"] is True
+    assert result["share_acceptance_verified"] is False
+    assert result["revenue_verified"] is False
+
+
+def test_negative_acceptance_phrases_do_not_count_as_acceptance():
+    for log in ("not accepted: 0/1", "share not accepted", "rejected: 1/1", "unaccepted share"):
+        result = classify_public_pool_evidence(miner_log=log)
+        assert result["local_accepted_message_observed"] is False, log
+        assert result["share_acceptance_verified"] is False
+        assert result["revenue_verified"] is False
+
+
+def test_pool_aggregate_activity_is_not_per_share_acceptance_proof():
+    result = classify_public_pool_evidence(
+        pool_snapshot={"ok": True, "workers_count": 1, "total_accepted_shares_reported": 5}
+    )
+    assert result["pool_activity_reported"] is True
+    assert result["share_acceptance_verified"] is False
     assert result["revenue_verified"] is False
 
 
