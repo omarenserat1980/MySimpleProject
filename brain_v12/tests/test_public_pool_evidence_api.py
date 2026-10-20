@@ -44,7 +44,7 @@ def test_record_requires_control_key(monkeypatch, tmp_path):
 def test_record_persists_only_unverified_local_evidence(monkeypatch, tmp_path):
     monkeypatch.setenv("BRAIN_CONTROL_KEY", "test-only-key")
     monkeypatch.setenv("BRAIN_PUBLIC_POOL_EVIDENCE_ROOT", str(tmp_path))
-    (tmp_path / "public-pool-debug.log").write_text("no accepted share record\n", encoding="utf-8")
+    (tmp_path / "public-pool-smoke.log").write_text("no accepted share record\n", encoding="utf-8")
     (tmp_path / "public-pool-latest.json").write_text(
         json.dumps({"workersCount": 0, "totalAcceptedShares": 0, "workers": []}), encoding="utf-8"
     )

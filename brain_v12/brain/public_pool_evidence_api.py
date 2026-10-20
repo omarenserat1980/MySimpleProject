@@ -39,7 +39,7 @@ def create_public_pool_evidence_router(evidence_store: Any) -> APIRouter:
             return candidate
 
         try:
-            miner_log = trusted_configured_path("BRAIN_PUBLIC_POOL_MINER_LOG", "public-pool-debug.log")
+            miner_log = trusted_configured_path("BRAIN_PUBLIC_POOL_MINER_LOG", "public-pool-smoke.log")
             snapshot = trusted_configured_path("BRAIN_PUBLIC_POOL_SNAPSHOT", "public-pool-latest.json")
             result = persist_public_pool_evidence(
                 evidence_store,
