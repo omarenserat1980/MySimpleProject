@@ -22,9 +22,9 @@ concurrency:
 
 jobs:
   validate:
-    # Use the original Arkan self-hosted runner for trusted events only.
-    # Pull requests stay on GitHub-hosted runners to avoid executing untrusted code on Arkan.
-    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || fromJSON('["self-hosted", "linux", "x64", "brain-internal"]') }}
+    # This job is read-only, has contents:read only, and never starts mining.
+    # Use GitHub-hosted compute so validation does not depend on the offline Arkan runner.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
