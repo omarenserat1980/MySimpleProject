@@ -2,6 +2,7 @@ import { supervisorTick } from "./supervisor.js";
 
 const DEFAULT_ALLOWED_ORIGIN = "https://omarenserat1980.github.io";
 const PAYTABS_BASE_URL = "https://secure-jordan.paytabs.com";
+const MAX_DELIVERY_ARTIFACT_BYTES = 10 * 1024 * 1024;
 
 export default {
   async fetch(request, env) {
@@ -933,6 +934,52 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
   return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId, revenue_realized: false, settlement_required: settlementRequired }, 200, requestOrigin, allowedOrigin);
 }
 
+async function verifyDeliveryArtifact(parsedArtifactUrl, expectedHash) {
+  let response;
+  try {
+    response = await fetch(parsedArtifactUrl.href, {
+      method: "GET",
+      redirect: "error",
+      headers: { Accept: "application/octet-stream" },
+    });
+  } catch {
+    return "ARTIFACT_FETCH_FAILED";
+  }
+  if (!response.ok) return "ARTIFACT_FETCH_FAILED";
+  const declaredLength = Number(response.headers.get("content-length") || "0");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_DELIVERY_ARTIFACT_BYTES) {
+    try { await response.body?.cancel(); } catch {}
+    return "ARTIFACT_TOO_LARGE";
+  }
+  if (!response.body) return "ARTIFACT_BODY_MISSING";
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_DELIVERY_ARTIFACT_BYTES) {
+        try { await reader.cancel(); } catch {}
+        return "ARTIFACT_TOO_LARGE";
+      }
+      chunks.push(value);
+    }
+  } catch {
+    try { await reader.cancel(); } catch {}
+    return "ARTIFACT_FETCH_FAILED";
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const actualHash = await sha256Hex(bytes);
+  return timingSafeEqual(actualHash, expectedHash) ? "VERIFIED" : "ARTIFACT_DIGEST_MISMATCH";
+}
+
 async function completeJob(request, env, requestOrigin, allowedOrigin) {
   if (!env.BRAIN_DB) return json({ ok: false, error: "D1_NOT_CONFIGURED" }, 503, requestOrigin, allowedOrigin);
   const control = String(env.BRAIN_CONTROL_TOKEN || "");
@@ -950,7 +997,7 @@ async function completeJob(request, env, requestOrigin, allowedOrigin) {
   if (!jobId || !evidenceObject || Object.keys(evidenceObject).length === 0) {
     return json({ ok: false, error: "STRUCTURED_RESULT_EVIDENCE_REQUIRED" }, 400, requestOrigin, allowedOrigin);
   }
-  if (!parsedArtifactUrl || parsedArtifactUrl.protocol !== "https:" || !parsedArtifactUrl.hostname) {
+  if (!parsedArtifactUrl || parsedArtifactUrl.protocol !== "https:" || !parsedArtifactUrl.hostname || parsedArtifactUrl.username || parsedArtifactUrl.password) {
     return json({ ok: false, error: "HTTPS_ARTIFACT_URL_REQUIRED" }, 400, requestOrigin, allowedOrigin);
   }
   const allowedArtifactOrigins = String(env.BRAIN_DELIVERY_ALLOWED_ORIGINS || "")
@@ -960,6 +1007,14 @@ async function completeJob(request, env, requestOrigin, allowedOrigin) {
   }
   if (!/^[a-f0-9]{64}$/.test(artifactHash)) {
     return json({ ok: false, error: "ARTIFACT_SHA256_REQUIRED" }, 400, requestOrigin, allowedOrigin);
+  }
+  // Verify bytes independently before mutating job, delivery, or order state.
+  const artifactVerification = await verifyDeliveryArtifact(parsedArtifactUrl, artifactHash);
+  if (artifactVerification === "ARTIFACT_DIGEST_MISMATCH") {
+    return json({ ok: false, error: "ARTIFACT_DIGEST_MISMATCH" }, 409, requestOrigin, allowedOrigin);
+  }
+  if (artifactVerification !== "VERIFIED") {
+    return json({ ok: false, error: artifactVerification }, 502, requestOrigin, allowedOrigin);
   }
   const job = await env.BRAIN_DB.prepare("SELECT job_id, order_id, state FROM service_jobs WHERE job_id = ?").bind(jobId).first();
   if (!job) return json({ ok: false, error: "JOB_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
