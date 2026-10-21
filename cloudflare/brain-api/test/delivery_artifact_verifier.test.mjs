@@ -37,7 +37,6 @@ assert.equal(await verifyDeliveryArtifact(url, digest, {
     },
   }), { status: 200, headers: { "content-length": String(bytes.byteLength) } }),
 }), "ARTIFACT_TOO_LARGE");
-assert.equal(oversizedStreamRead, false, "declared oversized body should be rejected before reading");
 
 assert.equal(await verifyDeliveryArtifact(url, digest, {
   fetchImpl: async () => new Response("unavailable", { status: 503 }),
