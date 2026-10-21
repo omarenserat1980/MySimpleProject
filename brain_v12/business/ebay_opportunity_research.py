@@ -209,7 +209,13 @@ def main() -> int:
     parser.add_argument("--outbound-shipping", type=float)
     parser.add_argument("--packaging-cost", type=float)
     args = parser.parse_args()
-    report = analyze_csv(args.input, unit_cost=args.unit_cost, fee_rate=args.fee_rate,
+    input_path = Path(args.input).expanduser()
+    if not input_path.is_file():
+        parser.error(
+            f"CSV file not found: {input_path}. Replace /path/to/product_research.csv "
+            "with the real file path. To locate CSV files, run: find ~/MySimpleProject ~/Downloads -type f -iname \"*.csv\" 2>/dev/null"
+        )
+    report = analyze_csv(input_path, unit_cost=args.unit_cost, fee_rate=args.fee_rate,
                          outbound_shipping=args.outbound_shipping, packaging_cost=args.packaging_cost,
                          currency=args.currency)
     payload = json.dumps(report, ensure_ascii=False, indent=2)

@@ -34,3 +34,12 @@ Analyze actual historical sold-item data exported by the user from eBay Product 
 - Do not list or promise delivery until actual shipping options, cost, delivery time, customs obligations, returns, and payout eligibility are confirmed.
 - eBay's public seller onboarding requires identity and payout-method verification. Jordan appearing in an international-fee classification does not itself prove that a specific Jordan-based account can complete seller onboarding or receive payouts. Confirm in the official onboarding flow before sourcing goods.
 - Treat an opportunity as a lead only. Revenue is realized only after a completed sale and verifiable payout, net of actual costs and reversals.
+
+## CSV template
+A blank header template is available at `ebay_product_research_template.csv`. Fill it only with real values from an eBay Product Research export or manually collected permitted results; do not treat an empty template or invented sample values as market evidence. Then run:
+
+```bash
+python -m brain_v12.business.ebay_opportunity_research ebay_product_research_template.csv --output ebay_report.json
+```
+
+An empty template correctly returns `NO_DATA`; it does not create sample opportunities.

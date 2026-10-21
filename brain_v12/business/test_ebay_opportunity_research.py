@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import pytest
+import subprocess
+import sys
 
 from brain_v12.business.ebay_opportunity_research import analyze_rows
 
@@ -51,3 +53,14 @@ def test_uses_item_id_as_grouping_key_when_present():
     ])
     assert report["unique_groups"] == 1
     assert report["opportunities"][0]["group_key"] == "id:123"
+
+
+def test_cli_missing_input_shows_actionable_error():
+    result = subprocess.run(
+        [sys.executable, "-m", "brain_v12.business.ebay_opportunity_research",
+         "/path/to/product_research.csv"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode != 0
+    assert "CSV file not found" in result.stderr
+    assert "Replace /path/to/product_research.csv" in result.stderr
