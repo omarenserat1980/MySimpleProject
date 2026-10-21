@@ -1,0 +1,43 @@
+{
+  "schema": "electronic-brain.realme-solo-mining-feasibility-evidence.v1",
+  "device_model": "RMX3710",
+  "benchmark_timestamp_utc": "2026-10-18T22:08:02.715057+00:00",
+  "device_sha256d_microbenchmark_hashes_per_second": 299687.4,
+  "benchmark_is_full_miner": false,
+  "benchmark_target_validation_performed": false,
+  "network_hashrate_source": "previously captured public CKPool aggregate telemetry; not a guaranteed current value",
+  "network_hashrate_reported": "241.0 PH/s",
+  "estimate": {
+    "schema": "electronic-brain.bitcoin-solo-economics.v1",
+    "valid": true,
+    "device_hashrate_hs": 299687.4,
+    "network_hashrate_hs": 2.41e+17,
+    "assumed_network_block_interval_seconds": 600.0,
+    "device_share_of_network_hashrate": 1.2435161825726143e-12,
+    "idealized_mean_time_to_find_one_block_seconds": 482502767884135.25,
+    "idealized_mean_time_to_find_one_block_years": 15289590.079224505,
+    "revenue_realized": false,
+    "payout_forecast_is_guaranteed": false,
+    "limitations": [
+      "Expected value only, not a prediction of when a block will be found.",
+      "Assumes constant device and network hashrate and a 600-second mean block interval.",
+      "Does not account for pool rules, downtime, stale work, fees, hardware power, or thermal throttling.",
+      "A CPU SHA256d benchmark is not proof of a production miner or accepted shares."
+    ]
+  },
+  "mining_started": false,
+  "share_submission_attempted": false,
+  "accepted_shares_verified": false,
+  "block_found_verified": false,
+  "payout_verified": false,
+  "revenue_realized": false,
+  "financial_execution_enabled": false,
+  "decision": "DO_NOT_TREAT_PHONE_CPU_SOLO_MINING_AS_A_REVENUE_PLAN",
+  "limitations": [
+    "Short CPU benchmark only, not a full mining client.",
+    "No proof-of-work target validation or share submission.",
+    "No power consumption measurement.",
+    "Aggregate pool hashrate snapshot may be stale.",
+    "Expected block interval is a statistical illustration, not a guaranteed outcome."
+  ]
+}
