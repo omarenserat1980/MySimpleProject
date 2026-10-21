@@ -29,3 +29,7 @@ python -m pytest -q brain_v12/tests/test_ckpool_readonly_collector.py
 ```
 
 The collector deliberately leaves `local_miner_started`, `local_hashrate_verified`, `local_share_acceptance_verified`, `block_found_verified`, `payout_verified`, and `revenue_realized` false. A payout requires separate independently verifiable block/transaction evidence. Solo mining has highly uncertain outcomes and is not a predictable income stream.
+
+## Brain API
+
+The read-only API route is `GET /api/mining/ckpool/status`. It returns the same aggregate public telemetry JSON as the collector. It does not accept wallet addresses or credentials and does not start a miner. A successful response means only that the public statistics were retrieved, not that this device mined or earned a reward.
