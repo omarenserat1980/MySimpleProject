@@ -228,3 +228,15 @@ assert.match(verifiedRetry, /priorEvidence\?\.capture_id/, "verified retry must 
 assert.match(paypalCaptureRecovery, /SELECT tran_ref, order_id, amount, currency, state, raw_evidence FROM payments WHERE tran_ref = \? AND order_id = \? AND provider = 'paypal'/, "verified retry must read persisted raw_evidence from the payment row");
 assert.match(verifiedRetry, /PAYPAL_VERIFIED_EVIDENCE_INCOMPLETE/, "verified retry must fail closed when prior evidence is incomplete");
 console.log("PAYPAL_VERIFIED_RETRY_RECOVERY_GATES=PASS");
+
+const completeJobSourceStart = worker.indexOf("async function completeJob(");
+const completeJobSourceEnd = worker.indexOf("\nasync function ", completeJobSourceStart + 1);
+const completeJobSource = worker.slice(completeJobSourceStart, completeJobSourceEnd);
+assert.match(worker, /async function verifyDeliveryArtifact\(/, "delivery artifact bytes must be independently verified");
+assert.match(worker, /redirect: "error"/, "artifact verification must reject redirects");
+assert.match(worker, /MAX_DELIVERY_ARTIFACT_BYTES/, "artifact download must have a hard byte limit");
+assert.match(completeJobSource, /await verifyDeliveryArtifact\(parsedArtifactUrl, artifactHash\)/, "job completion must verify artifact bytes before changing state");
+assert.match(completeJobSource, /ARTIFACT_DIGEST_MISMATCH/, "artifact digest mismatches must fail closed");
+assert.ok(completeJobSource.indexOf("await verifyDeliveryArtifact") < completeJobSource.indexOf("UPDATE service_jobs SET state = 'SUCCESS'"), "artifact verification must happen before marking the job successful");
+console.log("DELIVERY_ARTIFACT_BYTE_VERIFICATION=PASS");
+
