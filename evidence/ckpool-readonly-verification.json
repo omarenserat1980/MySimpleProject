@@ -1,0 +1,75 @@
+{
+  "block_found_verified": false,
+  "financial_execution_enabled": false,
+  "local_hashrate_verified": false,
+  "mining_started": false,
+  "observed_at_epoch": 1792595935,
+  "payout_verified": false,
+  "pool_telemetry": {
+    "block_found_verified": false,
+    "evidence_limit": "Pool-wide telemetry is aggregate. Address-level statistics, if returned, do not prove this device submitted shares. Solo mining has no guaranteed payout; only independently verified block and transaction evidence can establish a reward.",
+    "financial_execution_enabled": false,
+    "local_hashrate_verified": false,
+    "local_miner_started": false,
+    "local_share_acceptance_verified": false,
+    "observed_at_epoch": 1792595935,
+    "payout_verified": false,
+    "pool_stats": [
+      {
+        "Disconnected": 9404,
+        "Idle": 16497,
+        "Users": 33087,
+        "Workers": 53752,
+        "lastupdate": 1792595837,
+        "runtime": 1263395
+      },
+      {
+        "hashrate15m": "202P",
+        "hashrate1d": "241P",
+        "hashrate1hr": "206P",
+        "hashrate1m": "201P",
+        "hashrate5m": "202P",
+        "hashrate6hr": "228P",
+        "hashrate7d": "251P"
+      },
+      {
+        "SPS15m": 8390.9,
+        "SPS1h": 8395.8,
+        "SPS1m": 8367.2,
+        "SPS5m": 8377.7,
+        "accepted": 409050557294752,
+        "bestshare": 89321100180392,
+        "diff": 291.07,
+        "rejected": 8846192638607188264
+      }
+    ],
+    "pool_stats_available": true,
+    "read_only": true,
+    "revenue_realized": false,
+    "schema": "electronic-brain.ckpool-readonly.v1",
+    "source": "https://raw.stats.ckpool.org",
+    "user_stats": null,
+    "user_stats_available": false
+  },
+  "revenue_realized": false,
+  "schema": "electronic-brain.ckpool-verification-evidence.v1",
+  "scope": "public read-only telemetry plus non-authorizing Stratum subscribe probe",
+  "share_submission_attempted": false,
+  "stratum_probe": {
+    "authorization_sent": false,
+    "error_present": false,
+    "evidence_limit": "A successful subscribe response proves only Stratum protocol reachability. No worker authorization, share submission, local mining, block, or revenue was tested.",
+    "host": "stratum.ckpool.org",
+    "jsonrpc_response": true,
+    "latency_ms": 335.4,
+    "mining_started": false,
+    "port": 3333,
+    "probe": "mining.subscribe only",
+    "revenue_realized": false,
+    "schema": "electronic-brain.ckpool-stratum-probe.v1",
+    "share_submission_sent": false,
+    "subscription_response_present": true,
+    "subscription_result_items": 3,
+    "tcp_connected": true
+  }
+}
