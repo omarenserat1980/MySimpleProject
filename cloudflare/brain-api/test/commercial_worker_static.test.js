@@ -113,7 +113,7 @@ assert.match(worker, /ARTIFACT_SHA256_REQUIRED/, "job completion must require a 
 assert.match(worker, /artifact_sha256/, "delivery evidence must bind the artifact digest");
 assert.match(worker, /JOB_NOT_RUNNING/);
 assert.match(worker, /state = 'SUCCESS'/);
-assert.match(worker, /order_state: "READY"/);
+assert.match(worker, /order_state: orderState/, "completion response must return the reconciled order state");
 
 assert.match(worker, /confirmDelivery/);
 assert.match(worker, /DELIVERY_NOT_READY/);
