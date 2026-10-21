@@ -1,8 +1,8 @@
 import { supervisorTick } from "./supervisor.js";
+import { verifyDeliveryArtifact } from "./artifact-verifier.mjs";
 
 const DEFAULT_ALLOWED_ORIGIN = "https://omarenserat1980.github.io";
 const PAYTABS_BASE_URL = "https://secure-jordan.paytabs.com";
-const MAX_DELIVERY_ARTIFACT_BYTES = 10 * 1024 * 1024;
 
 export default {
   async fetch(request, env) {
@@ -932,52 +932,6 @@ async function confirmDelivery(request, env, requestOrigin, allowedOrigin) {
   }
   await recordOrderEvent(env, delivery.order_id, "READY", "COMPLETED", "CLIENT_DELIVERY_CONFIRMED", { delivery_id: deliveryId, client: client.email, revenue_realized: false, settlement_required: settlementRequired });
   return json({ ok: true, state: "DELIVERED", order_state: "COMPLETED", delivery_id: deliveryId, revenue_realized: false, settlement_required: settlementRequired }, 200, requestOrigin, allowedOrigin);
-}
-
-async function verifyDeliveryArtifact(parsedArtifactUrl, expectedHash) {
-  let response;
-  try {
-    response = await fetch(parsedArtifactUrl.href, {
-      method: "GET",
-      redirect: "error",
-      headers: { Accept: "application/octet-stream" },
-    });
-  } catch {
-    return "ARTIFACT_FETCH_FAILED";
-  }
-  if (!response.ok) return "ARTIFACT_FETCH_FAILED";
-  const declaredLength = Number(response.headers.get("content-length") || "0");
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_DELIVERY_ARTIFACT_BYTES) {
-    try { await response.body?.cancel(); } catch {}
-    return "ARTIFACT_TOO_LARGE";
-  }
-  if (!response.body) return "ARTIFACT_BODY_MISSING";
-  const reader = response.body.getReader();
-  const chunks = [];
-  let total = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_DELIVERY_ARTIFACT_BYTES) {
-        try { await reader.cancel(); } catch {}
-        return "ARTIFACT_TOO_LARGE";
-      }
-      chunks.push(value);
-    }
-  } catch {
-    try { await reader.cancel(); } catch {}
-    return "ARTIFACT_FETCH_FAILED";
-  }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  const actualHash = await sha256Hex(bytes);
-  return timingSafeEqual(actualHash, expectedHash) ? "VERIFIED" : "ARTIFACT_DIGEST_MISMATCH";
 }
 
 async function completeJob(request, env, requestOrigin, allowedOrigin) {
