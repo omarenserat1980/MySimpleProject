@@ -1,0 +1,32 @@
+name: Windows Brain Bridge Safety Tests
+
+on:
+  pull_request:
+    paths:
+      - "tools/windows_brain_bridge_agent.py"
+      - "tests/test_windows_brain_bridge_agent.py"
+      - "docs/WINDOWS_BRAIN_BRIDGE_AGENT.md"
+      - "docs/WINDOWS_BRAIN_BRIDGE_SETUP.md"
+      - ".github/workflows/windows-brain-bridge-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-brain-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  safety-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run Windows Bridge safety tests
+        run: python -m unittest tests/test_windows_brain_bridge_agent.py -v
