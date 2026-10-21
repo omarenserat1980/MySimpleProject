@@ -22,10 +22,16 @@ assert.equal(await verifyDeliveryArtifact(url, digest, {
   fetchImpl: async () => response(null, { "content-length": "9" }),
 }), "ARTIFACT_BODY_MISSING");
 
+let oversizedStreamRead = false;
 assert.equal(await verifyDeliveryArtifact(url, digest, {
   maxBytes: 8,
   fetchImpl: async () => response(bytes),
 }), "ARTIFACT_TOO_LARGE");
+assert.equal(await verifyDeliveryArtifact(url, digest, {
+  maxBytes: 8,
+  fetchImpl: async () => response(bytes, { "content-length": String(bytes.byteLength) }),
+}), "ARTIFACT_TOO_LARGE");
+assert.equal(oversizedStreamRead, false);
 
 assert.equal(await verifyDeliveryArtifact(url, digest, {
   fetchImpl: async () => new Response("unavailable", { status: 503 }),
@@ -33,6 +39,16 @@ assert.equal(await verifyDeliveryArtifact(url, digest, {
 
 assert.equal(await verifyDeliveryArtifact(url, digest, {
   fetchImpl: async () => { throw new Error("network failure"); },
+}), "ARTIFACT_FETCH_FAILED");
+
+const brokenStream = new ReadableStream({
+  start(controller) {
+    controller.enqueue(new Uint8Array([1, 2, 3]));
+    controller.error(new Error("stream interrupted"));
+  },
+});
+assert.equal(await verifyDeliveryArtifact(url, digest, {
+  fetchImpl: async () => new Response(brokenStream, { status: 200 }),
 }), "ARTIFACT_FETCH_FAILED");
 
 console.log("DELIVERY_ARTIFACT_VERIFIER_RUNTIME_TEST=PASS");
