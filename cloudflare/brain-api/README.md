@@ -21,8 +21,8 @@ The GitHub deployment workflow provisions/binds the D1 database and applies migr
 
 - Set the Worker variable `BRAIN_DELIVERY_ALLOWED_ORIGINS` to a comma-separated allowlist of exact HTTPS origins that actually host trusted service artifacts (origins only; no paths).
 - Keep this variable unset until the artifact host is selected and reviewed. In that state, `/health` reports `delivery_artifact_policy: NOT_CONFIGURED` and job completion fails closed.
-- Job completion requires structured evidence, an HTTPS artifact URL on an allowlisted origin, and a 64-character SHA-256 digest. The digest is currently recorded as executor-supplied evidence; this Worker does not download the artifact or independently recompute the digest. Do not treat the digest alone as proof that the artifact contents are authentic.
-- Before enabling production delivery, add an authenticated artifact verifier or signed-manifest verification and test it against the actual artifact provider. Do not use a broad wildcard origin or a user-controlled public upload host.
+- Job completion requires structured evidence, an HTTPS artifact URL on an allowlisted origin, and a 64-character SHA-256 digest. Before mutating job/order/delivery state, the Worker fetches the artifact without following redirects, streams and caps the body at 10 MiB, and independently recomputes SHA-256; fetch errors, missing bodies, oversized artifacts, redirects, and digest mismatches fail closed.
+- The allowlisted artifact origin must serve the exact bytes without a redirect. Private artifact providers that require authentication need a dedicated authenticated verifier or signed-manifest design; do not weaken the allowlist or accept executor-supplied hashes without verification. Validate the byte limit against the actual product artifact sizes before production delivery.
 
 ## Payment safety
 
