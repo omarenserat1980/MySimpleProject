@@ -1,4 +1,5 @@
 import { supervisorTick } from "./supervisor.js";
+import { verifyDeliveryArtifact } from "./artifact-verifier.mjs";
 
 const DEFAULT_ALLOWED_ORIGIN = "https://omarenserat1980.github.io";
 const PAYTABS_BASE_URL = "https://secure-jordan.paytabs.com";
@@ -950,7 +951,7 @@ async function completeJob(request, env, requestOrigin, allowedOrigin) {
   if (!jobId || !evidenceObject || Object.keys(evidenceObject).length === 0) {
     return json({ ok: false, error: "STRUCTURED_RESULT_EVIDENCE_REQUIRED" }, 400, requestOrigin, allowedOrigin);
   }
-  if (!parsedArtifactUrl || parsedArtifactUrl.protocol !== "https:" || !parsedArtifactUrl.hostname) {
+  if (!parsedArtifactUrl || parsedArtifactUrl.protocol !== "https:" || !parsedArtifactUrl.hostname || parsedArtifactUrl.username || parsedArtifactUrl.password) {
     return json({ ok: false, error: "HTTPS_ARTIFACT_URL_REQUIRED" }, 400, requestOrigin, allowedOrigin);
   }
   const allowedArtifactOrigins = String(env.BRAIN_DELIVERY_ALLOWED_ORIGINS || "")
@@ -964,6 +965,14 @@ async function completeJob(request, env, requestOrigin, allowedOrigin) {
   const job = await env.BRAIN_DB.prepare("SELECT job_id, order_id, state FROM service_jobs WHERE job_id = ?").bind(jobId).first();
   if (!job) return json({ ok: false, error: "JOB_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
   if (job.state !== "RUNNING") return json({ ok: false, error: "JOB_NOT_RUNNING" }, 409, requestOrigin, allowedOrigin);
+  // Verify bytes independently before mutating job, delivery, or order state.
+  const artifactVerification = await verifyDeliveryArtifact(parsedArtifactUrl, artifactHash);
+  if (artifactVerification === "ARTIFACT_DIGEST_MISMATCH") {
+    return json({ ok: false, error: "ARTIFACT_DIGEST_MISMATCH" }, 409, requestOrigin, allowedOrigin);
+  }
+  if (artifactVerification !== "VERIFIED") {
+    return json({ ok: false, error: artifactVerification }, 502, requestOrigin, allowedOrigin);
+  }
   const evidenceText = JSON.stringify({ ...evidenceObject, artifact_url: artifactUrl, artifact_sha256: artifactHash });
   // Compare-and-set prevents two concurrent completion requests from both claiming success.
   const completion = await env.BRAIN_DB.prepare(

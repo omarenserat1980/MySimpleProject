@@ -30,6 +30,7 @@ jobs:
           set -euo pipefail
           node --check src/index.js
           node test/commercial_worker_static.test.js
+          node test/delivery_artifact_verifier.test.mjs
           node test/staging_workflow_static.test.mjs
       - name: Test delivery/revenue SQL gates locally
         run: python cloudflare/brain-api/test/delivery_concurrency_sqlite_test.py -v
