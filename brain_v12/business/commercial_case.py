@@ -30,7 +30,7 @@ class CommercialCase:
     payment_evidence: str | None = None
     revenue_evidence: str | None = None
     cost_evidence: str | None = None
-    evidence_refs: list[str] = field(default_factory=list)
+    evidence_refs: list[str | dict[str, str]] = field(default_factory=list)
 
     def stage(self) -> str:
         if self.revenue_evidence and self.cost_evidence:
