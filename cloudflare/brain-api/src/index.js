@@ -962,10 +962,27 @@ async function completeJob(request, env, requestOrigin, allowedOrigin) {
   if (!/^[a-f0-9]{64}$/.test(artifactHash)) {
     return json({ ok: false, error: "ARTIFACT_SHA256_REQUIRED" }, 400, requestOrigin, allowedOrigin);
   }
-  const job = await env.BRAIN_DB.prepare("SELECT job_id, order_id, state FROM service_jobs WHERE job_id = ?").bind(jobId).first();
+  const job = await env.BRAIN_DB.prepare("SELECT job_id, order_id, state, result_evidence FROM service_jobs WHERE job_id = ?").bind(jobId).first();
   if (!job) return json({ ok: false, error: "JOB_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
-  if (job.state !== "RUNNING") return json({ ok: false, error: "JOB_NOT_RUNNING" }, 409, requestOrigin, allowedOrigin);
-  // Verify bytes independently before mutating job, delivery, or order state.
+  // A retry may resume after SUCCESS if a prior delivery/order write failed.
+  // Only the exact artifact already recorded for this job can resume recovery.
+  const alreadySuccessful = job.state === "SUCCESS";
+  if (job.state !== "RUNNING" && !alreadySuccessful) {
+    return json({ ok: false, error: "JOB_NOT_RUNNING" }, 409, requestOrigin, allowedOrigin);
+  }
+  let savedEvidence = null;
+  if (alreadySuccessful) {
+    try { savedEvidence = JSON.parse(String(job.result_evidence || "")); } catch {}
+    if (!savedEvidence || savedEvidence.artifact_url !== artifactUrl || savedEvidence.artifact_sha256 !== artifactHash) {
+      return json({ ok: false, error: "JOB_ALREADY_COMPLETED_WITH_DIFFERENT_ARTIFACT" }, 409, requestOrigin, allowedOrigin);
+    }
+  }
+  // During recovery, reuse the persisted evidence rather than accepting caller-supplied metadata.
+  const evidenceText = alreadySuccessful
+    ? JSON.stringify(savedEvidence)
+    : JSON.stringify({ ...evidenceObject, artifact_url: artifactUrl, artifact_sha256: artifactHash });
+
+  // Verify bytes independently before any new state mutation, including recovery.
   const artifactVerification = await verifyDeliveryArtifact(parsedArtifactUrl, artifactHash);
   if (artifactVerification === "ARTIFACT_DIGEST_MISMATCH") {
     return json({ ok: false, error: "ARTIFACT_DIGEST_MISMATCH" }, 409, requestOrigin, allowedOrigin);
@@ -973,28 +990,54 @@ async function completeJob(request, env, requestOrigin, allowedOrigin) {
   if (artifactVerification !== "VERIFIED") {
     return json({ ok: false, error: artifactVerification }, 502, requestOrigin, allowedOrigin);
   }
-  const evidenceText = JSON.stringify({ ...evidenceObject, artifact_url: artifactUrl, artifact_sha256: artifactHash });
-  // Compare-and-set prevents two concurrent completion requests from both claiming success.
-  const completion = await env.BRAIN_DB.prepare(
-    "UPDATE service_jobs SET state = 'SUCCESS', result_evidence = ?, updated_at = CURRENT_TIMESTAMP WHERE job_id = ? AND state = 'RUNNING'"
-  ).bind(evidenceText, jobId).run();
-  if (Number(completion.meta?.changes || 0) !== 1) {
-    return json({ ok: false, error: "JOB_COMPLETION_RACE" }, 409, requestOrigin, allowedOrigin);
+
+  if (!alreadySuccessful) {
+    // Compare-and-set prevents concurrent requests from both claiming job completion.
+    const completion = await env.BRAIN_DB.prepare(
+      "UPDATE service_jobs SET state = 'SUCCESS', result_evidence = ?, updated_at = CURRENT_TIMESTAMP WHERE job_id = ? AND state = 'RUNNING'"
+    ).bind(evidenceText, jobId).run();
+    if (Number(completion.meta?.changes || 0) !== 1) {
+      return json({ ok: false, error: "JOB_COMPLETION_RACE" }, 409, requestOrigin, allowedOrigin);
+    }
   }
+
+  // INSERT OR IGNORE makes retry after a partial write safe; validate any existing row.
   const deliveryId = "DEL-" + crypto.randomUUID().toUpperCase();
   const deliveryInsert = await env.BRAIN_DB.prepare(
     "INSERT OR IGNORE INTO deliveries (delivery_id, order_id, state, artifact_url, evidence) VALUES (?, ?, 'READY', ?, ?)"
   ).bind(deliveryId, job.order_id, artifactUrl, evidenceText).run();
   let finalDeliveryId = deliveryId;
+  let deliveryState = "READY";
   if (Number(deliveryInsert.meta?.changes || 0) !== 1) {
     const existingDelivery = await env.BRAIN_DB.prepare(
-      "SELECT delivery_id, state FROM deliveries WHERE order_id = ?"
+      "SELECT delivery_id, state, artifact_url, evidence FROM deliveries WHERE order_id = ?"
     ).bind(job.order_id).first();
     if (!existingDelivery) return json({ ok: false, error: "DELIVERY_PERSISTENCE_FAILED" }, 500, requestOrigin, allowedOrigin);
+    let savedDeliveryEvidence;
+    try { savedDeliveryEvidence = JSON.parse(String(existingDelivery.evidence || "")); } catch {}
+    if (existingDelivery.artifact_url !== artifactUrl || savedDeliveryEvidence?.artifact_sha256 !== artifactHash) {
+      return json({ ok: false, error: "DELIVERY_ARTIFACT_CONFLICT" }, 409, requestOrigin, allowedOrigin);
+    }
     finalDeliveryId = String(existingDelivery.delivery_id);
+    deliveryState = String(existingDelivery.state || "");
   }
-  await env.BRAIN_DB.prepare("UPDATE orders SET state = 'READY' WHERE order_id = ? AND state = 'PAYMENT_VERIFIED'").bind(job.order_id).run();
-  return json({ ok: true, state: "SUCCESS", job_id: jobId, delivery_id: finalDeliveryId, order_state: "READY" }, 200, requestOrigin, allowedOrigin);
+
+  // Re-running this update repairs a prior failure after job/delivery persistence.
+  const orderUpdate = await env.BRAIN_DB.prepare(
+    "UPDATE orders SET state = 'READY' WHERE order_id = ? AND state = 'PAYMENT_VERIFIED'"
+  ).bind(job.order_id).run();
+  let orderState = "READY";
+  if (Number(orderUpdate.meta?.changes || 0) !== 1) {
+    const order = await env.BRAIN_DB.prepare("SELECT state FROM orders WHERE order_id = ?").bind(job.order_id).first();
+    if (!order || !["READY", "COMPLETED"].includes(String(order.state))) {
+      return json({ ok: false, error: "ORDER_STATE_RECOVERY_FAILED" }, 409, requestOrigin, allowedOrigin);
+    }
+    orderState = String(order.state);
+  }
+  if (!["READY", "DELIVERED"].includes(deliveryState)) {
+    return json({ ok: false, error: "DELIVERY_STATE_RECOVERY_FAILED" }, 409, requestOrigin, allowedOrigin);
+  }
+  return json({ ok: true, state: "SUCCESS", job_id: jobId, delivery_id: finalDeliveryId, order_state: orderState, recovery: alreadySuccessful }, 200, requestOrigin, allowedOrigin);
 }
 
 async function claimNextJob(request, env, requestOrigin, allowedOrigin) {

@@ -100,6 +100,12 @@ assert.match(worker, /completeJob/);
 assert.match(worker, /WHERE job_id = \? AND state = 'RUNNING'/, "job completion must use compare-and-set to prevent concurrent completion");
 assert.match(worker, /JOB_COMPLETION_RACE/, "concurrent completion must fail closed");
 assert.match(worker, /DELIVERY_PERSISTENCE_FAILED/, "completion must not claim success if delivery persistence failed");
+assert.match(worker, /const alreadySuccessful = job\.state === "SUCCESS"/, "retry must resume a job after a partial completion write");
+assert.match(worker, /JOB_ALREADY_COMPLETED_WITH_DIFFERENT_ARTIFACT/, "recovery must reject a different artifact for an already-successful job");
+assert.match(worker, /const evidenceText = alreadySuccessful\s*\? JSON\.stringify\(savedEvidence\)/, "recovery must reuse persisted evidence instead of caller-supplied metadata");
+assert.match(worker, /DELIVERY_ARTIFACT_CONFLICT/, "recovery must reject an existing delivery with different artifact evidence");
+assert.match(worker, /ORDER_STATE_RECOVERY_FAILED/, "recovery must fail closed when the order state cannot be repaired");
+assert.match(worker, /recovery: alreadySuccessful/, "completion response must identify recovery retries");
 assert.match(worker, /STRUCTURED_RESULT_EVIDENCE_REQUIRED/, "job completion must reject free-form evidence");
 assert.match(worker, /HTTPS_ARTIFACT_URL_REQUIRED/, "job completion must require an HTTPS delivery artifact");
 assert.match(worker, /BRAIN_DELIVERY_ALLOWED_ORIGINS/, "delivery artifacts must use an explicitly configured origin allowlist");
@@ -108,7 +114,7 @@ assert.match(worker, /ARTIFACT_SHA256_REQUIRED/, "job completion must require a 
 assert.match(worker, /artifact_sha256/, "delivery evidence must bind the artifact digest");
 assert.match(worker, /JOB_NOT_RUNNING/);
 assert.match(worker, /state = 'SUCCESS'/);
-assert.match(worker, /order_state: "READY"/);
+assert.match(worker, /order_state: orderState/, "completion response must return the reconciled order state");
 
 assert.match(worker, /confirmDelivery/);
 assert.match(worker, /DELIVERY_NOT_READY/);
