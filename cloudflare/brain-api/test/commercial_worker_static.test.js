@@ -102,7 +102,7 @@ assert.match(worker, /JOB_COMPLETION_RACE/, "concurrent completion must fail clo
 assert.match(worker, /DELIVERY_PERSISTENCE_FAILED/, "completion must not claim success if delivery persistence failed");
 assert.match(worker, /const alreadySuccessful = job\.state === "SUCCESS"/, "retry must resume a job after a partial completion write");
 assert.match(worker, /JOB_ALREADY_COMPLETED_WITH_DIFFERENT_ARTIFACT/, "recovery must reject a different artifact for an already-successful job");
-assert.match(worker, /const evidenceText = alreadySuccessful\\s*\\? JSON\\.stringify\\(savedEvidence\\)/, "recovery must reuse persisted evidence instead of caller-supplied metadata");
+assert.match(worker, /const evidenceText = alreadySuccessful\s*\? JSON\.stringify\(savedEvidence\)/, "recovery must reuse persisted evidence instead of caller-supplied metadata");
 assert.match(worker, /DELIVERY_ARTIFACT_CONFLICT/, "recovery must reject an existing delivery with different artifact evidence");
 assert.match(worker, /ORDER_STATE_RECOVERY_FAILED/, "recovery must fail closed when the order state cannot be repaired");
 assert.match(worker, /recovery: alreadySuccessful/, "completion response must identify recovery retries");
