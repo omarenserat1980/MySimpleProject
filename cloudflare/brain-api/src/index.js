@@ -964,21 +964,23 @@ async function completeJob(request, env, requestOrigin, allowedOrigin) {
   }
   const job = await env.BRAIN_DB.prepare("SELECT job_id, order_id, state, result_evidence FROM service_jobs WHERE job_id = ?").bind(jobId).first();
   if (!job) return json({ ok: false, error: "JOB_NOT_FOUND" }, 404, requestOrigin, allowedOrigin);
-  const evidenceText = JSON.stringify({ ...evidenceObject, artifact_url: artifactUrl, artifact_sha256: artifactHash });
-
   // A retry may resume after SUCCESS if a prior delivery/order write failed.
   // Only the exact artifact already recorded for this job can resume recovery.
   const alreadySuccessful = job.state === "SUCCESS";
   if (job.state !== "RUNNING" && !alreadySuccessful) {
     return json({ ok: false, error: "JOB_NOT_RUNNING" }, 409, requestOrigin, allowedOrigin);
   }
+  let savedEvidence = null;
   if (alreadySuccessful) {
-    let savedEvidence;
     try { savedEvidence = JSON.parse(String(job.result_evidence || "")); } catch {}
     if (!savedEvidence || savedEvidence.artifact_url !== artifactUrl || savedEvidence.artifact_sha256 !== artifactHash) {
       return json({ ok: false, error: "JOB_ALREADY_COMPLETED_WITH_DIFFERENT_ARTIFACT" }, 409, requestOrigin, allowedOrigin);
     }
   }
+  // During recovery, reuse the persisted evidence rather than accepting caller-supplied metadata.
+  const evidenceText = alreadySuccessful
+    ? JSON.stringify(savedEvidence)
+    : JSON.stringify({ ...evidenceObject, artifact_url: artifactUrl, artifact_sha256: artifactHash });
 
   // Verify bytes independently before any new state mutation, including recovery.
   const artifactVerification = await verifyDeliveryArtifact(parsedArtifactUrl, artifactHash);
