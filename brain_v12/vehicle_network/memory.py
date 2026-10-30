@@ -135,7 +135,7 @@ def main() -> None:
     parser.add_argument("command", choices=("init", "status"))
     parser.add_argument("--db", dest="db_path")
     args = parser.parse_args()
-    path = initialize(args.db_path) if args.command == "init" else (Path(args.db_path) if args.db_path else DEFAULT_DB_PATH)
+    path = initialize(args.db_path) if args.command in {"init", "status"} else DEFAULT_DB_PATH
     if args.command == "status":
         data = summary(path)
         print(f"Database: {data['database']}")
