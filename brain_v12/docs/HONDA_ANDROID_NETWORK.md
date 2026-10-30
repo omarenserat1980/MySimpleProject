@@ -17,9 +17,10 @@ Initialize and inspect:
 ```bash
 python -m brain_v12.vehicle_network.memory init
 python -m brain_v12.vehicle_network.memory status
+python -m brain_v12.vehicle_network.diagnostics
 ```
 
-This uses Python's standard-library sqlite3 module; no paid service or external database is required.
+This uses Python's standard-library sqlite3 module; no paid service or external database is required. The diagnostics command performs read-only phone-side checks of Android USB properties and network interfaces, then stores a summary in SQLite. It does not change tethering or USB mode and cannot establish whether the head unit supports RNDIS host mode.
 
 ## Current baseline (conversation-derived; not all independently verified)
 
