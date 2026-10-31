@@ -1,0 +1,57 @@
+name: BRAIN Automotive HeadSwap Debug APK
+
+on:
+  push:
+    branches: [brain/automotive-intelligence-lab]
+    paths:
+      - 'third_party/headswap'
+      - 'scripts/apply_brain_headswap_branding.py'
+      - 'docs/BRAIN_HEADSWAP_UPSTREAM_INTEGRATION.md'
+      - '.github/workflows/brain-automotive-headswap-android.yml'
+  pull_request:
+    paths:
+      - 'third_party/headswap'
+      - 'scripts/apply_brain_headswap_branding.py'
+      - 'docs/BRAIN_HEADSWAP_UPSTREAM_INTEGRATION.md'
+      - '.github/workflows/brain-automotive-headswap-android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: brain-automotive-headswap-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with pinned upstream submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Apply reproducible BRAIN debug branding
+        run: python3 scripts/apply_brain_headswap_branding.py
+      - name: Build debug APK
+        working-directory: third_party/headswap/android
+        run: chmod +x ./gradlew && ./gradlew --no-daemon assembleDebug
+      - name: Verify APK and checksum
+        run: |
+          APK=third_party/headswap/android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          sha256sum "$APK" | tee brain-headswap-debug.sha256
+          $ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/aapt dump badging "$APK" | head -5
+      - name: Upload BRAIN CarLife Bridge debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-carlife-bridge-headswap-debug
+          path: |
+            third_party/headswap/android/app/build/outputs/apk/debug/app-debug.apk
+            brain-headswap-debug.sha256
+          if-no-files-found: error
