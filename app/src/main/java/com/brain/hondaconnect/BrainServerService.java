@@ -30,7 +30,12 @@ public class BrainServerService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        startForeground(1001, notification());
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(1001, notification(),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        } else {
+            startForeground(1001, notification());
+        }
         startServer();
     }
 
