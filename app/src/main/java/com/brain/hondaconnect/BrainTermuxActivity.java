@@ -23,11 +23,14 @@ public class BrainTermuxActivity extends Activity {
     private final Map<String,String> env = new HashMap<>();
     private final ExecutorService network = Executors.newSingleThreadExecutor();
     private File brainHome;
+    private File currentDir;
     private String lastJobId = "";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         brainHome = new File(getFilesDir(), "brain_home");
+        brainHome.mkdirs();
+        currentDir = brainHome;
         new File(brainHome, "bin").mkdirs();
         new File(brainHome, "brain").mkdirs();
         new File(brainHome, "cinematic_output").mkdirs();
@@ -38,7 +41,7 @@ public class BrainTermuxActivity extends Activity {
         env.put("BRAIN_RUNTIME", "BRAIN_TERMUX_EMULATOR");
         env.put("BRAIN_PORT", "8787");
         buildUi();
-        print("BRAIN TERMUX EMULATOR v4.0\\nNative BRAIN command runtime.\\nNo Termux installation required.\\nCloud Hub bridge enabled.\\nType 'help'.\\n$ ");
+        print("BRAIN TERMUX EMULATOR v4.0" + System.lineSeparator() + "Native BRAIN command runtime." + System.lineSeparator() + "No Termux installation required." + System.lineSeparator() + "Cloud Hub bridge enabled." + System.lineSeparator() + "Type 'help'." + System.lineSeparator() + "$ ");
     }
 
     private void buildUi() {
@@ -92,22 +95,39 @@ public class BrainTermuxActivity extends Activity {
     private String execute(String cmd) {
         if (cmd.equals("help")) return
             "BRAIN Termux Emulator commands:\n" +
-            "  pwd | ls | cd DIR\n" +
+            "  pwd | ls [DIR] | cd [DIR]\n" +
             "  mkdir NAME | touch NAME | rm NAME\n" +
             "  cat NAME | echo TEXT | env\n" +
             "  status | health | brain | processes\n" +
             "  factory TITLE | job ID | ffmpeg | qc ID\n" +
             "  clear | exit\n" +
             "External Termux packages are not required.";
-        if (cmd.equals("pwd")) return brainHome.getAbsolutePath();
-        if (cmd.equals("ls")) {
-            File[] files = brainHome.listFiles();
-            if (files == null) return "";
-            StringBuilder s = new StringBuilder();
-            for (File f : files) s.append(f.getName()).append(f.isDirectory()?"/  ":"  ");
-            return s.toString();
+        if (cmd.equals("pwd")) return currentDir.getAbsolutePath();
+        if (cmd.equals("ls") || cmd.startsWith("ls ")) {
+            try {
+                String target = cmd.equals("ls") ? "." : cmd.substring(3).trim();
+                File directory = resolve(target);
+                if (!directory.isDirectory()) return "not a directory: " + target;
+                File[] files = directory.listFiles();
+                if (files == null) return "cannot list directory";
+                StringBuilder s = new StringBuilder();
+                for (File f : files) s.append(f.getName()).append(f.isDirectory()?"/  ":"  ");
+                return s.length() == 0 ? "(empty)" : s.toString();
+            } catch(Exception e) { return "error: " + e.getMessage(); }
         }
-        if (cmd.startsWith("cd ")) { try { return "cwd -> " + resolve(cmd.substring(3)).getAbsolutePath(); } catch(Exception e) { return "error: " + e.getMessage(); } }
+        if (cmd.equals("cd") || cmd.startsWith("cd ")) {
+            try {
+                if (cmd.equals("cd")) {
+                    currentDir = brainHome;
+                    return "cwd -> " + currentDir.getAbsolutePath();
+                }
+                String target = cmd.substring(3).trim();
+                File directory = resolve(target);
+                if (!directory.isDirectory()) return "not a directory: " + target;
+                currentDir = directory;
+                return "cwd -> " + currentDir.getAbsolutePath();
+            } catch(Exception e) { return "error: " + e.getMessage(); }
+        }
         if (cmd.startsWith("mkdir ")) { try { File f=resolve(cmd.substring(6)); return f.mkdirs() ? "created "+f.getName() : "exists/failed"; } catch(Exception e){return "error: "+e.getMessage();} }
         if (cmd.startsWith("touch ")) {
             try { File f=resolve(cmd.substring(6)); if(f.exists()||f.createNewFile()) return "created "+f.getName(); }
@@ -154,7 +174,7 @@ public class BrainTermuxActivity extends Activity {
     private File resolve(String path) throws IOException {
         if(path == null || path.trim().isEmpty() || path.startsWith("/")) throw new SecurityException("absolute paths are blocked");
         File base=brainHome.getCanonicalFile();
-        File f=new File(base,path).getCanonicalFile();
+        File f=new File(currentDir, path).getCanonicalFile();
         String prefix=base.getPath()+File.separator;
         if(!f.getPath().equals(base.getPath()) && !f.getPath().startsWith(prefix)) throw new SecurityException("path escapes BRAIN HOME");
         return f;
