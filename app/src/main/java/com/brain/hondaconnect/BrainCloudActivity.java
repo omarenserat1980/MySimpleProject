@@ -23,7 +23,7 @@ public class BrainCloudActivity extends Activity {
         root.addView(title);
 
         TextView info = new TextView(this);
-        info.setText("الهاتف = عقدة BRAIN Cloud Hub محلية. السيرفر يعمل في الخلفية على المنفذ 8787.");
+        info.setText("الهاتف = عقدة BRAIN محلية. نقطة الخدمة محصورة على 127.0.0.1:8787 ولا تُعرض على شبكة Wi-Fi.");
         info.setTextColor(Color.LTGRAY);
         info.setPadding(0,20,0,20);
         root.addView(info);
@@ -73,7 +73,7 @@ public class BrainCloudActivity extends Activity {
             Intent i = new Intent(this, BrainServerService.class);
             if (android.os.Build.VERSION.SDK_INT >= 26) startForegroundService(i);
             else startService(i);
-            serverStatus.setText("🟢 BRAIN Phone Server يعمل على 0.0.0.0:8787");
+            serverStatus.setText("🟢 BRAIN Phone Server يعمل محلياً على 127.0.0.1:8787");
         } catch (Exception e) {
             serverStatus.setText("فشل التشغيل: " + e.getMessage());
         }

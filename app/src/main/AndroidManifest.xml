@@ -1,18 +1,35 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <application android:theme="@style/AppTheme" android:label="BRAIN Cloud Hub">
-        <activity android:name=".BrainBrowserActivity" android:exported="false"/>
-        <activity android:name=".BrainCloudActivity" android:exported="true">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:theme="@style/AppTheme"
+        android:label="BRAIN Cloud Hub"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <activity
+            android:name=".BrainBrowserActivity"
+            android:exported="false" />
+        <activity
+            android:name=".BrainCloudActivity"
+            android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".BrainTermuxActivity" android:exported="false"/>
-        <activity android:name=".MainActivity" android:exported="false"/>
-        <service android:name=".BrainServerService" android:exported="false" android:foregroundServiceType="dataSync"/>
+        <activity
+            android:name=".BrainTermuxActivity"
+            android:exported="false" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="false" />
+
+        <service
+            android:name=".BrainServerService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

@@ -77,11 +77,14 @@ public class BrainBrowserActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setDatabaseEnabled(true);
+        s.setAllowFileAccess(false);
+        s.setAllowContentAccess(false);
+        if (android.os.Build.VERSION.SDK_INT >= 26) s.setSafeBrowsingEnabled(true);
         s.setBuiltInZoomControls(false);
         s.setDisplayZoomControls(false);
         s.setSupportZoom(true);
         s.setMediaPlaybackRequiresUserGesture(false);
-        s.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         s.setUserAgentString(s.getUserAgentString() + " BRAINBrowser/1.0");
         web.setBackgroundColor(Color.BLACK);
         web.setWebViewClient(new BrowserClient());
