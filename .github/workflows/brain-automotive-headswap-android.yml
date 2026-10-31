@@ -38,6 +38,22 @@ jobs:
           java-version: '17'
       - name: Apply reproducible BRAIN debug branding
         run: python3 scripts/apply_brain_headswap_branding.py
+      - name: Fetch pinned public Android Auto JVC test credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="https://raw.githubusercontent.com/opencardev/aasdk/9bf6adf933665dee26532201719fac14a047ccf1/cert"
+          DEST="third_party/headswap/android/app/src/main/assets/aa/jvc"
+          mkdir -p "$DEST"
+          curl --fail --location --silent --show-error "$SRC/headunit.crt" -o "$DEST/cert.pem"
+          curl --fail --location --silent --show-error "$SRC/headunit.key" -o "$DEST/key.pem"
+          test -s "$DEST/cert.pem"
+          test -s "$DEST/key.pem"
+          openssl x509 -in "$DEST/cert.pem" -noout -subject -issuer
+          CERT_PUB="$(openssl x509 -in "$DEST/cert.pem" -pubkey -noout | openssl pkey -pubin -outform DER | sha256sum | cut -d' ' -f1)"
+          KEY_PUB="$(openssl pkey -in "$DEST/key.pem" -pubout -outform DER | sha256sum | cut -d' ' -f1)"
+          test "$CERT_PUB" = "$KEY_PUB"
+          echo "Public JVC test certificate and key pair verified."
       - name: Build debug APK
         working-directory: third_party/headswap/android
         run: chmod +x ./gradlew && ./gradlew --no-daemon assembleDebug
