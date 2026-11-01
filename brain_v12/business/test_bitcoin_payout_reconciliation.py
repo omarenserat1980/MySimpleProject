@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime, timezone
 
 from brain_v12.business.bitcoin_payout_reconciliation import audit_realized_bitcoin_payout
 
@@ -31,7 +32,7 @@ def chain(**overrides):
             {"address": "bc1qother", "value_sats": 9000},
         ],
         "source_url": f"https://mempool.space/tx/{TXID}",
-        "observed_at": "2026-10-14T10:00:00Z",
+        "observed_at": datetime.now(timezone.utc).isoformat(),
     }
     return data | overrides
 
