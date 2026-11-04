@@ -1,6 +1,6 @@
 {
   "schema": "brain-human-intermediary-state/v1",
-  "updated_at": "2026-11-04T15:21:26.590507+00:00",
+  "updated_at": "2026-11-04T21:28:58.155867+00:00",
   "max_phase": 0,
   "max_step": 5,
   "regression_blocked": false,
