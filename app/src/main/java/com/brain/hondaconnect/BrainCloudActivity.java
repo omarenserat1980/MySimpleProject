@@ -28,6 +28,10 @@ public class BrainCloudActivity extends Activity {
         info.setPadding(0,20,0,20);
         root.addView(info);
 
+        Button carlife = new Button(this);
+        carlife.setText("CarLife MD · Phone Sender / USB Diagnostics");
+        root.addView(carlife);
+
         Button start = new Button(this);
         start.setText("▶ تشغيل BRAIN Phone Server");
         root.addView(start);
@@ -61,6 +65,7 @@ public class BrainCloudActivity extends Activity {
         setContentView(root);
         refreshStatus();
 
+        carlife.setOnClickListener(v -> startActivity(new Intent(this, CarLifeMdActivity.class)));
         start.setOnClickListener(v -> startServer());
         stop.setOnClickListener(v -> stopServer());
         browser.setOnClickListener(v -> startActivity(new Intent(this, BrainBrowserActivity.class)));
