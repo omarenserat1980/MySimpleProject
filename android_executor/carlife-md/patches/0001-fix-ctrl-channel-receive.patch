@@ -1,0 +1,73 @@
+diff --git a/LibSource/core/CTranRecvPackageProcess.cpp b/LibSource/core/CTranRecvPackageProcess.cpp
+index 4f8a516..1e03ab4 100644
+--- a/LibSource/core/CTranRecvPackageProcess.cpp
++++ b/LibSource/core/CTranRecvPackageProcess.cpp
+@@ -306,6 +306,14 @@ bool CTranRecvPackageProcess::receivePackageHead() {
+ 			CCarLifeLog::carLifeLogLnWithPrefix("-> cmd package head is received");
+ 			break;
+ 
++		case CTRL_CHANNEL:
++			if(!CConnectManager::getInstance()->readCtrlData(recvPackage.packageHead, CTRL_HEAD_LEN)) {
++				CCarLifeLog::carLifeLogLnWithPrefix("-> ctrl package head is failed");
++				return false;
++			}
++			CCarLifeLog::carLifeLogLnWithPrefix("-> ctrl package head is received");
++			break;
++
+ 		case VIDEO_CHANNEL:
+ 			if(!CConnectManager::getInstance()->readVideoData(recvPackage.packageHead,VIDEO_HEAD_LEN)) {
+ 				CCarLifeLog::carLifeLogLnWithPrefix("-> video package head is failed");
+@@ -959,6 +967,15 @@ bool CTranRecvPackageProcess::receivePackageData() {
+ 			break;
+ 
+ 		case CTRL_CHANNEL:
++			if(analyzedHead.packageDataSize > CTRL_DATA_SIZE) {
++				CCarLifeLog::carLifeLogLnWithPrefix("CTRL channel receive data length > CTRL_DATA_SIZE !");
++				return false;
++			}
++			if(!CConnectManager::getInstance()->readCtrlData(recvPackage.packageData, analyzedHead.packageDataSize)) {
++				CCarLifeLog::carLifeLogLnWithPrefix("-> ctrl package data receive failed!");
++				return false;
++			}
++			CCarLifeLog::carLifeLogLnWithPrefix("-> ctrl package data is received");
+ 			break;
+ 
+ 		default:
+diff --git a/LibSource/include/CConnectManager.h b/LibSource/include/CConnectManager.h
+index 45414e8..094a7bd 100644
+--- a/LibSource/include/CConnectManager.h
++++ b/LibSource/include/CConnectManager.h
+@@ -94,6 +94,7 @@ public:
+ 	bool readTTSData(u8*data, u32 len);
+ 
+ 	bool readVRData(u8*data, u32 len);
++	bool readCtrlData(u8*data, u32 len);
+ 	bool writeVRData(u8*data, u32 len);
+ 
+ 	bool writeCtrlData(u8*data, u32 len);
+diff --git a/LibSource/utility/CConnectManager.cpp b/LibSource/utility/CConnectManager.cpp
+index 34a1c5a..35eb4c0 100644
+--- a/LibSource/utility/CConnectManager.cpp
++++ b/LibSource/utility/CConnectManager.cpp
+@@ -415,6 +415,21 @@ bool CConnectManager::readVRData(u8*data, u32 len) {
+ 	return true;
+ }
+ 
++bool CConnectManager::readCtrlData(u8*data, u32 len) {
++	if(NULL==ctrlSocket || NULL==ctrlSocket->iSocket) {
++		CCarLifeLog::carLifeLogLnWithPrefix("ctrlSocket is null!");
++		return false;
++	}
++
++	if(!ctrlSocket->iSocket->recv(data, len)) {
++		ctrlSocket->setConnectStatus(false);
++		CCarLifeLog::carLifeLogLnWithPrefix("ctrl socket.recv is failed!");
++		return false;
++	}
++
++	return true;
++}
++
+ bool CConnectManager::writeVRData(u8*data, u32 len) {
+ 	if(NULL==vrSocket) {
+ 		CCarLifeLog::carLifeLogLnWithPrefix("vrSocket is null!");

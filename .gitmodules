@@ -1,0 +1,3 @@
+[submodule "android_executor/carlife-md/upstream"]
+	path = android_executor/carlife-md/upstream
+	url = https://github.com/Doris-duo/CarLife-MD-Lib.git
