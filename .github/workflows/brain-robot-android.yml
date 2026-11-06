@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - "app/**"
+      - "android_executor/carlife-md/upstream/**"
+      - "android_executor/carlife-md/native/**"
       - "build.gradle"
       - "settings.gradle"
       - "gradle.properties"
@@ -11,6 +13,8 @@ on:
   pull_request:
     paths:
       - "app/**"
+      - "android_executor/carlife-md/upstream/**"
+      - "android_executor/carlife-md/native/**"
       - "build.gradle"
       - "settings.gradle"
       - "gradle.properties"
@@ -22,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
