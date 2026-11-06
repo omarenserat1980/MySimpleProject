@@ -5,6 +5,7 @@ on:
     paths:
       - "app/**"
       - "android_executor/carlife-md/upstream/**"
+      - "android_executor/carlife-md/**"
       - "android_executor/carlife-md/native/**"
       - "build.gradle"
       - "settings.gradle"
@@ -32,6 +33,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Run CarLife MD protocol inventory tests
+        run: python3 android_executor/carlife-md/tests/test_protocol_inventory.py
       - name: Prepare Android native dependency closure
         run: |
           sudo apt-get update
