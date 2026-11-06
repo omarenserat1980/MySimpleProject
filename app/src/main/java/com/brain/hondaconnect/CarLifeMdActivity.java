@@ -168,8 +168,9 @@ public class CarLifeMdActivity extends Activity {
         out.append("CarLife connection setup is intentionally not invoked until MD IP/interface are verified.\n");
         out.append("Authentication / active session / video / audio: NOT IMPLEMENTED YET\n\n");
         out.append("USB transport diagnostics (read-only)\n");
-        UsbManager manager = (UsbManager) getSystemService(USB_SERVICE);
-        if (manager == null) {
+        try {
+            UsbManager manager = (UsbManager) getSystemService(USB_SERVICE);
+            if (manager == null) {
             out.append("UsbManager: UNAVAILABLE\n");
         } else {
             UsbAccessory[] accessories = manager.getAccessoryList();
@@ -184,7 +185,8 @@ public class CarLifeMdActivity extends Activity {
                        .append("\nDescription: ").append(accessory.getDescription())
                        .append("\nVersion: ").append(accessory.getVersion())
                        .append("\nURI: ").append(accessory.getUri())
-                       .append("\nSerial: ").append(accessory.getSerial());
+                       // Serial access is restricted on some Android releases; do not query it.
+                       .append("\nSerial: NOT READ (privacy/permission-safe)\n");
                 }
             }
             HashMap<String, UsbDevice> devices = manager.getDeviceList();
@@ -211,6 +213,11 @@ public class CarLifeMdActivity extends Activity {
                 }
                 out.append('\n');
             }
+            }
+        } catch (Throwable usbError) {
+            out.append("USB scan error (contained): ")
+               .append(usbError.getClass().getSimpleName())
+               .append(": ").append(usbError.getMessage()).append('\n');
         }
         out.append("\nRead-only USB inspection only; no permission request, CarLife handshake, or media streaming was started.\n\n");
         report.setText(out.toString());
