@@ -28,6 +28,11 @@ android {
     }
 
     packaging {
+        jniLibs {
+            // Keep vendor CarLife ELF files byte-for-byte; stripping can rewrite
+            // their dynamic sections and invalidate the Android linker hash data.
+            keepDebugSymbols += ['**/*.so*']
+        }
         resources {
             excludes += ['/META-INF/{AL2.0,LGPL2.1}']
         }

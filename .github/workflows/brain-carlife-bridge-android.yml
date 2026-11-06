@@ -68,8 +68,10 @@ jobs:
           set -euo pipefail
           APK=app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
-          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbraincarlife_jni.so'
-          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libcarlifevehicle.so'
+          echo "Native entries packaged in APK:"
+          unzip -l "$APK" | grep 'lib/arm64-v8a/' || true
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbraincarlife_jni.so' || { echo "Missing JNI bridge library" >&2; exit 1; }
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libcarlifevehicle.so' || { echo "Missing CarLife vehicle library" >&2; exit 1; }
           mkdir -p "$RUNNER_TEMP/apk-native"
           unzip -o "$APK" 'lib/arm64-v8a/*.so*' -d "$RUNNER_TEMP/apk-native" >/dev/null
           for library in "$RUNNER_TEMP"/apk-native/lib/arm64-v8a/*.so*; do

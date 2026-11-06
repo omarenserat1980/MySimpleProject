@@ -4,6 +4,8 @@ ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SRC="$ROOT/app/src/main/assets/carlife-native/arm64-v8a"
 DEST="$ROOT/app/src/main/jniLibs/arm64-v8a"
 mkdir -p "$DEST"
+# Remove stale unversioned aliases from earlier packaging experiments.
+rm -f "$DEST/libicudata.so" "$DEST/libicuuc.so" "$DEST/libxml2.so" "$DEST/libz.so"
 
 # Preserve the vendor ELF images byte-for-byte. In particular, do not run
 # patchelf on libcarlifevehicle.so: its original PT_LOAD layout and GNU hash
