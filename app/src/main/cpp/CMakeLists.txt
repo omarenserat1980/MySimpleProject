@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(braincarlife_jni LANGUAGES CXX)
 
+# Do not embed Termux/CI host paths in Android ELF RUNPATH. Android resolves
+# app-bundled dependencies through the app linker namespace instead.
+set(CMAKE_SKIP_RPATH TRUE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+
 if(NOT ANDROID_ABI STREQUAL "arm64-v8a")
     message(FATAL_ERROR "CarLife MD native bridge currently supports arm64-v8a only")
 endif()
@@ -25,4 +30,5 @@ target_include_directories(braincarlife_jni PRIVATE "${CARLIFE_INCLUDE}")
 target_link_directories(braincarlife_jni PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/arm64-v8a")
 target_compile_features(braincarlife_jni PRIVATE cxx_std_17)
 target_compile_options(braincarlife_jni PRIVATE -Wall -Wextra -Werror=return-type)
+target_link_options(braincarlife_jni PRIVATE -Wl,--disable-new-dtags)
 target_link_libraries(braincarlife_jni PRIVATE carlifevehicle log)

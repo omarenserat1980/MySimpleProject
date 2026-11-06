@@ -1,25 +1,14 @@
 package com.brain.hondaconnect;
 
-/** Narrow JNI boundary to the pinned CarLife MD C++ library. */
+/** JNI methods; loading is centralized in CarLifeNativeLoader. */
 final class CarLifeJni {
-    private static boolean bridgeLoaded;
-    private static String loadError = "";
     private CarLifeJni() {}
 
-    static synchronized boolean loadBridge() {
-        if (bridgeLoaded) return true;
-        try {
-            System.loadLibrary("braincarlife_jni");
-            bridgeLoaded = true;
-            return true;
-        } catch (Throwable error) {
-            loadError = error.getClass().getSimpleName() + ": " + error.getMessage();
-            android.util.Log.e("BrainCarLifeJNI", "Failed to load JNI bridge", error);
-            return false;
-        }
+    static boolean loadBridge() {
+        return CarLifeNativeLoader.load(null);
     }
 
-    static synchronized String error() { return loadError; }
+    static String error() { return CarLifeNativeLoader.error(); }
 
     static native int nativeInitialize();
     static native int nativeConnectionSetup(String mdIp, String interfaceName);

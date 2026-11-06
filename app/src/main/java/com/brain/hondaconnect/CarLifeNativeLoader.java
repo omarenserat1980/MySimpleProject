@@ -3,7 +3,7 @@ package com.brain.hondaconnect;
 import android.content.Context;
 import android.os.Build;
 
-/** Loads the JNI bridge from Android's nativeLibraryDir, where its ELF dependencies are packaged. */
+/** Loads the JNI bridge; its native dependency closure is packaged beside it in lib/arm64-v8a. */
 final class CarLifeNativeLoader {
     private static boolean loaded;
     private static String failure = "";
@@ -15,7 +15,6 @@ final class CarLifeNativeLoader {
             return false;
         }
         try {
-            // The JNI .so and its complete DT_NEEDED closure live together in nativeLibraryDir.
             System.loadLibrary("braincarlife_jni");
             loaded = true;
             return true;
