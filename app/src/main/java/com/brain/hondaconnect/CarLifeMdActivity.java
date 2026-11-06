@@ -46,6 +46,7 @@ public class CarLifeMdActivity extends Activity {
         boolean jniLoaded = nativeReady && CarLifeJni.loadBridge();
         int initResult = jniLoaded ? CarLifeJni.nativeInitialize() : -1;
         out.append("\nJNI bridge: ").append(jniLoaded ? "LOADED" : "NOT LOADED").append('\n');
+        if (!jniLoaded) out.append("JNI loader error: ").append(CarLifeJni.error()).append('\n');
         out.append("Native library init: ").append(initResult == 0 ? "PASS" : "NOT VERIFIED (" + initResult + ")").append('\n');
         out.append("Transport status: NOT CONNECTED\n");
         out.append("CarLife connection setup is intentionally not invoked until MD IP/interface are verified.\n");
