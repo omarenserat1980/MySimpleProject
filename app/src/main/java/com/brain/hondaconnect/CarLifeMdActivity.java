@@ -15,7 +15,7 @@ import java.util.HashMap;
 
 /** Phone-side MD diagnostics: native library load and USB descriptor discovery. */
 public class CarLifeMdActivity extends Activity {
-    private static final String BUILD_ID = "md-jni-probe-20261106-r1";
+    private static final String BUILD_ID = "md-network-probe-20261106-r2";
     private TextView report;
 
     @Override public void onCreate(Bundle state) {
@@ -39,6 +39,84 @@ public class CarLifeMdActivity extends Activity {
         refresh();
     }
 
+    private void appendNetworkDiagnostics(StringBuilder out) {
+        out.append("\nMD network diagnostics (read-only)\n");
+        try {
+            android.net.ConnectivityManager cm =
+                (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            android.net.Network active = cm == null ? null : cm.getActiveNetwork();
+            if (active == null) {
+                out.append("Active network: NONE\n");
+            } else {
+                out.append("Active network: PRESENT\n");
+                android.net.NetworkCapabilities caps = cm.getNetworkCapabilities(active);
+                if (caps != null) {
+                    out.append("Transports:");
+                    if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI)) out.append(" WIFI");
+                    if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR)) out.append(" CELLULAR");
+                    if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)) out.append(" ETHERNET");
+                    if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH)) out.append(" BLUETOOTH");
+                    if (caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) out.append(" VPN");
+                    out.append("\nValidated internet: ").append(caps.hasCapability(
+                        android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)).append('\n');
+                }
+                android.net.LinkProperties lp = cm.getLinkProperties(active);
+                if (lp != null) {
+                    out.append("Active interface: ").append(lp.getInterfaceName()).append('\n');
+                    out.append("Active link addresses: ");
+                    for (android.net.LinkAddress address : lp.getLinkAddresses()) {
+                        out.append(address.getAddress().getHostAddress()).append(' ');
+                    }
+                    out.append('\n');
+                    out.append("Active routes: ");
+                    for (android.net.RouteInfo route : lp.getRoutes()) {
+                        out.append(route.toString()).append(" | ");
+                    }
+                    out.append('\n');
+                    out.append("DNS: ");
+                    for (java.net.InetAddress dns : lp.getDnsServers()) {
+                        out.append(dns.getHostAddress()).append(' ');
+                    }
+                    out.append('\n');
+                } else {
+                    out.append("Active link properties: UNAVAILABLE\n");
+                }
+            }
+        } catch (SecurityException error) {
+            out.append("Connectivity permission error: ").append(error.getMessage()).append('\n');
+        } catch (Throwable error) {
+            out.append("Connectivity diagnostic error: ").append(error.getClass().getSimpleName())
+               .append(": ").append(error.getMessage()).append('\n');
+        }
+
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> interfaces =
+                java.net.NetworkInterface.getNetworkInterfaces();
+            if (interfaces == null) {
+                out.append("Interface enumeration: UNAVAILABLE\n");
+                return;
+            }
+            while (interfaces.hasMoreElements()) {
+                java.net.NetworkInterface nif = interfaces.nextElement();
+                out.append("Interface ").append(nif.getName())
+                   .append(" up=").append(nif.isUp())
+                   .append(" loopback=").append(nif.isLoopback())
+                   .append(" mtu=").append(nif.getMTU()).append(" addresses=");
+                java.util.Enumeration<java.net.InetAddress> addresses = nif.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    java.net.InetAddress address = addresses.nextElement();
+                    out.append(address.getHostAddress());
+                    if (address instanceof java.net.Inet6Address) out.append("(IPv6)");
+                    out.append(' ');
+                }
+                out.append('\n');
+            }
+        } catch (Throwable error) {
+            out.append("Interface enumeration error: ").append(error.getClass().getSimpleName())
+               .append(": ").append(error.getMessage()).append('\n');
+        }
+    }
+
     private void refresh() {
         StringBuilder out = new StringBuilder();
         out.append("MD build: ").append(BUILD_ID).append("\n");
@@ -52,6 +130,7 @@ public class CarLifeMdActivity extends Activity {
         } catch (Exception metadataError) {
             out.append("App metadata error: ").append(metadataError.getClass().getSimpleName()).append('\n');
         }
+        appendNetworkDiagnostics(out);
         boolean nativeReady = CarLifeNativeLoader.load(this);
         out.append("Native library: ").append(nativeReady ? "LOADED" : "NOT LOADED").append('\n');
         if (!nativeReady) out.append("Loader: ").append(CarLifeNativeLoader.error()).append('\n');
