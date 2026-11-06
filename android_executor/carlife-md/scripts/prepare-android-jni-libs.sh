@@ -23,10 +23,16 @@ patchelf --replace-needed libicudata.so.78 libicudata.so "$DEST/libicuuc.so"
 
 for f in "$DEST"/*.so; do
   readelf -h "$f" >/dev/null
+  # Match each ELF SONAME to its packaged filename and DT_NEEDED references.
+  patchelf --set-soname "$(basename "$f")" "$f"
   # Strip inherited host/Termux paths from every prebuilt dependency too.
   patchelf --remove-rpath "$f"
   if readelf -d "$f" | grep -E 'RPATH|RUNPATH'; then
     echo "Unexpected RPATH/RUNPATH in $(basename "$f")" >&2
+    exit 1
+  fi
+  if ! readelf -d "$f" | grep -F "SONAME" | grep -F "[$(basename "$f")]"; then
+    echo "SONAME does not match packaged filename: $(basename "$f")" >&2
     exit 1
   fi
 done

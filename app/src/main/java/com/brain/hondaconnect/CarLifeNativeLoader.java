@@ -15,8 +15,26 @@ final class CarLifeNativeLoader {
             return false;
         }
         try {
-            System.loadLibrary("braincarlife_jni");
+            // Load the provider explicitly before the JNI consumer. This also
+            // makes provider-load failures distinguishable from JNI failures.
+            try {
+                System.loadLibrary("carlifevehicle");
+            } catch (Throwable error) {
+                failure = "libcarlifevehicle load failed: "
+                        + error.getClass().getSimpleName() + ": " + error.getMessage();
+                android.util.Log.e("BrainCarLifeJNI", failure, error);
+                return false;
+            }
+            try {
+                System.loadLibrary("braincarlife_jni");
+            } catch (Throwable error) {
+                failure = "libbraincarlife_jni load failed: "
+                        + error.getClass().getSimpleName() + ": " + error.getMessage();
+                android.util.Log.e("BrainCarLifeJNI", failure, error);
+                return false;
+            }
             loaded = true;
+            failure = "";
             return true;
         } catch (Throwable error) {
             failure = error.getClass().getSimpleName() + ": " + error.getMessage();
