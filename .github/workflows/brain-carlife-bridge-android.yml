@@ -70,7 +70,7 @@ jobs:
           test -s "$APK"
           echo "Native entries packaged in APK:"
           unzip -l "$APK" | grep 'lib/arm64-v8a/' || true
-          for name in libbraincarlife_jni.so libcarlifevehicle.so libc++_shared.so libiconv.so libicudata.so libicuuc.so libxml2.so libz.so; do
+          for name in libbraincarlife_jni.so libcarlifevehicle.so libc++_shared.so libiconv.so libbicudata.so libbicuuc.so libbxml2.so libbz.so; do
             unzip -l "$APK" | grep -q "lib/arm64-v8a/$name" || { echo "Missing packaged library: $name" >&2; exit 1; }
           done
           mkdir -p "$RUNNER_TEMP/apk-native"
@@ -83,7 +83,7 @@ jobs:
           VEHICLE="$RUNNER_TEMP/apk-native/lib/arm64-v8a/libcarlifevehicle.so"
           SYMBOL='_ZN12CCarLifeLibH11CCarLifeLib14carLifeLibInitEv'
           readelf -d "$JNI" | grep 'libcarlifevehicle.so'
-          for pair in "libcarlifevehicle.so:libz.so" "libcarlifevehicle.so:libxml2.so" "libxml2.so:libz.so" "libxml2.so:libicuuc.so" "libicuuc.so:libicudata.so"; do
+          for pair in "libcarlifevehicle.so:libbz.so" "libcarlifevehicle.so:libbxml2.so" "libbxml2.so:libbz.so" "libbxml2.so:libbicuuc.so" "libbicuuc.so:libbicudata.so"; do
             parent="${pair%%:*}"; dependency="${pair#*:}"
             readelf -d "$RUNNER_TEMP/apk-native/lib/arm64-v8a/$parent" | grep -F "[$dependency]" >/dev/null
             test -s "$RUNNER_TEMP/apk-native/lib/arm64-v8a/$dependency"
