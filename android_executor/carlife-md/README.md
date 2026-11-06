@@ -66,3 +66,7 @@ and CTRL protocol tests remain pending.
 ## Android APK packaging update
 
 The phone app now stores all ARM64 native dependencies under `app/src/main/assets/carlife-native/arm64-v8a/` because Android Gradle Plugin only packages standard `.so` names from `jniLibs`; upstream runtime dependencies use versioned SONAMEs such as `libxml2.so.16`. `CarLifeNativeLoader` extracts and loads dependencies in SONAME order. `CarLifeMdActivity` exposes USB descriptor discovery. The APK build does not yet implement JNI calls into the C++ API, CarLife authentication/session setup, or media streaming.
+
+## Android JNI bridge (MD)
+
+The phone app now builds `libbraincarlife_jni.so` with the Android NDK and links it to the pinned ARM64 `libcarlifevehicle.so`. `CarLifeJni.nativeInitialize()` only initializes the library singleton; it does not open sockets or start a CarLife session. The explicit `nativeConnectionSetup(mdIp, interfaceName)` entry point validates an IPv4 address and interface-name length, and is deliberately not called by the diagnostics screen until the actual MD network route/interface is established. The no-argument upstream `connectionSetup()` is intentionally not exposed because it invokes `adb forward` commands. Authentication, callbacks, channel receive loops, USB bulk transport, and media streaming remain separate unfinished integration work.

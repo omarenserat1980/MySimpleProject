@@ -43,8 +43,13 @@ public class CarLifeMdActivity extends Activity {
         StringBuilder out = new StringBuilder();
         out.append("Native library: ").append(nativeReady ? "LOADED" : "NOT LOADED").append('\n');
         if (!nativeReady) out.append("Loader: ").append(CarLifeNativeLoader.error()).append('\n');
-        out.append("\nTransport status: NOT CONNECTED\n");
-        out.append("Session / authentication / media JNI: NOT IMPLEMENTED YET\n\n");
+        boolean jniLoaded = nativeReady && CarLifeJni.loadBridge();
+        int initResult = jniLoaded ? CarLifeJni.nativeInitialize() : -1;
+        out.append("\nJNI bridge: ").append(jniLoaded ? "LOADED" : "NOT LOADED").append('\n');
+        out.append("Native library init: ").append(initResult == 0 ? "PASS" : "NOT VERIFIED (" + initResult + ")").append('\n');
+        out.append("Transport status: NOT CONNECTED\n");
+        out.append("CarLife connection setup is intentionally not invoked until MD IP/interface are verified.\n");
+        out.append("Authentication / active session / video / audio: NOT IMPLEMENTED YET\n\n");
         out.append("USB discovery\n");
         UsbManager manager = (UsbManager) getSystemService(USB_SERVICE);
         HashMap<String, UsbDevice> devices = manager.getDeviceList();

@@ -6,6 +6,7 @@ on:
       - brain/honda-android-network-sqlite
     paths:
       - "app/**"
+      - "android_executor/carlife-md/upstream/LibSource/include/**"
       - "android_executor/carlife-md/native/**"
       - "build.gradle"
       - "settings.gradle"
@@ -15,6 +16,7 @@ on:
   pull_request:
     paths:
       - "app/**"
+      - "android_executor/carlife-md/upstream/LibSource/include/**"
       - "android_executor/carlife-md/native/**"
       - "build.gradle"
       - "settings.gradle"
@@ -41,6 +43,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+      - name: Install native build tools
+        run: sdkmanager "cmake;3.22.1" "ndk;27.2.12479018"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
       - name: Build debug APK
