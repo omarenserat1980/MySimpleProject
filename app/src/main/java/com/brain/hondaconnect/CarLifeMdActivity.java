@@ -15,6 +15,7 @@ import java.util.HashMap;
 
 /** Phone-side MD diagnostics: native library load and USB descriptor discovery. */
 public class CarLifeMdActivity extends Activity {
+    private static final String BUILD_ID = "md-jni-probe-20261106-r1";
     private TextView report;
 
     @Override public void onCreate(Bundle state) {
@@ -39,9 +40,8 @@ public class CarLifeMdActivity extends Activity {
     }
 
     private void refresh() {
-        boolean nativeReady = CarLifeNativeLoader.load(this);
         StringBuilder out = new StringBuilder();
-        out.append("MD build: ce5a4060-diagnostic\n");
+        out.append("MD build: ").append(BUILD_ID).append("\n");
         try {
             android.content.pm.PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
             out.append("App version: ").append(info.versionName)
@@ -52,12 +52,37 @@ public class CarLifeMdActivity extends Activity {
         } catch (Exception metadataError) {
             out.append("App metadata error: ").append(metadataError.getClass().getSimpleName()).append('\n');
         }
+        boolean nativeReady = CarLifeNativeLoader.load(this);
         out.append("Native library: ").append(nativeReady ? "LOADED" : "NOT LOADED").append('\n');
         if (!nativeReady) out.append("Loader: ").append(CarLifeNativeLoader.error()).append('\n');
-        boolean jniLoaded = nativeReady && CarLifeJni.loadBridge();
-        int initResult = jniLoaded ? CarLifeJni.nativeInitialize() : -1;
-        out.append("\nJNI bridge: ").append(jniLoaded ? "LOADED" : "NOT LOADED").append('\n');
-        if (!jniLoaded) out.append("JNI loader error: ").append(CarLifeJni.error()).append('\n');
+
+        boolean jniReady = false;
+        int probeResult = -1;
+        String jniError = "";
+        if (nativeReady) {
+            try {
+                probeResult = CarLifeJni.nativeBridgeProbe();
+                jniReady = probeResult == CarLifeJni.BRIDGE_PROBE_OK;
+                if (!jniReady) jniError = "Unexpected JNI probe value: 0x" + Integer.toHexString(probeResult);
+            } catch (Throwable error) {
+                jniError = error.getClass().getSimpleName() + ": " + error.getMessage();
+            }
+        } else {
+            jniError = CarLifeNativeLoader.error();
+        }
+        out.append("JNI bridge: ").append(jniReady ? "CALLABLE" : "NOT VERIFIED").append('\n');
+        out.append("JNI probe: ").append(probeResult < 0 ? "NOT RUN" : "0x" + Integer.toHexString(probeResult)).append('\n');
+        if (!jniReady) out.append("JNI diagnostic: ").append(jniError).append('\n');
+
+        int initResult = -1;
+        if (jniReady) {
+            try {
+                initResult = CarLifeJni.nativeInitialize();
+            } catch (Throwable error) {
+                out.append("Native init exception: ").append(error.getClass().getSimpleName())
+                   .append(": ").append(error.getMessage()).append('\n');
+            }
+        }
         out.append("Native library init: ").append(initResult == 0 ? "PASS" : "NOT VERIFIED (" + initResult + ")").append('\n');
         out.append("Transport status: NOT CONNECTED\n");
         out.append("CarLife connection setup is intentionally not invoked until MD IP/interface are verified.\n");

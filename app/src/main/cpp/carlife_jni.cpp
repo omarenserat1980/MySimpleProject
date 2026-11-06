@@ -18,6 +18,12 @@ CCarLifeLibH::CCarLifeLib* instance() { return CCarLifeLibH::CCarLifeLib::getIns
 }
 
 extern "C" JNIEXPORT jint JNICALL
+Java_com_brain_hondaconnect_CarLifeJni_nativeBridgeProbe(JNIEnv*, jclass) {
+    // Confirms that this exact JNI shared library is loaded and callable.
+    return static_cast<jint>(0x434C4D44);
+}
+
+extern "C" JNIEXPORT jint JNICALL
 Java_com_brain_hondaconnect_CarLifeJni_nativeInitialize(JNIEnv*, jclass) {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_initialized) return 0;
