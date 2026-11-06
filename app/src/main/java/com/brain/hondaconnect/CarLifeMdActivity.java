@@ -41,6 +41,17 @@ public class CarLifeMdActivity extends Activity {
     private void refresh() {
         boolean nativeReady = CarLifeNativeLoader.load(this);
         StringBuilder out = new StringBuilder();
+        out.append("MD build: ce5a4060-diagnostic\n");
+        try {
+            android.content.pm.PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            out.append("App version: ").append(info.versionName)
+               .append(" (").append(info.getLongVersionCode()).append(")\n");
+            out.append("APK source: ").append(getApplicationInfo().sourceDir).append('\n');
+            out.append("Native dir: ").append(getApplicationInfo().nativeLibraryDir).append('\n');
+            out.append("ABIs: ").append(java.util.Arrays.toString(android.os.Build.SUPPORTED_ABIS)).append('\n');
+        } catch (Exception metadataError) {
+            out.append("App metadata error: ").append(metadataError.getClass().getSimpleName()).append('\n');
+        }
         out.append("Native library: ").append(nativeReady ? "LOADED" : "NOT LOADED").append('\n');
         if (!nativeReady) out.append("Loader: ").append(CarLifeNativeLoader.error()).append('\n');
         boolean jniLoaded = nativeReady && CarLifeJni.loadBridge();
