@@ -62,3 +62,7 @@ MD branch on Termux. The script does not build an APK. The existing
 `android_executor/app` module is not yet proven to be the CarLife-MD phone app
 and currently has no native library loading configuration. APK integration
 and CTRL protocol tests remain pending.
+
+## Android APK packaging update
+
+The phone app now stores all ARM64 native dependencies under `app/src/main/assets/carlife-native/arm64-v8a/` because Android Gradle Plugin only packages standard `.so` names from `jniLibs`; upstream runtime dependencies use versioned SONAMEs such as `libxml2.so.16`. `CarLifeNativeLoader` extracts and loads dependencies in SONAME order. `CarLifeMdActivity` exposes USB descriptor discovery. The APK build does not yet implement JNI calls into the C++ API, CarLife authentication/session setup, or media streaming.
