@@ -70,20 +70,24 @@ jobs:
           test -s "$APK"
           echo "Native entries packaged in APK:"
           unzip -l "$APK" | grep 'lib/arm64-v8a/' || true
-          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbraincarlife_jni.so' || { echo "Missing JNI bridge library" >&2; exit 1; }
-          unzip -l "$APK" | grep -q 'lib/arm64-v8a/libcarlifevehicle.so' || { echo "Missing CarLife vehicle library" >&2; exit 1; }
+          for name in libbraincarlife_jni.so libcarlifevehicle.so libc++_shared.so libiconv.so libicudata.so libicuuc.so libxml2.so libz.so; do
+            unzip -l "$APK" | grep -q "lib/arm64-v8a/$name" || { echo "Missing packaged library: $name" >&2; exit 1; }
+          done
           mkdir -p "$RUNNER_TEMP/apk-native"
-          unzip -o "$APK" 'lib/arm64-v8a/*.so*' -d "$RUNNER_TEMP/apk-native" >/dev/null
-          for library in "$RUNNER_TEMP"/apk-native/lib/arm64-v8a/*.so*; do
+          unzip -o "$APK" 'lib/arm64-v8a/*.so' -d "$RUNNER_TEMP/apk-native" >/dev/null
+          for library in "$RUNNER_TEMP"/apk-native/lib/arm64-v8a/*.so; do
             readelf -h "$library" >/dev/null
             readelf -d "$library" | grep -q 'GNU_HASH\|HASH' || { echo "Missing hash table: $library" >&2; exit 1; }
           done
-          cmp -s app/src/main/assets/carlife-native/arm64-v8a/libcarlifevehicle.so "$RUNNER_TEMP/apk-native/lib/arm64-v8a/libcarlifevehicle.so"
           JNI="$RUNNER_TEMP/apk-native/lib/arm64-v8a/libbraincarlife_jni.so"
           VEHICLE="$RUNNER_TEMP/apk-native/lib/arm64-v8a/libcarlifevehicle.so"
           SYMBOL='_ZN12CCarLifeLibH11CCarLifeLib14carLifeLibInitEv'
           readelf -d "$JNI" | grep 'libcarlifevehicle.so'
-          readelf -d "$VEHICLE" | grep -E 'libz.so.1|libxml2.so.16'
+          for pair in "libcarlifevehicle.so:libz.so" "libcarlifevehicle.so:libxml2.so" "libxml2.so:libz.so" "libxml2.so:libicuuc.so" "libicuuc.so:libicudata.so"; do
+            parent="${pair%%:*}"; dependency="${pair#*:}"
+            readelf -d "$RUNNER_TEMP/apk-native/lib/arm64-v8a/$parent" | grep -F "[$dependency]" >/dev/null
+            test -s "$RUNNER_TEMP/apk-native/lib/arm64-v8a/$dependency"
+          done
           nm -D --undefined-only "$JNI" | grep -F "$SYMBOL"
           nm -D --defined-only "$VEHICLE" | grep -F "$SYMBOL"
           sha256sum "$APK"
