@@ -13,7 +13,10 @@ if(NOT EXISTS "${CARLIFE_LIBRARY}")
 endif()
 
 add_library(carlifevehicle SHARED IMPORTED GLOBAL)
-set_target_properties(carlifevehicle PROPERTIES IMPORTED_LOCATION "${CARLIFE_LIBRARY}")
+set_target_properties(carlifevehicle PROPERTIES
+    IMPORTED_LOCATION "${CARLIFE_LIBRARY}"
+    IMPORTED_SONAME "libcarlifevehicle.so"
+)
 
 add_library(braincarlife_jni SHARED carlife_jni.cpp)
 target_include_directories(braincarlife_jni PRIVATE "${CARLIFE_INCLUDE}")
