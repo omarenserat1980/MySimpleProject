@@ -70,3 +70,8 @@ The phone app now stores all ARM64 native dependencies under `app/src/main/asset
 ## Android JNI bridge (MD)
 
 The phone app now builds `libbraincarlife_jni.so` with the Android NDK and links it to the pinned ARM64 `libcarlifevehicle.so`. `CarLifeJni.nativeInitialize()` only initializes the library singleton; it does not open sockets or start a CarLife session. The explicit `nativeConnectionSetup(mdIp, interfaceName)` entry point validates an IPv4 address and interface-name length, and is deliberately not called by the diagnostics screen until the actual MD network route/interface is established. The no-argument upstream `connectionSetup()` is intentionally not exposed because it invokes `adb forward` commands. Authentication, callbacks, channel receive loops, USB bulk transport, and media streaming remain separate unfinished integration work.
+
+
+### Android linker namespace packaging fix
+
+The phone's `System.load()` of files extracted into `filesDir` did not make those dependencies discoverable to the classloader linker namespace when loading `libbraincarlife_jni.so` from the APK. The Android build now normalizes the pinned runtime's versioned ELF dependencies to unversioned `.so` filenames using `patchelf`, places the complete dependency closure in `app/src/main/jniLibs/arm64-v8a`, and loads the JNI bridge from Android's `nativeLibraryDir` with `System.loadLibrary`. The preparation script is `scripts/prepare-android-jni-libs.sh`; CI runs it before Gradle. This addresses library discovery only; it does not establish a CarLife session.

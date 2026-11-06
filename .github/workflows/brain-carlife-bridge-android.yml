@@ -52,6 +52,11 @@ jobs:
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses >/dev/null
           "$SDKMANAGER" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.2.12479018"
+      - name: Prepare Android native dependency closure
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+          bash android_executor/carlife-md/scripts/prepare-android-jni-libs.sh
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
       - name: Build debug APK
