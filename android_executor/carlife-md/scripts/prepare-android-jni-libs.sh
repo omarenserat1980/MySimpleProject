@@ -3,44 +3,23 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SRC="$ROOT/app/src/main/assets/carlife-native/arm64-v8a"
 DEST="$ROOT/app/src/main/jniLibs/arm64-v8a"
-command -v patchelf >/dev/null || { echo 'patchelf is required' >&2; exit 2; }
 mkdir -p "$DEST"
+
+# Preserve the vendor ELF images byte-for-byte. In particular, do not run
+# patchelf on libcarlifevehicle.so: its original PT_LOAD layout and GNU hash
+# table are required by Android's linker.
 cp "$SRC/libc++_shared.so" "$DEST/libc++_shared.so"
 cp "$SRC/libcarlifevehicle.so" "$DEST/libcarlifevehicle.so"
 cp "$SRC/libiconv.so" "$DEST/libiconv.so"
-cp "$SRC/libicudata.so.78" "$DEST/libicudata.so"
-cp "$SRC/libicuuc.so.78" "$DEST/libicuuc.so"
-cp "$SRC/libxml2.so.16" "$DEST/libxml2.so"
-cp "$SRC/libz.so.1" "$DEST/libz.so"
+cp "$SRC/libicudata.so.78" "$DEST/libicudata.so.78"
+cp "$SRC/libicuuc.so.78" "$DEST/libicuuc.so.78"
+cp "$SRC/libxml2.so.16" "$DEST/libxml2.so.16"
+cp "$SRC/libz.so.1" "$DEST/libz.so.1"
 
-# Android's nativeLibraryDir reliably packages unversioned *.so names.
-# Normalize DT_NEEDED names to those packaged filenames.
-patchelf --replace-needed libz.so.1 libz.so "$DEST/libcarlifevehicle.so"
-patchelf --replace-needed libxml2.so.16 libxml2.so "$DEST/libcarlifevehicle.so"
-patchelf --replace-needed libz.so.1 libz.so "$DEST/libxml2.so"
-patchelf --replace-needed libicuuc.so.78 libicuuc.so "$DEST/libxml2.so"
-patchelf --replace-needed libicudata.so.78 libicudata.so "$DEST/libicuuc.so"
-
-for f in "$DEST"/*.so; do
+for f in "$DEST"/*.so "$DEST"/*.so.*; do
   readelf -h "$f" >/dev/null
-  # Match each ELF SONAME to its packaged filename and DT_NEEDED references.
-  patchelf --set-soname "$(basename "$f")" "$f"
-  # Strip inherited host/Termux paths from every prebuilt dependency too.
-  patchelf --remove-rpath "$f"
-  if readelf -d "$f" | grep -E 'RPATH|RUNPATH'; then
-    echo "Unexpected RPATH/RUNPATH in $(basename "$f")" >&2
-    exit 1
-  fi
-  if ! readelf -d "$f" | grep -F "SONAME" | grep -F "[$(basename "$f")]"; then
-    echo "SONAME does not match packaged filename: $(basename "$f")" >&2
-    exit 1
-  fi
+  readelf -d "$f" | grep -q 'GNU_HASH\|HASH' || { echo "Missing ELF hash table: $f" >&2; exit 1; }
 done
-
-echo 'Prepared Android native library directory:'
+cmp -s "$SRC/libcarlifevehicle.so" "$DEST/libcarlifevehicle.so"
+echo 'Prepared Android native libraries without rewriting vendor ELF files.'
 find "$DEST" -maxdepth 1 -type f -printf '%f\n' | sort
-echo 'Remaining non-system DT_NEEDED entries:'
-for f in "$DEST"/*.so; do
-  echo "[$(basename "$f")]"
-  readelf -d "$f" | grep NEEDED || true
-done

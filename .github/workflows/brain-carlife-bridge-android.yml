@@ -58,7 +58,6 @@ jobs:
       - name: Prepare Android native dependency closure
         run: |
           sudo apt-get update
-          sudo apt-get install -y patchelf
           bash android_executor/carlife-md/scripts/prepare-android-jni-libs.sh
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
@@ -72,19 +71,17 @@ jobs:
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libbraincarlife_jni.so'
           unzip -l "$APK" | grep -q 'lib/arm64-v8a/libcarlifevehicle.so'
           mkdir -p "$RUNNER_TEMP/apk-native"
-          unzip -o "$APK" 'lib/arm64-v8a/*.so' -d "$RUNNER_TEMP/apk-native" >/dev/null
-          for library in "$RUNNER_TEMP"/apk-native/lib/arm64-v8a/*.so; do
-            name="$(basename "$library")"
-            if readelf -d "$library" | grep -E 'RPATH|RUNPATH'; then
-              echo "Unexpected RPATH/RUNPATH in $name" >&2
-              exit 1
-            fi
-            readelf -d "$library" | grep -F "SONAME" | grep -F "[$name]"
+          unzip -o "$APK" 'lib/arm64-v8a/*.so*' -d "$RUNNER_TEMP/apk-native" >/dev/null
+          for library in "$RUNNER_TEMP"/apk-native/lib/arm64-v8a/*.so*; do
+            readelf -h "$library" >/dev/null
+            readelf -d "$library" | grep -q 'GNU_HASH\|HASH' || { echo "Missing hash table: $library" >&2; exit 1; }
           done
+          cmp -s app/src/main/assets/carlife-native/arm64-v8a/libcarlifevehicle.so "$RUNNER_TEMP/apk-native/lib/arm64-v8a/libcarlifevehicle.so"
           JNI="$RUNNER_TEMP/apk-native/lib/arm64-v8a/libbraincarlife_jni.so"
           VEHICLE="$RUNNER_TEMP/apk-native/lib/arm64-v8a/libcarlifevehicle.so"
           SYMBOL='_ZN12CCarLifeLibH11CCarLifeLib14carLifeLibInitEv'
           readelf -d "$JNI" | grep 'libcarlifevehicle.so'
+          readelf -d "$VEHICLE" | grep -E 'libz.so.1|libxml2.so.16'
           nm -D --undefined-only "$JNI" | grep -F "$SYMBOL"
           nm -D --defined-only "$VEHICLE" | grep -F "$SYMBOL"
           sha256sum "$APK"
