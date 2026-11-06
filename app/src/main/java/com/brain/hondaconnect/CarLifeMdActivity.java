@@ -1,6 +1,7 @@
 package com.brain.hondaconnect;
 
 import android.app.Activity;
+import android.hardware.usb.UsbAccessory;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
@@ -15,7 +16,7 @@ import java.util.HashMap;
 
 /** Phone-side MD diagnostics: native library load and USB descriptor discovery. */
 public class CarLifeMdActivity extends Activity {
-    private static final String BUILD_ID = "md-network-probe-20261106-r2";
+    private static final String BUILD_ID = "md-usb-accessory-probe-20261106-r3";
     private TextView report;
 
     @Override public void onCreate(Bundle state) {
@@ -166,32 +167,52 @@ public class CarLifeMdActivity extends Activity {
         out.append("Transport status: NOT CONNECTED\n");
         out.append("CarLife connection setup is intentionally not invoked until MD IP/interface are verified.\n");
         out.append("Authentication / active session / video / audio: NOT IMPLEMENTED YET\n\n");
-        out.append("USB discovery\n");
+        out.append("USB transport diagnostics (read-only)\n");
         UsbManager manager = (UsbManager) getSystemService(USB_SERVICE);
-        HashMap<String, UsbDevice> devices = manager.getDeviceList();
-        if (devices.isEmpty()) out.append("No USB device currently enumerated. Connect the HU with a data-capable USB cable.\n");
-        for (UsbDevice device : devices.values()) {
-            out.append("\nDevice: ").append(device.getDeviceName())
-               .append("\nVID: 0x").append(Integer.toHexString(device.getVendorId()))
-               .append("  PID: 0x").append(Integer.toHexString(device.getProductId()))
-               .append("\nClass: ").append(device.getDeviceClass())
-               .append(" Subclass: ").append(device.getDeviceSubclass())
-               .append(" Protocol: ").append(device.getDeviceProtocol());
-            for (int i = 0; i < device.getInterfaceCount(); i++) {
-                UsbInterface intf = device.getInterface(i);
-                out.append("\n  Interface ").append(i).append(": class=").append(intf.getInterfaceClass())
-                   .append(" subclass=").append(intf.getInterfaceSubclass())
-                   .append(" protocol=").append(intf.getInterfaceProtocol());
-                for (int e = 0; e < intf.getEndpointCount(); e++) {
-                    UsbEndpoint ep = intf.getEndpoint(e);
-                    out.append("\n    Endpoint ").append(e).append(": address=0x")
-                       .append(Integer.toHexString(ep.getAddress())).append(" type=").append(ep.getType())
-                       .append(" direction=").append(ep.getDirection()).append(" maxPacket=").append(ep.getMaxPacketSize());
+        if (manager == null) {
+            out.append("UsbManager: UNAVAILABLE\n");
+        } else {
+            UsbAccessory[] accessories = manager.getAccessoryList();
+            if (accessories == null || accessories.length == 0) {
+                out.append("USB accessory: NONE ENUMERATED\n");
+            } else {
+                for (int i = 0; i < accessories.length; i++) {
+                    UsbAccessory accessory = accessories[i];
+                    out.append("\nUSB accessory ").append(i)
+                       .append("\nManufacturer: ").append(accessory.getManufacturer())
+                       .append("\nModel: ").append(accessory.getModel())
+                       .append("\nDescription: ").append(accessory.getDescription())
+                       .append("\nVersion: ").append(accessory.getVersion())
+                       .append("\nURI: ").append(accessory.getUri())
+                       .append("\nSerial: ").append(accessory.getSerial());
                 }
             }
-            out.append('\n');
+            HashMap<String, UsbDevice> devices = manager.getDeviceList();
+            out.append("\nUSB host devices: ").append(devices.size()).append('\n');
+            if (devices.isEmpty()) out.append("No USB host devices enumerated (this can be normal in accessory mode).\n");
+            for (UsbDevice device : devices.values()) {
+                out.append("\nDevice: ").append(device.getDeviceName())
+                   .append("\nVID: 0x").append(Integer.toHexString(device.getVendorId()))
+                   .append("  PID: 0x").append(Integer.toHexString(device.getProductId()))
+                   .append("\nClass: ").append(device.getDeviceClass())
+                   .append(" Subclass: ").append(device.getDeviceSubclass())
+                   .append(" Protocol: ").append(device.getDeviceProtocol());
+                for (int i = 0; i < device.getInterfaceCount(); i++) {
+                    UsbInterface intf = device.getInterface(i);
+                    out.append("\n  Interface ").append(i).append(": class=").append(intf.getInterfaceClass())
+                       .append(" subclass=").append(intf.getInterfaceSubclass())
+                       .append(" protocol=").append(intf.getInterfaceProtocol());
+                    for (int e = 0; e < intf.getEndpointCount(); e++) {
+                        UsbEndpoint ep = intf.getEndpoint(e);
+                        out.append("\n    Endpoint ").append(e).append(": address=0x")
+                           .append(Integer.toHexString(ep.getAddress())).append(" type=").append(ep.getType())
+                           .append(" direction=").append(ep.getDirection()).append(" maxPacket=").append(ep.getMaxPacketSize());
+                    }
+                }
+                out.append('\n');
+            }
         }
-        out.append("\nThis screen only enumerates descriptors; it does not claim a CarLife handshake or video/audio streaming.");
+        out.append("\nRead-only USB inspection only; no permission request, CarLife handshake, or media streaming was started.\n\n");
         report.setText(out.toString());
     }
 }
