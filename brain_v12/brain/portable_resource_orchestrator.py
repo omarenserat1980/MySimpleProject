@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from hashlib import sha256
 import json
+import math
 from typing import Any, Iterable
 
 
@@ -20,10 +21,13 @@ class ResourceDemand:
     timeout_seconds: int = 300
 
     def __post_init__(self) -> None:
-        if self.cpu_cores < 0 or self.memory_mb < 0 or self.disk_mb < 0:
-            raise ValueError("resource demand cannot be negative")
-        if self.gpu_count < 0 or self.timeout_seconds <= 0:
-            raise ValueError("gpu_count must be non-negative and timeout_seconds positive")
+        if isinstance(self.cpu_cores, bool) or not isinstance(self.cpu_cores, (int, float)) or not math.isfinite(float(self.cpu_cores)) or self.cpu_cores < 0:
+            raise ValueError("INVALID_CPU_DEMAND")
+        for name, value in (("memory_mb", self.memory_mb), ("disk_mb", self.disk_mb), ("gpu_count", self.gpu_count), ("timeout_seconds", self.timeout_seconds)):
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError(f"INVALID_{name.upper()}")
+        if self.memory_mb < 0 or self.disk_mb < 0 or self.gpu_count < 0 or self.timeout_seconds <= 0:
+            raise ValueError("INVALID_RESOURCE_DEMAND")
 
 
 @dataclass(frozen=True)
@@ -45,10 +49,15 @@ class ExecutorCapacity:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if not self.executor_id:
+        if not isinstance(self.executor_id, str) or not self.executor_id.strip():
             raise ValueError("executor_id is required")
-        if min(self.cpu_cores, self.memory_mb, self.disk_mb, self.gpu_count, self.estimated_cost) < 0:
-            raise ValueError("executor capacity and cost cannot be negative")
+        if isinstance(self.cpu_cores, bool) or not isinstance(self.cpu_cores, (int, float)) or not math.isfinite(float(self.cpu_cores)) or self.cpu_cores < 0:
+            raise ValueError("INVALID_EXECUTOR_CPU_CAPACITY")
+        for name, value in (("memory_mb", self.memory_mb), ("disk_mb", self.disk_mb), ("gpu_count", self.gpu_count)):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"INVALID_EXECUTOR_{name.upper()}")
+        if isinstance(self.estimated_cost, bool) or not isinstance(self.estimated_cost, (int, float)) or not math.isfinite(float(self.estimated_cost)) or self.estimated_cost < 0:
+            raise ValueError("INVALID_EXECUTOR_COST")
         if self.currency != "USD":
             raise ValueError("cost estimates must be normalized to USD before scheduling")
 
@@ -60,6 +69,18 @@ class LocalResourceBudget:
     max_memory_mb_per_task: int = 256
     max_disk_mb_per_task: int = 512
     max_concurrent_tasks: int = 1
+
+    def __post_init__(self) -> None:
+        cpu = self.max_cpu_cores_per_task
+        if isinstance(cpu, bool) or not isinstance(cpu, (int, float)) or not math.isfinite(float(cpu)) or cpu < 0:
+            raise ValueError("INVALID_LOCAL_CPU_BUDGET")
+        for name, value in (
+            ("max_memory_mb_per_task", self.max_memory_mb_per_task),
+            ("max_disk_mb_per_task", self.max_disk_mb_per_task),
+            ("max_concurrent_tasks", self.max_concurrent_tasks),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"INVALID_LOCAL_{name.upper()}")
 
 
 @dataclass(frozen=True)
@@ -74,10 +95,12 @@ class ScheduleRequest:
     intent: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        if not self.task_id or not self.capability:
+        if not isinstance(self.task_id, str) or not self.task_id.strip() or not isinstance(self.capability, str) or not self.capability.strip():
             raise ValueError("task_id and capability are required")
-        if self.max_cost_usd < 0:
-            raise ValueError("max_cost_usd cannot be negative")
+        if isinstance(self.max_cost_usd, bool) or not isinstance(self.max_cost_usd, (int, float)) or not math.isfinite(float(self.max_cost_usd)) or self.max_cost_usd < 0:
+            raise ValueError("INVALID_MAX_COST")
+        if not isinstance(self.allow_paid, bool):
+            raise ValueError("allow_paid must be a boolean")
         if not self.allow_paid and self.max_cost_usd != 0:
             raise ValueError("nonzero max_cost_usd requires allow_paid=True")
 
@@ -105,7 +128,7 @@ def intent_digest(request: ScheduleRequest) -> str:
         "required_permissions": sorted(request.required_permissions),
         "intent": request.intent,
     }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     return sha256(encoded.encode("utf-8")).hexdigest()
 
 
@@ -165,6 +188,10 @@ class PortableResourceOrchestrator:
                 reason = "PERMISSION_MISSING"
             elif not _fits(request.demand, executor):
                 reason = "INSUFFICIENT_CAPACITY"
+            elif executor.tier in {"PAID_EXTERNAL", "PAID_CLOUD"} and not allow_paid:
+                # Tier policy is authoritative even when a provider reports a
+                # zero/unknown estimate; a $0 estimate is not proof of free use.
+                reason = "PAID_DISABLED"
             elif executor.estimated_cost > 0 and not allow_paid:
                 reason = "PAID_DISABLED"
             elif executor.estimated_cost > request.max_cost_usd:

@@ -138,3 +138,97 @@ class PortableResourceOrchestratorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PortableResourceOrchestratorInvalidNumericTests(unittest.TestCase):
+    def test_resource_demand_rejects_non_finite_and_boolean_cpu(self):
+        for value in (float("nan"), float("inf"), float("-inf"), True):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    ResourceDemand(cpu_cores=value)
+
+    def test_resource_demand_rejects_boolean_integer_capacity_fields(self):
+        for field in ("memory_mb", "disk_mb", "gpu_count", "timeout_seconds"):
+            with self.subTest(field=field):
+                with self.assertRaises(ValueError):
+                    ResourceDemand(**{field: True})
+
+    def test_executor_capacity_rejects_non_finite_cpu_and_cost(self):
+        for field, value in (
+            ("cpu_cores", float("nan")),
+            ("cpu_cores", float("inf")),
+            ("estimated_cost", float("nan")),
+            ("estimated_cost", float("inf")),
+            ("estimated_cost", True),
+        ):
+            with self.subTest(field=field, value=value):
+                args = {
+                    "executor_id": "invalid",
+                    "capabilities": frozenset({"python.test"}),
+                    "cpu_cores": 2,
+                    "memory_mb": 1024,
+                    "disk_mb": 1024,
+                }
+                args[field] = value
+                with self.assertRaises(ValueError):
+                    ExecutorCapacity(**args)
+
+    def test_executor_capacity_rejects_boolean_integer_fields(self):
+        for field in ("memory_mb", "disk_mb", "gpu_count"):
+            with self.subTest(field=field):
+                args = {
+                    "executor_id": "invalid",
+                    "capabilities": frozenset({"python.test"}),
+                    "cpu_cores": 2,
+                    "memory_mb": 1024,
+                    "disk_mb": 1024,
+                }
+                args[field] = True
+                with self.assertRaises(ValueError):
+                    ExecutorCapacity(**args)
+
+    def test_schedule_request_rejects_non_finite_and_boolean_cost(self):
+        for value in (float("nan"), float("inf"), float("-inf"), True):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    ScheduleRequest(
+                        task_id="invalid-cost",
+                        capability="python.test",
+                        max_cost_usd=value,
+                    )
+
+    def test_intent_digest_rejects_non_canonical_nan(self):
+        request = ScheduleRequest(
+            task_id="nan-intent",
+            capability="python.test",
+            intent={"unsafe": float("nan")},
+        )
+        with self.assertRaises(ValueError):
+            intent_digest(request)
+
+
+class PortableResourceOrchestratorCostAndBudgetGateTests(unittest.TestCase):
+    def test_paid_tier_with_zero_estimated_cost_stays_blocked_without_opt_in(self):
+        paid = ExecutorCapacity(
+            executor_id="paid-but-zero-estimate",
+            capabilities=frozenset({"python.test"}),
+            cpu_cores=8,
+            memory_mb=16000,
+            disk_mb=50000,
+            tier="PAID_CLOUD",
+            estimated_cost=0.0,
+        )
+        request = ScheduleRequest(task_id="no-spend", capability="python.test")
+        decision = PortableResourceOrchestrator().plan(request, [paid])
+        self.assertEqual(decision.status, "BLOCKED_NO_EXECUTOR")
+        self.assertEqual(decision.rejected[0]["reason"], "PAID_DISABLED")
+
+    def test_local_resource_budget_rejects_non_finite_and_boolean_values(self):
+        for value in (float("nan"), float("inf"), True):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    LocalResourceBudget(max_cpu_cores_per_task=value)
+        for field in ("max_memory_mb_per_task", "max_disk_mb_per_task", "max_concurrent_tasks"):
+            with self.subTest(field=field):
+                with self.assertRaises(ValueError):
+                    LocalResourceBudget(**{field: True})
