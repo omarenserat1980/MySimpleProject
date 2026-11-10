@@ -1,26 +1,30 @@
-"""Commercial operations API for Electronic Brain.
+"""Commercial operations API with durable case tracking.
 
-Evidence-first commercial case tracking. No external outreach, contracting,
-charging, withdrawal, or funds movement is performed by this API.
+Evidence references remain UNVERIFIED metadata and cannot advance commercial stages.
+No outreach, contracting, charging, withdrawal, or funds movement is performed.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from uuid import uuid4
+
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from brain_v12.business.commercial_case import CommercialCase
-from brain_v12.business.commercial_operations_dashboard import (
-    build_commercial_operations_dashboard,
-)
+from brain_v12.business.commercial_case_store import CommercialCaseStore
+from brain_v12.business.commercial_operations_dashboard import build_commercial_operations_dashboard
 from brain_v12.business.initial_monetization_catalog import INITIAL_MONETIZATION_CATALOG
-
-_CASES: dict[str, CommercialCase] = {}
+from .control_auth import require_control_key
 
 
 class CreateCommercialCase(BaseModel):
-    capability_id: str = Field(min_length=1)
-    case_id: str | None = None
-    prospect_evidence: str | None = None
+    capability_id: str = Field(min_length=1, max_length=120)
+    case_id: str | None = Field(default=None, min_length=1, max_length=120)
+
+
+class AddEvidenceReference(BaseModel):
+    evidence_type: str = Field(min_length=1, max_length=32)
+    evidence_ref: str = Field(min_length=1, max_length=1000)
 
 
 def _record(case: CommercialCase) -> dict:
@@ -40,10 +44,11 @@ def router() -> APIRouter:
     api = APIRouter(prefix="/api/commercial", tags=["commercial"])
 
     @api.get("/dashboard")
-    def dashboard() -> dict:
-        result = build_commercial_operations_dashboard(
-            INITIAL_MONETIZATION_CATALOG, list(_CASES.values())
-        )
+    def dashboard(request: Request) -> dict:
+        # The dashboard includes internal case identifiers and action queues.
+        require_control_key(request)
+        store = CommercialCaseStore()
+        result = build_commercial_operations_dashboard(INITIAL_MONETIZATION_CATALOG, store.list_cases())
         return {"ok": True, **result.to_record()}
 
     @api.get("/offers")
@@ -66,28 +71,44 @@ def router() -> APIRouter:
         }
 
     @api.get("/cases")
-    def cases() -> dict:
-        return {"ok": True, "cases": [_record(x) for x in _CASES.values()]}
+    def cases(request: Request) -> dict:
+        require_control_key(request)
+        return {"ok": True, "cases": [_record(x) for x in CommercialCaseStore().list_cases()]}
 
     @api.post("/cases")
-    def create_case(payload: CreateCommercialCase) -> dict:
-        offer = next(
-            (x for x in INITIAL_MONETIZATION_CATALOG
-             if x.capability_id == payload.capability_id),
-            None,
-        )
+    def create_case(request: Request, payload: CreateCommercialCase) -> dict:
+        require_control_key(request)
+        offer = next((x for x in INITIAL_MONETIZATION_CATALOG if x.capability_id == payload.capability_id), None)
         if offer is None:
             raise HTTPException(status_code=404, detail="UNKNOWN_CAPABILITY")
-        case_id = (payload.case_id or "").strip() or f"case-{len(_CASES)+1:04d}"
-        if case_id in _CASES:
-            raise HTTPException(status_code=409, detail="CASE_EXISTS")
-        case = CommercialCase(
-            case_id=case_id,
-            capability_id=offer.capability_id,
-            offer=offer.offer,
-            prospect_evidence=payload.prospect_evidence,
-        )
-        _CASES[case_id] = case
+        case_id = (payload.case_id or "").strip() or f"case-{uuid4().hex[:12]}"
+        case = CommercialCase(case_id=case_id, capability_id=offer.capability_id, offer=offer.offer)
+        try:
+            CommercialCaseStore().create_case(case)
+        except ValueError as exc:
+            if str(exc) == "CASE_EXISTS":
+                raise HTTPException(status_code=409, detail="CASE_EXISTS") from exc
+            raise
         return {"ok": True, "case": _record(case)}
+
+    @api.post("/cases/{case_id}/evidence-references")
+    def add_evidence_reference(request: Request, case_id: str, payload: AddEvidenceReference) -> dict:
+        require_control_key(request)
+        try:
+            case = CommercialCaseStore().add_evidence_reference(
+                case_id, payload.evidence_type, payload.evidence_ref
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if case is None:
+            raise HTTPException(status_code=404, detail="CASE_NOT_FOUND")
+        return {
+            "ok": True,
+            "case": _record(case),
+            "evidence_reference_state": "UNVERIFIED",
+            "stage_advanced": False,
+            "revenue_verified": False,
+            "note": "A reference is not proof; stage advancement requires independent verification.",
+        }
 
     return api
