@@ -1,0 +1,27 @@
+name: Durable Capability Evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'brain_v12/brain/prototype_capabilities.py'
+      - 'brain_v12/brain/evidence_store.py'
+      - 'brain_v12/tests/test_prototype_capabilities.py'
+      - '.github/workflows/durable-capability-evidence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  durable-capability-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt pytest
+      - name: Run capability prototype and durable evidence tests
+        run: python -m pytest -q brain_v12/tests/test_prototype_capabilities.py
