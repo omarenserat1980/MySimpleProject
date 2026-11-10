@@ -45,10 +45,36 @@ class VirtualServerFabricTests(unittest.TestCase):
     def test_host_observation_has_host_provenance_and_no_side_effects(self):
         observed = observe_host_capacity(".")
         self.assertEqual(observed.provenance, HOST_OBSERVED)
+        self.assertIn(observed.available_memory_source, {
+            "PROC_MEMINFO_MEMAVAILABLE", "WINDOWS_GLOBAL_MEMORY_STATUS_EX",
+            "CGROUP_V1_MEMORY_HEADROOM", "CGROUP_V2_MEMORY_HEADROOM", "UNAVAILABLE",
+        })
         self.assertGreaterEqual(observed.logical_cpus, 1)
         self.assertLessEqual(observed.logical_cpus, os.cpu_count() or 1)
         self.assertGreaterEqual(observed.available_memory_mib or 0, 0)
         self.assertIsNotNone(observed.available_disk_bytes)
+
+    def test_host_memory_observation_reports_tighter_cgroup_source(self):
+        from brain_v12.virtual_hardware import server_fabric
+
+        with patch.object(server_fabric, "_proc_available_memory_mib", return_value=2048):
+            with patch.object(server_fabric, "_cgroup_memory_available_observation",
+                              return_value=(512, "CGROUP_V2_MEMORY_HEADROOM")):
+                value, source = server_fabric._available_memory_observation()
+        self.assertEqual(value, 512)
+        self.assertEqual(source, "CGROUP_V2_MEMORY_HEADROOM")
+
+    def test_host_memory_observation_reports_windows_api_source(self):
+        from brain_v12.virtual_hardware import server_fabric
+
+        with patch.object(server_fabric.os, "name", "nt"):
+            with patch.object(server_fabric, "_proc_available_memory_mib", return_value=None):
+                with patch.object(server_fabric, "_windows_available_memory_mib", return_value=768):
+                    with patch.object(server_fabric, "_cgroup_memory_available_observation",
+                                      return_value=(None, "UNAVAILABLE")):
+                        value, source = server_fabric._available_memory_observation()
+        self.assertEqual(value, 768)
+        self.assertEqual(source, "WINDOWS_GLOBAL_MEMORY_STATUS_EX")
 
     def test_admission_rejects_unknown_host_capacity(self):
         host = HostCapacity(4, None, None, "Linux", "x86_64", HOST_OBSERVED)
