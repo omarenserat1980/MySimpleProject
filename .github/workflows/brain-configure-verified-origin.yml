@@ -108,10 +108,30 @@ jobs:
               if not (v14_ok and v14_ready):
                   raise SystemExit("BLOCKED: neither supported Brain health/readiness contract passed; BRAIN_ORIGIN was not saved.")
 
+          # General Brain readiness is not Cloud Executor issuer readiness.
+          # Do not persist an origin until the redacted attestation status confirms
+          # the issuer key, registry, executor enrollment, and trusted host binding.
+          attestation = get_json("/api/cloud-executor/attestation/status")
+          if not isinstance(attestation, dict):
+              raise SystemExit("BLOCKED: attestation status endpoint missing or invalid; BRAIN_ORIGIN was not saved.")
+          required = (
+              attestation.get("control_plane_configured") is True
+              and attestation.get("signing_key_present") is True
+              and attestation.get("registry_configured") is True
+              and isinstance(attestation.get("enrolled_executor_count"), int)
+              and attestation.get("enrolled_executor_count", 0) > 0
+              and isinstance(attestation.get("valid_host_binding_count"), int)
+              and attestation.get("valid_host_binding_count", 0) > 0
+          )
+          if not required:
+              raise SystemExit("BLOCKED: Cloud Executor attestation configuration is NOT_READY; BRAIN_ORIGIN was not saved.")
+          
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write("origin=" + value + "\n")
           print("BRAIN_RUNTIME_HEALTH=PASS")
           print("BRAIN_RUNTIME_READY=PASS")
+          print("BRAIN_ATTESTATION_CONFIGURATION=PASS")
+          print("BRAIN_LIVE_ATTESTATION_VERIFIED=NOT_CLAIMED")
           print("BRAIN_ORIGIN_NOT_PRINTED=true")
           PY
 
