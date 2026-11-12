@@ -18,10 +18,37 @@ import androidx.core.app.ActivityCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Base64
+import java.io.File
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     private lateinit var statusView: TextView
     private var pendingAttestationChallenge: ByteArray? = null
+    private var backupOperation: String = ""
+    private var backupStatus: TextView? = null
+    private var selectedBackupUri: Uri? = null
+
+    private val backupInput = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val outputName = if (backupOperation == "encrypt") "ElectronicBrain-Backup.ebkst" else "ElectronicBrain-Restored.tar"
+            backupOutput.launch(outputName)
+            selectedBackupUri = uri
+        } else {
+            backupStatus?.text = "Backup operation cancelled"
+        }
+    }
+
+    private val backupOutput = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { outputUri ->
+        val inputUri = selectedBackupUri
+        selectedBackupUri = null
+        if (outputUri == null || inputUri == null) {
+            backupStatus?.text = "Backup operation cancelled"
+            return@registerForActivityResult
+        }
+        runBackupOperation(inputUri, outputUri, backupOperation)
+    }
 
     private val createAttestationDocument = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -126,6 +153,45 @@ class MainActivity : ComponentActivity() {
                     .show()
             }
         }
+        val backupKeyStatus = TextView(this).apply {
+            text = "Backup key: not checked"
+            textSize = 14f
+            setPadding(0, 16, 0, 8)
+        }
+        backupStatus = backupKeyStatus
+        val inspectBackupKey = Button(this).apply {
+            text = "INITIALIZE / CHECK SECURE BACKUP KEY"
+            setOnClickListener {
+                backupKeyStatus.text = "Checking Android Keystore…"
+                Thread {
+                    try {
+                        val info = AndroidKeystoreBackup.initialize()
+                        runOnUiThread {
+                            backupKeyStatus.text = "Backup Keystore: AVAILABLE | Level: ${info.securityLevel} | Hardware-backed: ${info.insideSecureHardware} | Alias present: ${info.keyAliasPresent}"
+                        }
+                    } catch (t: Throwable) {
+                        runOnUiThread {
+                            backupKeyStatus.text = "Backup Keystore error: ${t.javaClass.simpleName}: ${t.message}"
+                        }
+                    }
+                }.start()
+            }
+        }
+        val encryptBackup = Button(this).apply {
+            text = "ENCRYPT BACKUP WITH ANDROID KEYSTORE"
+            setOnClickListener {
+                backupOperation = "encrypt"
+                backupInput.launch(arrayOf("*/*"))
+            }
+        }
+        val decryptBackup = Button(this).apply {
+            text = "RESTORE / DECRYPT BACKUP"
+            setOnClickListener {
+                backupOperation = "decrypt"
+                backupInput.launch(arrayOf("*/*"))
+            }
+        }
+
         val start = Button(this).apply {
             text = "START EXECUTOR"
             setOnClickListener {
@@ -173,6 +239,12 @@ class MainActivity : ComponentActivity() {
             })
             addView(agentId); addView(agentKey); addView(brainUrl)
             addView(identityProbe); addView(attestationChallenge); addView(exportAttestation)
+            addView(TextView(this@MainActivity).apply {
+                text = "DEVICE-BOUND SECURE BACKUP — KEEP THIS APP INSTALLATION AND ITS DATA INTACT"
+                textSize = 13f
+                setPadding(0, 24, 0, 8)
+            })
+            addView(inspectBackupKey); addView(encryptBackup); addView(decryptBackup); addView(backupKeyStatus)
             addView(start); addView(stop)
             addView(accessibility); addView(storage); addView(statusView)
             addView(TextView(this@MainActivity).apply {
@@ -182,4 +254,50 @@ class MainActivity : ComponentActivity() {
             })
         })
     }
+
+
+    private fun runBackupOperation(inputUri: Uri, outputUri: Uri, operation: String) {
+        backupStatus?.text = "Preparing secure file operation…"
+        Thread {
+            val token = UUID.randomUUID().toString()
+            val inputFile = File(cacheDir, "eb-input-$token.tmp")
+            val outputFile = File(cacheDir, "eb-output-$token.tmp")
+            try {
+                if (operation == "encrypt") {
+                    // Stream source directly into encryption; do not stage plaintext in cache.
+                    contentResolver.openInputStream(inputUri).use { source ->
+                        requireNotNull(source) { "Cannot read selected source" }
+                        AndroidKeystoreBackup.encryptStream(source, outputFile)
+                    }
+                } else {
+                    // Ciphertext may be staged privately; plaintext is produced only after GCM authentication.
+                    contentResolver.openInputStream(inputUri).use { source ->
+                        requireNotNull(source) { "Cannot read selected encrypted backup" }
+                        inputFile.outputStream().use { target -> source.copyTo(target) }
+                    }
+                    AndroidKeystoreBackup.decryptFile(inputFile, outputFile)
+                }
+                contentResolver.openOutputStream(outputUri, "w").use { target ->
+                    requireNotNull(target) { "Cannot open selected destination" }
+                    outputFile.inputStream().use { source -> source.copyTo(target) }
+                    target.flush()
+                }
+                runOnUiThread {
+                    backupStatus?.text = if (operation == "encrypt") {
+                        "ENCRYPTION COMPLETE — verify the .ebkst file before deleting any source"
+                    } else {
+                        "AUTHENTICATED DECRYPTION COMPLETE — restore archive is ready"
+                    }
+                }
+            } catch (t: Throwable) {
+                runOnUiThread {
+                    backupStatus?.text = "Backup failed: ${t.javaClass.simpleName}: ${t.message}"
+                }
+            } finally {
+                inputFile.delete()
+                outputFile.delete()
+            }
+        }.start()
+    }
+
 }
