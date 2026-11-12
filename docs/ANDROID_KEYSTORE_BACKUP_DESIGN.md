@@ -92,3 +92,5 @@ This is a device/app-installation-bound backup. Android Keystore keys are non-ex
 - Preserved the current `PhoneIdentityKeyStore` attestation/enrollment UI in `MainActivity.kt`; the backup key uses a separate alias and SAF controls were added alongside the existing identity flow.
 - Kept the Android Executor's existing service, permissions, network-security configuration, and other current-main code unchanged.
 - This clean branch must run CI independently. The earlier successful CI run validated the previous branch snapshot, not this integrated current-main snapshot.
+
+- Current-main CI run 43217326997: Gradle configuration and Kotlin compilation passed. The unit-test task exposed that the existing `BrainCapabilityContractTest.kt` imports JUnit 4 but the module lacked the JUnit dependency. Added `testImplementation("junit:junit:4.13.2")`; rerun CI to verify the tests and APK assembly.
