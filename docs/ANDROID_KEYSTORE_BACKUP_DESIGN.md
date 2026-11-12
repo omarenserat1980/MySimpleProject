@@ -80,4 +80,5 @@ This is a device/app-installation-bound backup. Android Keystore keys are non-ex
 - `git diff --check` passed after these edits. The Termux encrypted migration archive still does not exist.
 - Corrected the app Gradle DSL: moved `dependencies` outside the `android` block. The local build configuration had been structurally incorrect.
 - Aligned Android Gradle Plugin to 8.10.1 (Android SDK 36 support) and configured the dedicated GitHub Actions workflow to use JDK 17, Gradle 8.11.1, install Android SDK 36, compile Kotlin, run unit tests, assemble the debug APK, and upload it as an artifact.
-- CI execution has not yet been triggered or verified. No APK is claimed as built.
+- First GitHub Actions run (43215401987) reached the Android SDK setup step, then failed because `android-actions/setup-android@v3` attempted to install the obsolete SDK package `tools`. Kotlin compilation did not run in that attempt.
+- Removed that action and changed the workflow to use the runner's preinstalled Android command-line tools directly (`sdkmanager --licenses`, then install API 36/build-tools 36.0.0). A rerun is required; no APK is claimed as built.
