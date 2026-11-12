@@ -94,3 +94,11 @@ This is a device/app-installation-bound backup. Android Keystore keys are non-ex
 - This clean branch must run CI independently. The earlier successful CI run validated the previous branch snapshot, not this integrated current-main snapshot.
 
 - Current-main CI run 43217326997: Gradle configuration and Kotlin compilation passed. The unit-test task exposed that the existing `BrainCapabilityContractTest.kt` imports JUnit 4 but the module lacked the JUnit dependency. Added `testImplementation("junit:junit:4.13.2")`; rerun CI to verify the tests and APK assembly.
+
+## Current-main clean-branch CI result — 2026-11-12
+
+- GitHub Actions run `43217806227` passed Gradle configuration, Kotlin compilation, the existing JUnit unit test, debug APK assembly, and artifact upload on branch `brain/android-keystore-ci-clean`.
+- Downloaded APK: `app-debug.apk`, 5,877,686 bytes; package `com.electronicbrain.androidexecutor`; versionCode 2 / versionName 1.1.0; min SDK 26 / target SDK 36 / compile SDK 36.
+- ZIP integrity and APK v2 signature verification passed. It uses the standard Android Debug certificate, not a production signing key. APK SHA-256: `6c74259a09165b82d0d7ecb62e5282650ea961293ec8ad7fb3a322741b68144e`.
+- Pull request #1116 is open against the current `main`; GitHub reports it mergeable. Additional repository-wide PR checks are still pending. Do not merge until required checks finish and a maintainer reviews it.
+- The APK has not been installed on the Realme. Keystore runtime/hardware backing and tamper/round-trip tests remain unverified on-device. The Termux migration archive remains a separate pending task.
