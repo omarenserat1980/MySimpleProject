@@ -4,14 +4,21 @@ on:
   push:
     paths:
       - "android_executor/**"
+      - ".github/workflows/brain-android-executor.yml"
   pull_request:
     paths:
       - "android_executor/**"
+      - ".github/workflows/brain-android-executor.yml"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
     defaults:
       run:
         working-directory: android_executor
@@ -21,11 +28,32 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Accept Android SDK licenses
+        shell: bash
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+          test -x "$SDKMANAGER"
+          set +o pipefail
+          yes | "$SDKMANAGER" --licenses > /dev/null
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: "8.11.1"
+      - name: Verify Gradle configuration
+        run: gradle --no-daemon help
+      - name: Compile Kotlin sources
+        run: gradle --no-daemon :app:compileDebugKotlin
+      - name: Run unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest
       - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
+        run: gradle --no-daemon :app:assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: electronic-brain-android-executor-debug
           path: android_executor/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
