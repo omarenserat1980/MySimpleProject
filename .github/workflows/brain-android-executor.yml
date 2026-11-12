@@ -33,6 +33,7 @@ jobs:
         run: |
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
           test -x "$SDKMANAGER"
+          set +o pipefail
           yes | "$SDKMANAGER" --licenses > /dev/null
       - name: Install Android SDK 36
         shell: bash
